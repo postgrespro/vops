@@ -1,0 +1,5 @@
+# vops extension
+comment = 'Vectorized operations'
+default_version = '1.0'
+module_pathname = '$libdir/vops'
+relocatable = true
