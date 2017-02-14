@@ -313,6 +313,43 @@ create type vops_aggregates as(group_by int8, count int8, aggs float8[]);
 create function reduce(bigint) returns setof vops_aggregates;
 </pre>
 
+<p>
+But there is much simple and straightforward way of performing group aggregates using VOPS.
+We need to partition table by <i>group by</i> fields. In this case grouping keys will be stored in normal way and other fields - inside tiles.
+Now Postgres executor will execute VOPS aggregates for each group:
+</p>
+
+<pre>
+select
+    l_returnflag,
+    l_linestatus,
+    sum(l_quantity) as sum_qty,
+    sum(l_extendedprice) as sum_base_price,
+    sum(l_extendedprice*(1-l_discount)) as sum_disc_price,
+    sum(l_extendedprice*(1-l_discount)*(1+l_tax)) as sum_charge,
+    avg(l_quantity) as avg_qty,
+    avg(l_extendedprice) as avg_price,
+    avg(l_discount) as avg_disc,
+    countall(*) as count_order
+from
+    vops_lineitem_projection
+where
+    filter(l_shipdate &lt;= '1998-12-01'::date)
+group by
+    l_returnflag,
+    l_linestatus
+order by
+    l_returnflag,
+    l_linestatus;
+</pre>
+
+<p>
+In this example <code>l_returnflag</code> and <code>l_linestatus</code> fields of table vops_lineitem_projection have <code>"char"</code> type
+while all other used fields - tile types (<code>l_shipdate</code> has type <code>vops_date</code> and other fields - <code>vops_float4</code>).
+The query above is executed even faster than query with <code>reduce(map(...))</code>.
+The main problem with this approach is that you have to create projection for each combination of group by keys you want to use in queries.
+</p>
+
 <h3><a name="indexes">Using indexes</a></h3>
 <p>
 Analytic queries are usually performed on the data for which no indexes are defined. 
@@ -418,8 +455,43 @@ Example of populate function invocation:
 </p>
 
 <pre>
-select populate(destination := 'vops_lineitem'::regclass, source := 'lineitem'::regclass, sort := 'l_shipdate');
+select populate(destination := 'vops_lineitem'::regclass, source := 'lineitem'::regclass);
 </pre>
+
+<p>
+You can use populated table in queries performing sequential scan. VOPS operators can speed up filtering of records
+and calculation of aggregates. Aggregation with <code>group by</code> requires use of <code>reduce + map</code> functions.
+But as it was mentioned above in the section describing aggregates, it is possible to populate table in such way, 
+that standard Postgres grouping algorithm will be used. 
+</p>
+<p>
+We need to choose partitioning keys and sort original table by this keys.
+Combination of partitioning keys expected to be NOT unique - otherwise tiles can only increase used space and lead to performance degradation.
+But if there are a lot of duplicates, then "collapsing" them and storing other fields in tiles will help to reduce space and speed up queries.
+Let's create the following projection of <code>lineitems</code> table:
+</p> 
+<pre>
+create table vops_lineitem_projection(                                                                                    
+   l_shipdate vops_date not null,
+   l_quantity vops_float4 not null,
+   l_extendedprice vops_float4 not null,
+   l_discount vops_float4 not null,
+   l_tax vops_float4 not null,
+   l_returnflag "char" not null,
+   l_linestatus "char" not null
+);
+</pre>
+<p>
+As you can see, in this table <code>l_returnflag</code> and <code>l_linestatus</code> fields are scalars, and other fields - tiles.
+This projection can be populated using the following command:
+</p>
+<pre>
+select populate(destination := 'vops_lineitem_projection'::regclass, source := 'lineitem_projection'::regclass, sort := 'l_returnflag,l_linestatus');
+</pre>
+<p>
+Now we can create normal index on partitioning keys, define standard predicates for them and use them in <code>group by</code> and 
+<code>order by</code> clauses.
+</p>
 
 <h3><a name="unnest">Back to normal tuples</a></h3>
 <p>
@@ -491,6 +563,21 @@ select populate(destination := 'vops_lineitem'::regclass, source := 'lineitem'::
 -- For honest comparison creates the same projection without VOPS types
 create table lineitem_projection as (select l_shipdate,l_quantity,l_extendedprice,l_discount,l_tax,l_returnflag::"char",l_linestatus::"char" from lineitem);
 
+-- Now create mixed projection with partitioning keys:
+create table vops_lineitem_projection(                                                                                    
+   l_shipdate vops_date not null,
+   l_quantity vops_float4 not null,
+   l_extendedprice vops_float4 not null,
+   l_discount vops_float4 not null,
+   l_tax vops_float4 not null,
+   l_returnflag "char" not null,
+   l_linestatus "char" not null
+);
+
+-- And populate it with data sorted by partitioning key:
+select populate(destination := 'vops_lineitem_projection'::regclass, source := 'lineitem_projection'::regclass, sort := 'l_returnflag,l_linestatus');
+
+
 -- Let's measure time
 \timing
 
@@ -544,6 +631,29 @@ select reduce(map(l_returnflag||l_linestatus, 'sum,sum,sum,sum,avg,avg,avg',
     l_extendedprice,
     l_discount)) from vops_lineitem where filter(l_shipdate &lt;= '1998-12-01'::date);
 	   
+-- Mixed mode: let's Postgres do group by and calculate VOPS aggregates for each group
+select
+    l_returnflag,
+    l_linestatus,
+    sum(l_quantity) as sum_qty,
+    sum(l_extendedprice) as sum_base_price,
+    sum(l_extendedprice*(1-l_discount)) as sum_disc_price,
+    sum(l_extendedprice*(1-l_discount)*(1+l_tax)) as sum_charge,
+    avg(l_quantity) as avg_qty,
+    avg(l_extendedprice) as avg_price,
+    avg(l_discount) as avg_disc,
+    countall(*) as count_order
+from
+    vops_lineitem_projection
+where
+    filter(l_shipdate <= '1998-12-01'::date)
+group by
+    l_returnflag,
+    l_linestatus
+order by
+    l_returnflag,
+    l_linestatus;
+
 </pre>
 
 
@@ -564,8 +674,9 @@ For each query we measured time of sequential and parallel execution with 8 para
 <tr><td>Original Q1 for lineitem</td><td align=right>38028</td><td align=right>10997</td></tr>
 <tr><td>Original Q1 for lineitem_projection</td><td align=right>33872</td><td align=right>9656</td></tr>
 <tr><td>Vectorized Q1 for vops_lineitem</td><td align=right>3372</td><td align=right>951</td></tr>
+<tr><td>Mixed Q1 for vops_lineitem_projection</td><td align=right>1490</td><td align=right>396</td></tr>
 <tr><td>Original Q6 for lineitem</td><td align=right>16796</td><td align=right>4110</td></tr>
-<tr><td>Original Q6 for lineitem_projection</td><td align=right>10896</td><td align=right>2679</td></tr>
+<tr><td>Original Q6 for lineitem_projection</td><td align=right>4279</td><td align=right>1171</td></tr>
 <tr><td>Vectorized Q6 for vops_lineitem</td><td align=right>875</td><td align=right>284</td></tr>
 </table>
 

@@ -24,6 +24,7 @@
 
 #include "utils/array.h"
 #include "utils/tqual.h"
+#include "utils/datum.h"
 #include "utils/builtins.h"
 #include "utils/datetime.h"
 #include <utils/typcache.h>
@@ -143,6 +144,13 @@ typedef struct {
 	vops_tile**     tiles;
 } vops_unnest_context;
 
+typedef struct { 
+	vops_type tid;
+	int16     len;
+	bool      byval;
+	char      align;
+} vops_type_info;	
+
 static struct { 
 	char const* name;
 	Oid         oid;
@@ -196,13 +204,8 @@ static vops_type vops_get_type(Oid typid)
 			vops_type_map[i].oid = TypenameGetTypid(vops_type_map[i].name);
 		}
 	}
-	for (i = 0; i < VOPS_LAST; i++) { 
-		if (vops_type_map[i].oid == typid) { 
-			return (vops_type)i;
-		}
-	}	
-	elog(ERROR, "Unsuported attribute type id %d", typid);
-	return VOPS_FLOAT8; 
+	for (i = 0; i < VOPS_LAST && vops_type_map[i].oid != typid; i++);
+	return (vops_type)i;
 }
 
 /* Parameters used in macros: 
@@ -346,16 +349,23 @@ static vops_type vops_get_type(Oid typid)
 		bool is_null = PG_ARGISNULL(0);								    \
 		STYPE sum = is_null ? 0 : PG_GETARG_##GSTYPE(0);				\
 		int i;															\
-		for (i = 0; i < TILE_SIZE; i++) {								\
-			if ((filter_mask & ~opd->nullmask) & ((uint64)1 << i)) {	\
-				is_null = false;										\
-				sum += opd->payload[i];									\
+		if ((~filter_mask | opd->nullmask) == 0) {						\
+		    for (i = 0; i < TILE_SIZE; i++) {							\
+			    sum += opd->payload[i];									\
 			}															\
-		}																\
-		if (is_null) {													\
-			PG_RETURN_NULL();											\
-		} else {														\
 			PG_RETURN_##GSTYPE(sum);									\
+		} else {														\
+			for (i = 0; i < TILE_SIZE; i++) {							\
+				if ((filter_mask & ~opd->nullmask) & ((uint64)1 << i)) { \
+					is_null = false;									\
+					sum += opd->payload[i];								\
+				}														\
+			}															\
+			if (is_null) {												\
+				PG_RETURN_NULL();										\
+			} else {													\
+				PG_RETURN_##GSTYPE(sum);								\
+			}															\
 		}																\
 	}
 
@@ -932,13 +942,6 @@ const size_t vops_sizeof[] =
 	sizeof(vops_float8)
 };
 	
-static vops_tile* vops_clone(vops_type tid, Datum orig)
-{
-    vops_tile* tile = (vops_tile*)palloc(vops_sizeof[tid]);
-    memcpy(tile, DatumGetPointer(orig), vops_sizeof[tid]);
-    return tile;
-}		
-
 PG_FUNCTION_INFO_V1(vops_populate);
 Datum vops_populate(PG_FUNCTION_ARGS) 
 {
@@ -950,7 +953,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 	char sep;
 	TupleDesc spi_tupdesc;
 	int i, j, n, n_attrs;
-	vops_type* types;
+	vops_type_info* types;
 	Datum* values;
 	bool*  nulls;
     SPIPlanPtr plan;
@@ -971,7 +974,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 			 get_namespace_name(get_rel_namespace(destination)), 
 			 get_rel_name(destination)); 
     }
-	types = (vops_type*)palloc(sizeof(vops_type)*n_attrs);
+	types = (vops_type_info*)palloc(sizeof(vops_type_info)*n_attrs);
 	values = (Datum*)palloc(sizeof(Datum)*n_attrs);
 	nulls = (bool*)palloc0(sizeof(bool)*n_attrs);
 
@@ -982,7 +985,8 @@ Datum vops_populate(PG_FUNCTION_ARGS)
         HeapTuple spi_tuple = SPI_tuptable->vals[i];
         char const* name = SPI_getvalue(spi_tuple, spi_tupdesc, 1);
         Oid type_id = DatumGetObjectId(SPI_getbinval(spi_tuple, spi_tupdesc, 2, &is_null));
-		types[i] = vops_get_type(type_id);
+		types[i].tid = vops_get_type(type_id);
+		get_typlenbyvalalign(type_id, &types[i].len, &types[i].byval, &types[i].align);
 		n += sprintf(stmt + n, "%c%s", sep, name);
 		sep = ',';
 		SPI_freetuple(spi_tuple);
@@ -1003,8 +1007,8 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 
 	begin_batch_insert(destination);
 
-	for (i = 0; i < n_attrs; i++) { 
-		values[i] = PointerGetDatum(palloc(vops_sizeof[types[i]]));
+	for (i = 0; i < n_attrs; i++) {
+		values[i] = PointerGetDatum(types[i].tid != VOPS_LAST ? palloc(vops_sizeof[types[i].tid]) : NULL);
 	}
      		
 	for (j = 0; ; j++) { 
@@ -1016,41 +1020,69 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 				insert_tuple(values, nulls);
 				j = 0;
 			}
+		  Pack:
 			for (i = 0; i < n_attrs; i++) { 
 				Datum val = SPI_getbinval(spi_tuple, spi_tupdesc, i+1, &is_null);
-				vops_tile* tile = (vops_tile*)DatumGetPointer(values[i]);
-				tile->nullmask &= ~((uint64)1 << j);
-				tile->nullmask |= (uint64)is_null << j;
-				switch (types[i]) {
-				  case VOPS_BOOL:
-					((vops_bool*)tile)->payload &= ~((uint64)1 << j);
-					((vops_bool*)tile)->payload |= (uint64)DatumGetBool(val) << j;
+				if (types[i].tid == VOPS_LAST) { 
+					if (j == 0) { 
+						nulls[i] = is_null;
+						if (types[i].byval) { 
+							values[i] = val;
+						} else if (!is_null) { 
+							if (DatumGetPointer(values[i]) != NULL) { 
+								pfree(DatumGetPointer(values[i]));
+							}
+							values[i] = datumCopy(val, true, types[i].len);
+						}
+					}
+					else if (is_null != nulls[i] 
+							 || !(is_null || datumIsEqual(values[i], val, types[i].byval, types[i].len)))
+					{
+						/* Mark unassigned elements as nulls */
+						for (i = 0; i < n_attrs; i++) { 
+							if (types[i].tid != VOPS_LAST) { 
+								vops_tile* tile = (vops_tile*)DatumGetPointer(values[i]);
+								tile->nullmask |= (uint64)~0 << j;
+							}
+						}        
+						insert_tuple(values, nulls);
+						j = 0;
+						goto Pack;
+					}
+				} else { 
+					vops_tile* tile = (vops_tile*)DatumGetPointer(values[i]);
+					tile->nullmask &= ~((uint64)1 << j);
+					tile->nullmask |= (uint64)is_null << j;
+					switch (types[i].tid) {
+					  case VOPS_BOOL:
+						((vops_bool*)tile)->payload &= ~((uint64)1 << j);
+						((vops_bool*)tile)->payload |= (uint64)DatumGetBool(val) << j;
 					break;
-				  case VOPS_CHAR:					
-					((vops_char*)tile)->payload[j] = 
-						SPI_gettypeid(spi_tupdesc, i+1) == CHAROID
-						? DatumGetChar(val)
-						: *VARDATA(DatumGetTextP(val));
-					break;
-				  case VOPS_INT2:
-					((vops_int2*)tile)->payload[j] = DatumGetInt16(val);
-					break;
-				  case VOPS_INT4:
-				  case VOPS_DATE:
-					((vops_int4*)tile)->payload[j] = DatumGetInt32(val);
-					break;
-				  case VOPS_INT8:
-				  case VOPS_TIMESTAMP:
-					((vops_int8*)tile)->payload[j] = DatumGetInt64(val);
-					break;
-				  case VOPS_FLOAT4:
-					((vops_float4*)tile)->payload[j] = DatumGetFloat4(val);
-					break;
-				  case VOPS_FLOAT8:
-					((vops_float8*)tile)->payload[j] = DatumGetFloat8(val);
-					break;
-				  default:
-					Assert(false);
+					  case VOPS_CHAR:					
+						((vops_char*)tile)->payload[j] = SPI_gettypeid(spi_tupdesc, i+1) == CHAROID
+							? DatumGetChar(val)
+							: *VARDATA(DatumGetTextP(val));
+						break;
+					  case VOPS_INT2:
+						((vops_int2*)tile)->payload[j] = DatumGetInt16(val);
+						break;
+					  case VOPS_INT4:
+					  case VOPS_DATE:
+						((vops_int4*)tile)->payload[j] = DatumGetInt32(val);
+						break;
+					  case VOPS_INT8:
+					  case VOPS_TIMESTAMP:
+						((vops_int8*)tile)->payload[j] = DatumGetInt64(val);
+						break;
+					  case VOPS_FLOAT4:
+						((vops_float4*)tile)->payload[j] = DatumGetFloat4(val);
+						break;
+					  case VOPS_FLOAT8:
+						((vops_float8*)tile)->payload[j] = DatumGetFloat8(val);
+						break;
+					  default:
+						Assert(false);
+					}
 				}
 			}
             SPI_freetuple(spi_tuple);
@@ -1063,8 +1095,10 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 		if (j != TILE_SIZE) { 
 			/* Mark unassigned elements as nulls */
 			for (i = 0; i < n_attrs; i++) { 
-				vops_tile* tile = (vops_tile*)DatumGetPointer(values[i]);
-				tile->nullmask |= (uint64)~0 << j;
+				if (types[i].tid != VOPS_LAST) { 
+					vops_tile* tile = (vops_tile*)DatumGetPointer(values[i]);
+					tile->nullmask |= (uint64)~0 << j;
+				}
 			}        
 		}
 		insert_tuple(values, nulls);		
@@ -1101,6 +1135,9 @@ static vops_agg_state* vops_init_agg_state(char const* aggregates, Oid elem_type
 	}		
 	state = vops_create_agg_state(n_aggregates);
 	state->agg_type = vops_get_type(elem_type);
+	if (state->agg_type == VOPS_LAST) { 
+		elog(ERROR, "Group by attributes should have VOPS tile type");
+	}
 	for (i = 0; i < n_aggregates; i++) {
 		for (j = 0; j < VOPS_AGG_LAST && strncmp(aggregates, vops_agg_kind_map[j].name, strlen(vops_agg_kind_map[j].name)) != 0; j++);
 		if (j == VOPS_AGG_LAST) { 
@@ -1605,16 +1642,20 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
 	int i, j, n_attrs;
 	FuncCallContext* func_ctx;
     vops_unnest_context* user_ctx;
-	HeapTupleHeader t = PG_GETARG_HEAPTUPLEHEADER(0); 
 
 	if (SRF_IS_FIRSTCALL()) { 
 		Oid	argtype; 
         MemoryContext old_context;
 		char typtype;
-		TupleDesc src_desc = lookup_rowtype_tupdesc(HeapTupleHeaderGetTypeId(t), HeapTupleHeaderGetTypMod(t));
+		HeapTupleHeader t;
+		TupleDesc src_desc;
 
 		func_ctx = SRF_FIRSTCALL_INIT();
 		old_context = MemoryContextSwitchTo(func_ctx->multi_call_memory_ctx);  
+
+		t = PG_GETARG_HEAPTUPLEHEADER(0); 
+		src_desc = lookup_rowtype_tupdesc(HeapTupleHeaderGetTypeId(t), HeapTupleHeaderGetTypMod(t));
+
 		user_ctx = (vops_unnest_context*)palloc(sizeof(vops_unnest_context));
         argtype = get_fn_expr_argtype(fcinfo->flinfo, 0);
         typtype = get_typtype(argtype);
@@ -1635,18 +1676,23 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
         for (i = 0; i < n_attrs; i++) {
 			Form_pg_attribute attr = src_desc->attrs[i]; 
 			vops_type tid = vops_get_type(attr->atttypid);
-			Datum tile = GetAttributeByNum(t, attr->attnum, &user_ctx->nulls[i]);
+			Datum val = GetAttributeByNum(t, attr->attnum, &user_ctx->nulls[i]);
 			user_ctx->types[i] = tid;
-			if (user_ctx->nulls[i]) { 
-				user_ctx->tiles[i] = NULL;
-			} else {
-				user_ctx->tiles[i] = vops_clone(tid, tile);				
+			if (tid == VOPS_LAST) { 
+				user_ctx->values[i] = val;
+				TupleDescInitEntry(user_ctx->desc, attr->attnum, attr->attname.data, attr->atttypid, attr->atttypmod, attr->attndims);
+			} else { 
+				if (user_ctx->nulls[i]) { 
+					user_ctx->tiles[i] = NULL;
+				} else {
+					user_ctx->tiles[i] = (vops_tile*)PointerGetDatum(val);				
+				}
+				TupleDescInitEntry(user_ctx->desc, attr->attnum, attr->attname.data, vops_map_tid[tid], -1, 0);
 			}
-			TupleDescInitEntry(user_ctx->desc, attr->attnum, attr->attname.data, vops_map_tid[tid], -1, 0);
 		}
 		TupleDescGetAttInMetadata(user_ctx->desc);
-        MemoryContextSwitchTo(old_context);      
  		ReleaseTupleDesc(src_desc);
+        MemoryContextSwitchTo(old_context);      
 	}
 	func_ctx = SRF_PERCALL_SETUP();
     user_ctx = (vops_unnest_context*)func_ctx->user_fctx;

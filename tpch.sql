@@ -31,12 +31,24 @@ create table vops_lineitem(
    l_linestatus vops_char not null
 );
 
+create table vops_lineitem_projection(                                                                                    
+   l_shipdate vops_date not null,
+   l_quantity vops_float4 not null,
+   l_extendedprice vops_float4 not null,
+   l_discount vops_float4 not null,
+   l_tax vops_float4 not null,
+   l_returnflag "char" not null,
+   l_linestatus "char" not null
+);
+
 -- create index lineitem_shipdate on vops_lineitem using brin(first(l_shipdate)); 
 -- select populate(destination := 'vops_lineitem'::regclass, source := 'lineitem'::regclass, sort := 'l_shipdate');
 
 select populate(destination := 'vops_lineitem'::regclass, source := 'lineitem'::regclass);
 
 create table lineitem_projection as (select l_shipdate,l_quantity,l_extendedprice,l_discount,l_tax,l_returnflag::"char",l_linestatus::"char" from lineitem);
+
+select populate(destination := 'vops_lineitem_projection'::regclass, source := 'lineitem_projection'::regclass, sort := 'l_returnflag,l_linestatus');
 
 \timing
 
@@ -57,11 +69,11 @@ select
 from
     lineitem_projection
 where
-    l_shipdate between '1996-01-01'::date and '1997-01-01'::date
+    l_shipdate between '1996-01-01' and '1997-01-01'
     and l_discount between 0.08 and 0.1
     and l_quantity < 24;
--- Seq time: 10896.380 ms
--- Par time:  2678.581 ms
+-- Seq time:  4279.043 ms
+-- Par time:  1171.193 ms
 
 select 
     l_returnflag,
@@ -145,3 +157,26 @@ select reduce(map(l_returnflag||l_linestatus, 'sum,sum,sum,sum,avg,avg,avg',
 -- Par time: 951.031 ms
 	   
 
+select
+    l_returnflag,
+    l_linestatus,
+    sum(l_quantity) as sum_qty,
+    sum(l_extendedprice) as sum_base_price,
+    sum(l_extendedprice*(1-l_discount)) as sum_disc_price,
+    sum(l_extendedprice*(1-l_discount)*(1+l_tax)) as sum_charge,
+    avg(l_quantity) as avg_qty,
+    avg(l_extendedprice) as avg_price,
+    avg(l_discount) as avg_disc,
+    countall(*) as count_order
+from
+    vops_lineitem_projection
+where
+    filter(l_shipdate <= '1998-12-01'::date)
+group by
+    l_returnflag,
+    l_linestatus
+order by
+    l_returnflag,
+    l_linestatus;
+-- Seq time: 1490.143 ms
+-- Par time: 396.329 ms
