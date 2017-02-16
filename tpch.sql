@@ -127,6 +127,7 @@ order by
 -- VOPS
 -- 
 
+-- Q6 using VOPS special operators
 select countall(*),sum(l_extendedprice*l_discount) as revenue
 from vops_lineitem
 where filter((l_shipdate >= '1996-01-01'::date) 
@@ -135,6 +136,7 @@ where filter((l_shipdate >= '1996-01-01'::date)
 		& (l_discount <= 0.1)
 		& (l_quantity < 24));
 
+-- Q6 with BETIXT
 select sum(l_extendedprice*l_discount) as revenue
 from vops_lineitem
 where filter(betwixt(l_shipdate, '1996-01-01', '1997-01-01')
@@ -143,8 +145,17 @@ where filter(betwixt(l_shipdate, '1996-01-01', '1997-01-01')
 -- Seq time: 875.045 ms
 -- Par time: 283.966 ms
 
+-- Q6 using standard SQL
+select
+    sum(l_extendedprice*l_discount) as revenue
+from
+    lineitem_projection
+where
+    l_shipdate between '1996-01-01'::date and '1997-01-01'::date
+    and l_discount between 0.08 and 0.1
+    and l_quantity < 24;
 
-
+-- Q1 using VOPS group by
 select reduce(map(l_returnflag||l_linestatus, 'sum,sum,sum,sum,avg,avg,avg',
     l_quantity,
     l_extendedprice,
@@ -156,7 +167,7 @@ select reduce(map(l_returnflag||l_linestatus, 'sum,sum,sum,sum,avg,avg,avg',
 -- Seq time: 3372.416 ms
 -- Par time: 951.031 ms
 	   
-
+-- Q1 in standard SQL
 select
     l_returnflag,
     l_linestatus,
@@ -167,11 +178,11 @@ select
     avg(l_quantity) as avg_qty,
     avg(l_extendedprice) as avg_price,
     avg(l_discount) as avg_disc,
-    countall(*) as count_order
+    count(*) as count_order
 from
     vops_lineitem_projection
 where
-    filter(l_shipdate <= '1998-12-01'::date)
+    l_shipdate <= '1998-12-01'::date
 group by
     l_returnflag,
     l_linestatus
