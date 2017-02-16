@@ -566,7 +566,12 @@ In principle, it is possible to provide such conversion operator. But it is not 
 generate dummy tile with all components equal to the specified constant and perform 
 (<i>vector</i> <b>OP</b> <i>vector</i>) operation instead of more efficient (<i>vector</i> <b>OP</b> <i>scalar</i>).
 </p>
-
+<p>
+There is one pitfall with post parse analyze hook: it is initialized in the extension <code>_PG_init</code> function.
+But if extension was not registered in <code>shared_preload_libraries</code> list, then it will be loaded on demand when any function of this extension is requested.
+Unfortunately it happens <b>after</b> parse analyze is done. So first time you execute VOPS query, it will not be transformed. You can get wrong result in this case.
+Either take it in account, either add <code>vops</code> to <code>shared_preload_libraries</code> configuration string.
+</p>
 
 <h2><a name="example">Example</a></h2>
 

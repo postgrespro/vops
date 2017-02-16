@@ -149,7 +149,7 @@ where filter(betwixt(l_shipdate, '1996-01-01', '1997-01-01')
 select
     sum(l_extendedprice*l_discount) as revenue
 from
-    lineitem_projection
+    vops_lineitem_projection
 where
     l_shipdate between '1996-01-01'::date and '1997-01-01'::date
     and l_discount between 0.08 and 0.1
