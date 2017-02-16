@@ -1825,6 +1825,19 @@ vops_expression_tree_mutator(Node *node, void *context)
 		ctx->countall = NULL;
 		ctx->has_vector_aggregates = false;
 		
+		if (vops_bool_oid == InvalidOid) { 
+			Oid profile[2];
+			vops_bool_oid = LookupTypeNameOid(NULL, makeTypeName("vops_bool"), false);
+			profile[0] = vops_bool_oid;
+			profile[1] = vops_bool_oid;
+			filter_oid = LookupFuncName(list_make1(makeString("filter")), 1, profile, false);
+			vops_and_oid = LookupFuncName(list_make1(makeString("vops_bool_and")), 2, profile, false);
+			vops_or_oid = LookupFuncName(list_make1(makeString("vops_bool_or")), 2, profile, false);
+			vops_not_oid = LookupFuncName(list_make1(makeString("vops_bool_not")), 1, profile, false);
+			count_oid = LookupFuncName(list_make1(makeString("count")), 0, profile, false);
+			countall_oid = LookupFuncName(list_make1(makeString("countall")), 0, profile, false);
+		}
+
 		node = (Node *) query_tree_mutator((Query *) node,
 										   vops_expression_tree_mutator,
 										   context,
@@ -1927,18 +1940,6 @@ static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
 	/* Invoke original hook if needed */
 	if (post_parse_analyze_hook_next) {
 		post_parse_analyze_hook_next(pstate, query);
-	}
-	if (vops_bool_oid == InvalidOid) { 
-		Oid profile[2];
-		vops_bool_oid = LookupTypeNameOid(NULL, makeTypeName("vops_bool"), false);
-		profile[0] = vops_bool_oid;
-		profile[1] = vops_bool_oid;
-		filter_oid = LookupFuncName(list_make1(makeString("filter")), 1, profile, false);
-		vops_and_oid = LookupFuncName(list_make1(makeString("vops_bool_and")), 2, profile, false);
-		vops_or_oid = LookupFuncName(list_make1(makeString("vops_bool_or")), 2, profile, false);
-		vops_not_oid = LookupFuncName(list_make1(makeString("vops_bool_not")), 1, profile, false);
-		count_oid = LookupFuncName(list_make1(makeString("count")), 0, profile, false);
-		countall_oid = LookupFuncName(list_make1(makeString("countall")), 0, profile, false);
 	}
 	(void)query_tree_mutator(query, vops_expression_tree_mutator, &ctx, QTW_DONT_COPY_QUERY);
 }
