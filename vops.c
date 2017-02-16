@@ -33,12 +33,22 @@
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
 #include "parser/parse_relation.h"
+#include "parser/parse_func.h"
+#include "parser/parse_type.h"
+#include "parser/analyze.h"
 #include "libpq/pqformat.h"                                                            
 #include "executor/spi.h"
+#include "nodes/nodeFuncs.h"
+#include "nodes/makefuncs.h"
+#include "nodes/pg_list.h"
 
 #ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
 #endif
+
+/* pg module functions */
+void _PG_init(void);
+void _PG_fini(void);
 
 typedef enum 
 {	
@@ -633,12 +643,12 @@ PG_FUNCTION_INFO_V1(vops_filter);
 Datum vops_filter(PG_FUNCTION_ARGS) 
 { 
 	if (PG_ARGISNULL(0)) {
-		filter_mask = ~0;
+		filter_mask = 0;
 	} else { 
 		vops_bool* result = (vops_bool*)PG_GETARG_POINTER(0);
 		filter_mask = result->payload & ~result->nullmask;
 	}
-	PG_RETURN_BOOL(true);
+	PG_RETURN_BOOL(filter_mask != 0);
 }
 
 PG_FUNCTION_INFO_V1(vops_bool_not);
@@ -1787,3 +1797,159 @@ Datum vops_int4_concat(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(result);
 }
 		
+static Oid vops_bool_oid;
+static Oid filter_oid;
+static Oid vops_and_oid;
+static Oid vops_or_oid;
+static Oid vops_not_oid;
+static Oid countall_oid;
+static Oid count_oid;
+
+typedef struct
+{
+	Aggref* countall;
+	bool    has_vector_aggregates;
+} vops_mutator_context;
+
+static Node*
+vops_expression_tree_mutator(Node *node, void *context)
+{
+	vops_mutator_context* ctx = (vops_mutator_context*)context;
+	if (node == NULL) 
+	{ 
+		return NULL;
+	}
+	if (IsA(node, Query))
+	{
+		vops_mutator_context save_ctx = *ctx;
+		ctx->countall = NULL;
+		ctx->has_vector_aggregates = false;
+		
+		node = (Node *) query_tree_mutator((Query *) node,
+										   vops_expression_tree_mutator,
+										   context,
+										   QTW_DONT_COPY_QUERY);
+		*(vops_mutator_context*)context = save_ctx; /* restore qurye context */
+		return node;
+	}
+	/* depth first traversal */
+	node = expression_tree_mutator(node, vops_expression_tree_mutator, context);
+	if (IsA(node, BoolExpr))
+	{
+		BoolExpr* expr = (BoolExpr*)node;
+		ListCell *cell;
+		List* vector_args = NULL;
+		List* scalar_args = NULL;
+		FuncExpr* filter;
+
+		foreach(cell, expr->args)
+		{
+			Node* arg = lfirst(cell);
+			if (IsA(arg, FuncExpr)) 
+			{
+				filter = (FuncExpr*)arg;
+				if (filter->funcid == filter_oid) { 
+					vector_args = lappend(vector_args, linitial(filter->args));
+					continue;
+				}
+			}
+			scalar_args = lappend(scalar_args, arg);
+		}
+		if (expr->boolop == NOT_EXPR) 
+		{
+			if (list_length(vector_args) != 0) 
+			{ 
+				Assert(list_length(vector_args) == 1);				
+				/* Transform expression (NOT filter(o1)) to (filter(vops_not(o1)) */
+				return (Node*)makeFuncExpr(filter_oid, BOOLOID, 
+										   list_make1(makeFuncExpr(vops_not_oid, vops_bool_oid, 
+																   vector_args,
+																   InvalidOid, InvalidOid, COERCE_EXPLICIT_CALL)),
+										   InvalidOid, InvalidOid, COERCE_EXPLICIT_CALL);
+			}
+		} 
+		else if (list_length(vector_args) > 1) 		
+		{
+ 			/* Transaform expression (filter(o1) AND filter(o2)) to (filter(vops_and(o1, o2))) */
+			Node* filter_arg = NULL;	
+
+			foreach(cell, vector_args)
+			{
+				if (filter_arg == NULL) 
+				{
+					filter_arg = (Node*)lfirst(cell);
+				} 
+				else
+				{
+					filter_arg = (Node*)makeFuncExpr(expr->boolop == AND_EXPR ? vops_and_oid : vops_or_oid, 
+													 vops_bool_oid, 
+													 list_make2(filter_arg, lfirst(cell)),
+													 InvalidOid, InvalidOid, COERCE_EXPLICIT_CALL);
+				}
+			}
+			filter = makeFuncExpr(filter_oid, BOOLOID, list_make1(filter_arg),
+								  InvalidOid, InvalidOid, COERCE_EXPLICIT_CALL);
+			return list_length(scalar_args) != 0
+				? (Node*)makeBoolExpr(expr->boolop, lappend(scalar_args, filter), expr->location)
+				: (Node*)filter;
+		}
+	}
+	else if (IsA(node, Aggref))
+	{
+		Aggref* agg = (Aggref*)node;
+		if (agg->aggfnoid == count_oid) {
+			Assert(agg->aggstar);
+			if (ctx->has_vector_aggregates) { 
+				agg->aggfnoid = countall_oid;
+				ctx->countall = NULL;
+			} else { 
+				ctx->countall = agg;
+			}
+		} else if (!agg->aggstar && !ctx->has_vector_aggregates) {
+			Assert(list_length(agg->aggargtypes) >= 1);
+			if (vops_get_type(linitial_oid(agg->aggargtypes)) != VOPS_LAST) {
+				ctx->has_vector_aggregates = true;
+				if (ctx->countall) {
+					ctx->countall->aggfnoid = countall_oid;
+					ctx->countall = NULL;
+				} 
+			}
+		}
+	}
+	return node;
+}
+
+static post_parse_analyze_hook_type	post_parse_analyze_hook_next;
+
+static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
+{
+	vops_mutator_context ctx = {NULL,false};	
+	/* Invoke original hook if needed */
+	if (post_parse_analyze_hook_next) {
+		post_parse_analyze_hook_next(pstate, query);
+	}
+	if (vops_bool_oid == InvalidOid) { 
+		Oid profile[2];
+		vops_bool_oid = LookupTypeNameOid(NULL, makeTypeName("vops_bool"), false);
+		profile[0] = vops_bool_oid;
+		profile[1] = vops_bool_oid;
+		filter_oid = LookupFuncName(list_make1(makeString("filter")), 1, profile, false);
+		vops_and_oid = LookupFuncName(list_make1(makeString("vops_bool_and")), 2, profile, false);
+		vops_or_oid = LookupFuncName(list_make1(makeString("vops_bool_or")), 2, profile, false);
+		vops_not_oid = LookupFuncName(list_make1(makeString("vops_bool_not")), 1, profile, false);
+		count_oid = LookupFuncName(list_make1(makeString("count")), 0, profile, false);
+		countall_oid = LookupFuncName(list_make1(makeString("countall")), 0, profile, false);
+	}
+	(void)query_tree_mutator(query, vops_expression_tree_mutator, &ctx, QTW_DONT_COPY_QUERY);
+}
+
+void _PG_init(void)
+{
+	post_parse_analyze_hook_next	= post_parse_analyze_hook;
+	post_parse_analyze_hook			= vops_post_parse_analysis_hook;
+}
+
+void _PG_fini(void)
+{
+	post_parse_analyze_hook = post_parse_analyze_hook_next;
+}

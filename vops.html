@@ -16,6 +16,7 @@
  <li><a href="#populating">Preparing data for VOPS</a></li>
  <li><a href="#unnest">Back to normal tuples</a></li>
 </ul>
+<li><a href="#transform">Standard SQL query transformation</a></li>
 <li><a href="#example">Example</a></li>
 <li><a href="#performance">Performance evaluation</a></li>
 <li><a href="#conclusion">Conclusion</a></li>
@@ -205,7 +206,7 @@ Operands of such operators can be either tiles, either scalar constants: <code>x
 Boolean operators <code>and</code>, <code>or</code>, <code>not</code> can not be overloaded.
 This is why VOPS provides instead of them operators <b>& | !</b>. Please notice that precedence of this operators is different 
 from <code>and</code>, <code>or</code>, <code>not</code> operators. So you can not write predicate as <code>x=1 | x=2</code> - it will
-cause syntax error. To solve this problem please use braces: <code>(x=1) | (x=2)</code>.
+cause syntax error. To solve this problem please use parenthesis: <code>(x=1) | (x=2)</code>.
 </p>
 <p>
 Also VOPS provides analog of between operator. In SQL expression <code>(x BETWEEN a AND b)</code> is equivalent to 
@@ -510,6 +511,63 @@ postgres=# select unnest(l.*) from vops_lineitem l where filter(l_shipdate &lt;=
 </pre>
 
 
+<h2><a name="transform">Standard SQL query transformation</a></h2>
+<p>
+Previous section describes VOPS specific types, operators, functions,...
+Good news! You do not need to learn them. You can use normal SQL.
+Well, it is still responsibility of programmer or database administrator to create proper projections
+of original table. This projections need to use tiles types for some attributes (vops_float4,...).
+Then you can query this table using standard SQL. And this query will be executed using vector operations!
+</p>
+<p>
+How it works? There are absolutely no magic here. There are four main components of the puzzle:
+</p>
+
+<ol>
+<li>User defined types</li>
+<li>User defined operator</li>
+<li>User defined implicit type casts</li>
+<li>Post parse analyze hook which performs query transformation</li>
+</ol>
+
+<p>
+So VOPS defines tile types and standard SQL operators for this types.
+Then it defines implicit type cast from <code>vops_bool</code> (result of boolean operation with tiles)
+to boolean type. Now programmer do not have to wrap vectorized boolean operations in <code>filter()</code>
+function call. And the final transformation is done by post parse analyze hook, defined by VOPS extension.
+It replaces scalar boolean operations with vector boolean operations:
+</p>
+
+<table border>
+<tr><th>Original expression</th><th>Result of transformation</th></tr>
+<tr><td><code>NOT filter(o1)</code></td><td><code>filter(vops_bool_not(o1))</code></td></tr>
+<tr><td><code>filter(o1) AND filter(o2)</code></td><td><code>filter(vops_bool_and(o1, o2))</code></td></tr>
+<tr><td><code>filter(o1) OR filter(o2)</code></td><td><code>filter(vops_bool_or(o1, o2))</code></td></tr>
+</table>
+
+<p>
+Now there is no need to use VOPS specific <code>BETIXT</code> operator: standard SQL <code>BETWEEN</code> operator will work (but still using <code>BETIXT</code> is slightly more efficient, because it performs both comparions in one function). Also there are no problems with operators precedence and extra parenthesis are not needed. If query includes vectorized aggregates, then <code>count(*)</code> is transformed to <code>countall(*)</code>.
+</p>
+
+<p>
+There is only one difference left between standard SQL and its vectorized extension. You still have to perform explicit type cast in case of using string literal, for example <code>l_shipdate &lt;= '1998-12-01'</code>
+will not work for <code>l_shipdate</code> column with tile type. Postgres have two overloaded versions
+of &lt;= operator which can be applied here:
+</p>
+
+<ol>
+<li><code>vops_date</code> <b>&lt;=</b> <code>vops_date</code></li>
+<li><code>vops_date</code> <b>&lt;=</b> <code>date</code></li>
+</ol>
+
+<p>
+And it decides that it is better to convert string to the tile type <code>vops_date</code>. 
+In principle, it is possible to provide such conversion operator. But it is not good idea, because we have to
+generate dummy tile with all components equal to the specified constant and perform 
+(<i>vector</i> <b>OP</b> <i>vector</i>) operation instead of more efficient (<i>vector</i> <b>OP</b> <i>scalar</i>).
+</p>
+
+
 <h2><a name="example">Example</a></h2>
 
 <p>
@@ -591,14 +649,23 @@ where
     and l_discount between 0.08 and 0.1
     and l_quantity &lt; 24;
 
--- VOPS version of Q6
+-- VOPS version of Q6 using VOPS specific operators
 select sum(l_extendedprice*l_discount) as revenue
 from vops_lineitem
 where filter(betwixt(l_shipdate, '1996-01-01', '1997-01-01')
 		& betwixt(l_discount, 0.08, 0.1)
 		& (l_quantity &lt; 24));
 
--- Original version of Q1: filtering + grouping + aggregation
+-- Yet another vectorized version of Q6, but now in stadnard SQL:
+select sum(l_extendedprice*l_discount) as revenue
+from vops_lineitem
+where l_shipdate between '1996-01-01'::date AND '1997-01-01'::date
+   and l_discount between 0.08 and 0.1
+   and l_quantity &lt; 24;
+
+
+
+-- Original version of Q1: filter + group by + aggregation
 select 
     l_returnflag,
     l_linestatus,
@@ -631,7 +698,7 @@ select reduce(map(l_returnflag||l_linestatus, 'sum,sum,sum,sum,avg,avg,avg',
     l_extendedprice,
     l_discount)) from vops_lineitem where filter(l_shipdate &lt;= '1998-12-01'::date);
 	   
--- Mixed mode: let's Postgres do group by and calculate VOPS aggregates for each group
+-- Mixed mode: let's Postgres does group by and calculates VOPS aggregates for each group
 select
     l_returnflag,
     l_linestatus,
@@ -642,17 +709,19 @@ select
     avg(l_quantity) as avg_qty,
     avg(l_extendedprice) as avg_price,
     avg(l_discount) as avg_disc,
-    countall(*) as count_order
+    count(*) as count_order
 from
     vops_lineitem_projection
 where
-    filter(l_shipdate <= '1998-12-01'::date)
+    l_shipdate <= '1998-12-01'::date
 group by
     l_returnflag,
     l_linestatus
 order by
     l_returnflag,
     l_linestatus;
+
+
 
 </pre>
 

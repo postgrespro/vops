@@ -121,7 +121,7 @@ order by
     l_returnflag,
     l_linestatus;
 -- Seq time: 33872.223 ms
--- Par time: 9655.906 ms
+-- Par time:  7502.620 ms
                                                                                                                                  
 --
 -- VOPS
