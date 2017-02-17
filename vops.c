@@ -224,6 +224,11 @@ static vops_type vops_get_type(Oid typid)
 	return (vops_type)i;
 }
 
+static bool is_vops_type(Oid typeid)
+{
+	return vops_get_type(typeid) != VOPS_LAST;
+} 
+
 /* Parameters used in macros: 
  * TYPE:  Postgres SQL type:                         char,    int2,   int4,   int8, float4, float8
  * CTYPE: Postgres C type:                           char,   int16,  int32,  int64, float8, float8
@@ -1930,6 +1935,34 @@ Datum vops_int4_concat(PG_FUNCTION_ARGS)
 	result->nullmask = left->nullmask | right->nullmask;
 	PG_RETURN_POINTER(result);
 }
+
+PG_FUNCTION_INFO_V1(vops_is_null);
+Datum vops_is_null(PG_FUNCTION_ARGS) 
+{
+	vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));	
+	result->nullmask = 0;
+	if (PG_ARGISNULL(0)) {
+		result->payload = ~0;
+	} else { 
+		vops_tile* opd = (vops_tile*)PG_GETARG_POINTER(0);
+		result->payload = opd->nullmask;
+	}
+	PG_RETURN_POINTER(result);
+}
+		
+PG_FUNCTION_INFO_V1(vops_is_not_null);
+Datum vops_is_not_null(PG_FUNCTION_ARGS) 
+{
+	vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));	
+	result->nullmask = 0;
+	if (PG_ARGISNULL(0)) {
+		result->payload = 0;
+	} else { 
+		vops_tile* opd = (vops_tile*)PG_GETARG_POINTER(0);
+		result->payload = ~opd->nullmask;
+	}
+	PG_RETURN_POINTER(result);
+}
 		
 static Oid vops_bool_oid;
 static Oid filter_oid;
@@ -1938,11 +1971,13 @@ static Oid vops_or_oid;
 static Oid vops_not_oid;
 static Oid countall_oid;
 static Oid count_oid;
+static Oid is_null_oid;
+static Oid is_not_null_oid;
 
 typedef struct
 {
 	Aggref* countall;
-	bool    has_vector_aggregates;
+	bool    has_vector_ops;
 } vops_mutator_context;
 
 static Node*
@@ -1957,21 +1992,7 @@ vops_expression_tree_mutator(Node *node, void *context)
 	{
 		vops_mutator_context save_ctx = *ctx;
 		ctx->countall = NULL;
-		ctx->has_vector_aggregates = false;
-		
-		if (vops_bool_oid == InvalidOid) { 
-			Oid profile[2];
-			vops_bool_oid = LookupTypeNameOid(NULL, makeTypeName("vops_bool"), false);
-			profile[0] = vops_bool_oid;
-			profile[1] = vops_bool_oid;
-			filter_oid = LookupFuncName(list_make1(makeString("filter")), 1, profile, false);
-			vops_and_oid = LookupFuncName(list_make1(makeString("vops_bool_and")), 2, profile, false);
-			vops_or_oid = LookupFuncName(list_make1(makeString("vops_bool_or")), 2, profile, false);
-			vops_not_oid = LookupFuncName(list_make1(makeString("vops_bool_not")), 1, profile, false);
-			count_oid = LookupFuncName(list_make1(makeString("count")), 0, profile, false);
-			countall_oid = LookupFuncName(list_make1(makeString("countall")), 0, profile, false);
-		}
-
+		ctx->has_vector_ops = false;
 		node = (Node *) query_tree_mutator((Query *) node,
 										   vops_expression_tree_mutator,
 										   context,
@@ -2041,21 +2062,50 @@ vops_expression_tree_mutator(Node *node, void *context)
 				: (Node*)filter;
 		}
 	}
+	else if (IsA(node, NullTest))
+	{
+		NullTest* test = (NullTest*)node;
+		if (!test->argisrow && is_vops_type(exprType((Node*)test->arg))) 
+		{
+			ctx->has_vector_ops = true;
+			if (ctx->countall) {
+				ctx->countall->aggfnoid = countall_oid;
+				ctx->countall = NULL;
+			} 
+			return (Node*)makeFuncExpr(filter_oid, BOOLOID, 
+									   list_make1(makeFuncExpr(test->nulltesttype == IS_NULL 
+															   ? is_null_oid 
+															   : is_not_null_oid,
+															   vops_bool_oid, 
+															   list_make1(test->arg),
+															   InvalidOid, InvalidOid, COERCE_EXPLICIT_CALL)),
+									   
+									   InvalidOid, InvalidOid, COERCE_EXPLICIT_CALL);
+		}
+	}
+	else if (IsA(node, FuncExpr) && !ctx->has_vector_ops && ((FuncExpr*)node)->funcid == filter_oid) 
+	{ 
+		ctx->has_vector_ops = true;
+		if (ctx->countall) {
+			ctx->countall->aggfnoid = countall_oid;
+			ctx->countall = NULL;
+		} 
+	}
 	else if (IsA(node, Aggref))
 	{
 		Aggref* agg = (Aggref*)node;
 		if (agg->aggfnoid == count_oid) {
 			Assert(agg->aggstar);
-			if (ctx->has_vector_aggregates) { 
+			if (ctx->has_vector_ops) { 
 				agg->aggfnoid = countall_oid;
 				ctx->countall = NULL;
 			} else { 
 				ctx->countall = agg;
 			}
-		} else if (!agg->aggstar && !ctx->has_vector_aggregates) {
+		} else if (!agg->aggstar && !ctx->has_vector_ops) {
 			Assert(list_length(agg->aggargtypes) >= 1);
-			if (vops_get_type(linitial_oid(agg->aggargtypes)) != VOPS_LAST) {
-				ctx->has_vector_aggregates = true;
+			if (is_vops_type(linitial_oid(agg->aggargtypes))) {
+				ctx->has_vector_ops = true;
 				if (ctx->countall) {
 					ctx->countall->aggfnoid = countall_oid;
 					ctx->countall = NULL;
@@ -2075,6 +2125,25 @@ static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
 	if (post_parse_analyze_hook_next) {
 		post_parse_analyze_hook_next(pstate, query);
 	}
+		
+	if (is_not_null_oid == InvalidOid) { 
+		Oid profile[2];
+		Oid any = ANYELEMENTOID;
+		is_not_null_oid = LookupFuncName(list_make1(makeString("is_not_null")), 1, &any, true); /* lookup last functions defined in extension */
+		if (is_not_null_oid != InvalidOid) { /* if extension is already intialized */
+			vops_bool_oid = LookupTypeNameOid(NULL, makeTypeName("vops_bool"), false);
+			profile[0] = vops_bool_oid;
+			profile[1] = vops_bool_oid;
+			filter_oid = LookupFuncName(list_make1(makeString("filter")), 1, profile, false);
+			vops_and_oid = LookupFuncName(list_make1(makeString("vops_bool_and")), 2, profile, false);
+			vops_or_oid = LookupFuncName(list_make1(makeString("vops_bool_or")), 2, profile, false);
+			vops_not_oid = LookupFuncName(list_make1(makeString("vops_bool_not")), 1, profile, false);
+			count_oid = LookupFuncName(list_make1(makeString("count")), 0, profile, false);
+			countall_oid = LookupFuncName(list_make1(makeString("countall")), 0, profile, false);
+			is_null_oid = LookupFuncName(list_make1(makeString("is_null")), 1, &any, false);
+		}
+	}
+	filter_mask = ~0;
 	(void)query_tree_mutator(query, vops_expression_tree_mutator, &ctx, QTW_DONT_COPY_QUERY);
 }
 

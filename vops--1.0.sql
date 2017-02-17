@@ -260,7 +260,7 @@ CREATE AGGREGATE variance(vops_char) (
 CREATE AGGREGATE stddev_pop(vops_char) (
 	SFUNC = vops_char_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_pop_final,
+	FINALFUNC = vops_stddev_pop_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -270,7 +270,7 @@ CREATE AGGREGATE stddev_pop(vops_char) (
 CREATE AGGREGATE stddev_samp(vops_char) (
 	SFUNC = vops_char_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -280,7 +280,7 @@ CREATE AGGREGATE stddev_samp(vops_char) (
 CREATE AGGREGATE stddev(vops_char) (
 	SFUNC = vops_char_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -447,7 +447,7 @@ CREATE AGGREGATE variance(vops_int2) (
 CREATE AGGREGATE stddev_pop(vops_int2) (
 	SFUNC = vops_int2_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_pop_final,
+	FINALFUNC = vops_stddev_pop_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -457,7 +457,7 @@ CREATE AGGREGATE stddev_pop(vops_int2) (
 CREATE AGGREGATE stddev_samp(vops_int2) (
 	SFUNC = vops_int2_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -467,7 +467,7 @@ CREATE AGGREGATE stddev_samp(vops_int2) (
 CREATE AGGREGATE stddev(vops_int2) (
 	SFUNC = vops_int2_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -648,7 +648,7 @@ CREATE AGGREGATE variance(vops_int4) (
 CREATE AGGREGATE stddev_pop(vops_int4) (
 	SFUNC = vops_int4_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_pop_final,
+	FINALFUNC = vops_stddev_pop_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -658,7 +658,7 @@ CREATE AGGREGATE stddev_pop(vops_int4) (
 CREATE AGGREGATE stddev_samp(vops_int4) (
 	SFUNC = vops_int4_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -668,7 +668,7 @@ CREATE AGGREGATE stddev_samp(vops_int4) (
 CREATE AGGREGATE stddev(vops_int4) (
 	SFUNC = vops_int4_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -845,7 +845,7 @@ CREATE AGGREGATE variance(vops_date) (
 CREATE AGGREGATE stddev_pop(vops_date) (
 	SFUNC = vops_date_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_pop_final,
+	FINALFUNC = vops_stddev_pop_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -855,7 +855,7 @@ CREATE AGGREGATE stddev_pop(vops_date) (
 CREATE AGGREGATE stddev_samp(vops_date) (
 	SFUNC = vops_date_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -865,7 +865,7 @@ CREATE AGGREGATE stddev_samp(vops_date) (
 CREATE AGGREGATE stddev(vops_date) (
 	SFUNC = vops_date_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1042,7 +1042,7 @@ CREATE AGGREGATE variance(vops_timestamp) (
 CREATE AGGREGATE stddev_pop(vops_timestamp) (
 	SFUNC = vops_timestamp_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_pop_final,
+	FINALFUNC = vops_stddev_pop_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1052,7 +1052,7 @@ CREATE AGGREGATE stddev_pop(vops_timestamp) (
 CREATE AGGREGATE stddev_samp(vops_timestamp) (
 	SFUNC = vops_timestamp_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1062,7 +1062,7 @@ CREATE AGGREGATE stddev_samp(vops_timestamp) (
 CREATE AGGREGATE stddev(vops_timestamp) (
 	SFUNC = vops_timestamp_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1240,7 +1240,7 @@ CREATE AGGREGATE variance(vops_int8) (
 CREATE AGGREGATE stddev_pop(vops_int8) (
 	SFUNC = vops_int8_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_pop_final,
+	FINALFUNC = vops_stddev_pop_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1250,7 +1250,7 @@ CREATE AGGREGATE stddev_pop(vops_int8) (
 CREATE AGGREGATE stddev_samp(vops_int8) (
 	SFUNC = vops_int8_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1260,7 +1260,7 @@ CREATE AGGREGATE stddev_samp(vops_int8) (
 CREATE AGGREGATE stddev(vops_int8) (
 	SFUNC = vops_int8_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1427,7 +1427,7 @@ CREATE AGGREGATE variance(vops_float4) (
 CREATE AGGREGATE stddev_pop(vops_float4) (
 	SFUNC = vops_float4_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_pop_final,
+	FINALFUNC = vops_stddev_pop_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1437,7 +1437,7 @@ CREATE AGGREGATE stddev_pop(vops_float4) (
 CREATE AGGREGATE stddev_samp(vops_float4) (
 	SFUNC = vops_float4_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1447,7 +1447,7 @@ CREATE AGGREGATE stddev_samp(vops_float4) (
 CREATE AGGREGATE stddev(vops_float4) (
 	SFUNC = vops_float4_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1614,7 +1614,7 @@ CREATE AGGREGATE variance(vops_float8) (
 CREATE AGGREGATE stddev_pop(vops_float8) (
 	SFUNC = vops_float8_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_pop_final,
+	FINALFUNC = vops_stddev_pop_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1624,7 +1624,7 @@ CREATE AGGREGATE stddev_pop(vops_float8) (
 CREATE AGGREGATE stddev_samp(vops_float8) (
 	SFUNC = vops_float8_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1634,7 +1634,7 @@ CREATE AGGREGATE stddev_samp(vops_float8) (
 CREATE AGGREGATE stddev(vops_float8) (
 	SFUNC = vops_float8_var_accumulate,
 	STYPE = internal,
-	FINALFUNC = vops_var_samp_final,
+	FINALFUNC = vops_stddev_samp_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1716,3 +1716,6 @@ create function reduce(bigint) returns setof vops_aggregates as 'MODULE_PATHNAME
 create function unnest(anyelement) returns setof record as 'MODULE_PATHNAME','vops_unnest' language C parallel safe strict immutable;
 
 create cast (vops_bool as bool) with function filter(vops_bool) AS IMPLICIT;
+
+create function is_null(anyelement) returns vops_bool as 'MODULE_PATHNAME','vops_is_null'  language C parallel safe immutable;
+create function is_not_null(anyelement) returns vops_bool as 'MODULE_PATHNAME','vops_is_not_null'  language C parallel safe immutable;

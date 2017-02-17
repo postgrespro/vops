@@ -1,0 +1,13 @@
+create extension vops;
+create table s(x real);
+create table v(x vops_float4);
+insert into s values(1.0),(2.0),(null),(3.0),(null),(4.0);
+select populate(destination:='v'::regclass, source:='s'::regclass);
+select unnest(v.*) from v where x > 1;
+select countall(*) from v where x is not null;
+select count(*) from v where x is null;
+select count(*) from v where x is not null;
+select count(*),count(x),sum(x),avg(x),min(x),max(x),variance(x),var_pop(x),var_samp(x),stddev(x),stddev_pop(x),stddev_samp(x) from v where x >= 0.0;
+select count(*),count(x),sum(x),avg(x),min(x),max(x),variance(x),var_pop(x),var_samp(x),stddev(x),stddev_pop(x),stddev_samp(x) from s where x >= 0.0;
+select count(*),count(x),sum(x),avg(x),min(x),max(x),variance(x),var_pop(x),var_samp(x),stddev(x),stddev_pop(x),stddev_samp(x) from v where x > 1.0;
+select count(*),count(x),sum(x),avg(x),min(x),max(x),variance(x),var_pop(x),var_samp(x),stddev(x),stddev_pop(x),stddev_samp(x) from s where x > 1.0;
