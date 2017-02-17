@@ -1,12 +1,14 @@
-CREATE EXTENSION
-CREATE TABLE
-CREATE TABLE
-INSERT 0 6
+create extension vops;
+create table s(x real);
+create table v(x vops_float4);
+insert into s values(1.0),(2.0),(null),(3.0),(null),(4.0);
+select populate(destination:='v'::regclass, source:='s'::regclass);
  populate 
 ----------
  
 (1 row)
 
+select unnest(v.*) from v where x > 1;
  unnest 
 --------
  (2)
@@ -14,36 +16,43 @@ INSERT 0 6
  (4)
 (3 rows)
 
+select countall(*) from v where x is not null;
  countall 
 ----------
         4
 (1 row)
 
+select count(*) from v where x is null;
  count 
 -------
     60
 (1 row)
 
+select count(*) from v where x is not null;
  count 
 -------
      4
 (1 row)
 
+select count(*),count(x),sum(x),avg(x),min(x),max(x),variance(x),var_pop(x),var_samp(x),stddev(x),stddev_pop(x),stddev_samp(x) from v where x >= 0.0;
  count | count | sum | avg | min | max |     variance     | var_pop |     var_samp     |      stddev      |    stddev_pop    |   stddev_samp    
 -------+-------+-----+-----+-----+-----+------------------+---------+------------------+------------------+------------------+------------------
      4 |     4 |  10 | 2.5 |   1 |   4 | 1.66666666666667 |    1.25 | 1.66666666666667 | 1.29099444873581 | 1.11803398874989 | 1.29099444873581
 (1 row)
 
+select count(*),count(x),sum(x),avg(x),min(x),max(x),variance(x),var_pop(x),var_samp(x),stddev(x),stddev_pop(x),stddev_samp(x) from s where x >= 0.0;
  count | count | sum | avg | min | max |     variance     | var_pop |     var_samp     |      stddev      |    stddev_pop    |   stddev_samp    
 -------+-------+-----+-----+-----+-----+------------------+---------+------------------+------------------+------------------+------------------
      4 |     4 |  10 | 2.5 |   1 |   4 | 1.66666666666667 |    1.25 | 1.66666666666667 | 1.29099444873581 | 1.11803398874989 | 1.29099444873581
 (1 row)
 
+select count(*),count(x),sum(x),avg(x),min(x),max(x),variance(x),var_pop(x),var_samp(x),stddev(x),stddev_pop(x),stddev_samp(x) from v where x > 1.0;
  count | count | sum | avg | min | max | variance |      var_pop      | var_samp | stddev |    stddev_pop     | stddev_samp 
 -------+-------+-----+-----+-----+-----+----------+-------------------+----------+--------+-------------------+-------------
      3 |     3 |   9 |   3 |   2 |   4 |        1 | 0.666666666666667 |        1 |      1 | 0.816496580927726 |           1
 (1 row)
 
+select count(*),count(x),sum(x),avg(x),min(x),max(x),variance(x),var_pop(x),var_samp(x),stddev(x),stddev_pop(x),stddev_samp(x) from s where x > 1.0;
  count | count | sum | avg | min | max | variance |      var_pop      | var_samp | stddev |    stddev_pop     | stddev_samp 
 -------+-------+-----+-----+-----+-----+----------+-------------------+----------+--------+-------------------+-------------
      3 |     3 |   9 |   3 |   2 |   4 |        1 | 0.666666666666667 |        1 |      1 | 0.816496580927726 |           1

@@ -6,9 +6,9 @@ OBJS = vops.o
 EXTENSION = vops
 DATA = vops--1.0.sql
 PGFILEDESC = "vops - vectorized operations"
-#CUSTOM_COPT = -O3
+CUSTOM_COPT = -O3
 
-REGRESS = test.sql
+REGRESS = test
 
 ifdef USE_PGXS
 PG_CONFIG = pg_config
