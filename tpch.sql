@@ -50,7 +50,7 @@ create table lineitem_projection as (select l_shipdate,l_quantity,l_extendedpric
 
 select populate(destination := 'vops_lineitem_projection'::regclass, source := 'lineitem_projection'::regclass, sort := 'l_returnflag,l_linestatus');
 
-\timing
+\timing on
 
 -- Q6
 select

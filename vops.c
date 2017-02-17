@@ -104,6 +104,12 @@ typedef struct {
 	double sum;
 } vops_avg_state;
 
+typedef struct { 
+	uint64 count;
+	double sum;
+	double sum2;
+} vops_var_state;
+
 typedef struct {
 	HTAB* htab;
 	int   n_aggs;
@@ -437,6 +443,36 @@ static vops_type vops_get_type(Oid typid)
 				}														\
 				state->count += 1;										\
 				state->sum += opd->payload[i];							\
+			}															\
+		}																\
+		if (state == NULL) {											\
+			PG_RETURN_NULL();											\
+		} else {														\
+			PG_RETURN_POINTER(state);									\
+		}																\
+	}																    \
+
+#define VAR_AGG(TYPE)													\
+	PG_FUNCTION_INFO_V1(vops_##TYPE##_var_accumulate);					\
+	Datum vops_##TYPE##_var_accumulate(PG_FUNCTION_ARGS)				\
+	{																	\
+	    vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
+		vops_var_state* state = PG_ARGISNULL(0) ? NULL : (vops_var_state*)PG_GETARG_POINTER(0); \
+		int i;															\
+		for (i = 0; i < TILE_SIZE; i++) {								\
+		    if ((filter_mask & ~opd->nullmask) & ((uint64)1 << i)) {	\
+			    if (state == NULL) {									\
+					MemoryContext agg_context;							\
+					MemoryContext old_context;							\
+					if (!AggCheckCallContext(fcinfo, &agg_context))		\
+						elog(ERROR, "aggregate function called in non-aggregate context"); \
+					old_context = MemoryContextSwitchTo(agg_context);	\
+					state = (vops_var_state*)palloc0(sizeof(vops_var_state)); \
+					MemoryContextSwitchTo(old_context);					\
+				}														\
+				state->count += 1;										\
+				state->sum += opd->payload[i];							\
+				state->sum2 += (double)opd->payload[i]*opd->payload[i];	\
 			}															\
 		}																\
 		if (state == NULL) {											\
@@ -811,6 +847,103 @@ Datum vops_avg_deserial(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(state);
 }
 
+PG_FUNCTION_INFO_V1(vops_var_samp_final);					
+Datum vops_var_samp_final(PG_FUNCTION_ARGS)				    
+{																	
+	vops_var_state* state = (vops_var_state*)PG_GETARG_POINTER(0); 
+	if (state->count <= 1) { 
+		PG_RETURN_NULL();
+	}
+	PG_RETURN_FLOAT8((state->sum2 * state->count - state->sum*state->sum) / ((double)state->count * (state->count - 1)));				
+}																	
+
+PG_FUNCTION_INFO_V1(vops_var_pop_final);					
+Datum vops_var_pop_final(PG_FUNCTION_ARGS)				    
+{																	
+	vops_var_state* state = (vops_var_state*)PG_GETARG_POINTER(0); 
+	PG_RETURN_FLOAT8((state->sum2 - state->sum*state->sum/state->count) / state->count);				
+}																	
+
+PG_FUNCTION_INFO_V1(vops_stddev_samp_final);					
+Datum vops_stddev_samp_final(PG_FUNCTION_ARGS)				    
+{																	
+	vops_var_state* state = (vops_var_state*)PG_GETARG_POINTER(0); 
+	double var;
+	if (state->count <= 1) { 
+		PG_RETURN_NULL();
+	}
+	var = (state->sum2 * state->count - state->sum*state->sum) / ((double)state->count * (state->count - 1));
+	PG_RETURN_FLOAT8(var <= 0.0 ? 0.0 : sqrt(var));
+}																	
+
+PG_FUNCTION_INFO_V1(vops_stddev_pop_final);					
+Datum vops_stddev_pop_final(PG_FUNCTION_ARGS)				    
+{																	
+	vops_var_state* state = (vops_var_state*)PG_GETARG_POINTER(0); 
+	double var = (state->sum2 - state->sum*state->sum/state->count) / state->count;				
+	PG_RETURN_FLOAT8(var <= 0.0 ? 0.0 : sqrt(var));	
+}																	
+
+PG_FUNCTION_INFO_V1(vops_var_combine);					
+Datum vops_var_combine(PG_FUNCTION_ARGS)				    
+{																	
+	vops_var_state* state0 = PG_ARGISNULL(0) ? NULL : (vops_var_state*)PG_GETARG_POINTER(0); 
+	vops_var_state* state1 = PG_ARGISNULL(1) ? NULL : (vops_var_state*)PG_GETARG_POINTER(1); 
+	if (state0 == NULL) { 
+		if (state1 == NULL) { 
+			PG_RETURN_NULL();
+		} else { 
+			MemoryContext agg_context;									
+			MemoryContext old_context;									
+			if (!AggCheckCallContext(fcinfo, &agg_context))				
+				elog(ERROR, "aggregate function called in non-aggregate context"); 
+			old_context = MemoryContextSwitchTo(agg_context);			
+			state0 = (vops_var_state*)palloc0(sizeof(vops_var_state));	
+			MemoryContextSwitchTo(old_context);							
+			*state0 = *state1;
+		}
+	} else if (state1 != NULL) { 
+		state0->sum += state1->sum;
+		state0->sum2 += state1->sum2;
+		state0->count += state1->count;
+	}
+	PG_RETURN_POINTER(state0);
+}																
+			
+PG_FUNCTION_INFO_V1(vops_var_serial);					
+Datum vops_var_serial(PG_FUNCTION_ARGS)				    
+{
+	vops_var_state* state = (vops_var_state*)PG_GETARG_POINTER(0); 
+	StringInfoData buf;
+	bytea* result;
+	pq_begintypsend(&buf);
+	pq_sendint64(&buf, state->count);
+	pq_sendfloat8(&buf, state->sum);
+	pq_sendfloat8(&buf, state->sum2);
+	result = pq_endtypsend(&buf);
+	PG_RETURN_BYTEA_P(result);
+}
+	
+PG_FUNCTION_INFO_V1(vops_var_deserial);					
+Datum vops_var_deserial(PG_FUNCTION_ARGS)				    
+{
+	bytea* sstate = PG_GETARG_BYTEA_P(0);
+	vops_var_state* state = (vops_var_state*)palloc(sizeof(vops_var_state));
+	StringInfoData buf;
+
+	initStringInfo(&buf);
+	appendBinaryStringInfo(&buf, VARDATA(sstate), VARSIZE(sstate) - VARHDRSZ);
+
+	state->count = pq_getmsgint64(&buf);  
+	state->sum = pq_getmsgfloat8(&buf);
+	state->sum2 = pq_getmsgfloat8(&buf);
+
+	pq_getmsgend(&buf);
+	pfree(buf.data);
+
+	PG_RETURN_POINTER(state);
+}
+
 PG_FUNCTION_INFO_V1(vops_agg_serial);					
 Datum vops_agg_serial(PG_FUNCTION_ARGS)				    
 {
@@ -921,6 +1054,7 @@ Datum vops_agg_deserial(PG_FUNCTION_ARGS)
     COUNT_AGG(TYPE)											\
 	SUM_AGG(TYPE,STYPE,GSTYPE)								\
 	AVG_AGG(TYPE)											\
+	VAR_AGG(TYPE)											\
 	MINMAX_AGG(TYPE,CTYPE,GCTYPE,min,<)						\
 	MINMAX_AGG(TYPE,CTYPE,GCTYPE,max,>)						\
 	FIRST_AGG(TYPE,GCTYPE)									\

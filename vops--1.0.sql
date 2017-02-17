@@ -218,6 +218,75 @@ CREATE AGGREGATE avg(vops_char) (
 	PARALLEL = SAFE
 );
 
+create function vops_var_combine(internal,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_var_serial(internal) returns bytea as 'MODULE_PATHNAME' language C parallel safe strict;
+create function vops_var_deserial(bytea,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe strict;
+create function vops_var_pop_final(state internal) returns float8 as 'MODULE_PATHNAME' language C parallel safe strict;
+create function vops_var_samp_final(state internal) returns float8 as 'MODULE_PATHNAME' language C parallel safe strict;
+create function vops_stddev_pop_final(state internal) returns float8 as 'MODULE_PATHNAME' language C parallel safe strict;
+create function vops_stddev_samp_final(state internal) returns float8 as 'MODULE_PATHNAME' language C parallel safe strict;
+
+create function vops_char_var_accumulate(state internal, val vops_char) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE var_pop(vops_char) (
+	SFUNC = vops_char_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE var_samp(vops_char) (
+	SFUNC = vops_char_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE variance(vops_char) (
+	SFUNC = vops_char_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_pop(vops_char) (
+	SFUNC = vops_char_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_samp(vops_char) (
+	SFUNC = vops_char_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev(vops_char) (
+	SFUNC = vops_char_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
 create function vops_char_max_accumulate(state char, val vops_char) returns char as 'MODULE_PATHNAME' language C parallel safe;
 CREATE AGGREGATE max(vops_char) (
 	SFUNC = vops_char_max_accumulate,
@@ -343,6 +412,68 @@ CREATE AGGREGATE sum(vops_int2) (
     COMBINEFUNC = int8pl,
 	PARALLEL = SAFE
 );
+
+create function vops_int2_var_accumulate(state internal, val vops_int2) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE var_pop(vops_int2) (
+	SFUNC = vops_int2_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE var_samp(vops_int2) (
+	SFUNC = vops_int2_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE variance(vops_int2) (
+	SFUNC = vops_int2_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_pop(vops_int2) (
+	SFUNC = vops_int2_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_samp(vops_int2) (
+	SFUNC = vops_int2_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev(vops_int2) (
+	SFUNC = vops_int2_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
 
 create function vops_int2_avg_accumulate(state internal, val vops_int2) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 CREATE AGGREGATE avg(vops_int2) (
@@ -483,6 +614,67 @@ CREATE AGGREGATE sum(vops_int4) (
 	PARALLEL = SAFE
 );
 
+create function vops_int4_var_accumulate(state internal, val vops_int4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE var_pop(vops_int4) (
+	SFUNC = vops_int4_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE var_samp(vops_int4) (
+	SFUNC = vops_int4_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE variance(vops_int4) (
+	SFUNC = vops_int4_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_pop(vops_int4) (
+	SFUNC = vops_int4_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_samp(vops_int4) (
+	SFUNC = vops_int4_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev(vops_int4) (
+	SFUNC = vops_int4_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
 create function vops_int4_avg_accumulate(state internal, val vops_int4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 CREATE AGGREGATE avg(vops_int4) (
 	SFUNC = vops_int4_avg_accumulate,
@@ -619,6 +811,67 @@ CREATE AGGREGATE sum(vops_date) (
 	PARALLEL = SAFE
 );
 
+create function vops_date_var_accumulate(state internal, val vops_date) returns internal as 'MODULE_PATHNAME','vops_int4_var_accumulate' language C parallel safe;
+CREATE AGGREGATE var_pop(vops_date) (
+	SFUNC = vops_date_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE var_samp(vops_date) (
+	SFUNC = vops_date_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE variance(vops_date) (
+	SFUNC = vops_date_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_pop(vops_date) (
+	SFUNC = vops_date_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_samp(vops_date) (
+	SFUNC = vops_date_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev(vops_date) (
+	SFUNC = vops_date_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
 create function vops_date_avg_accumulate(state internal, val vops_date) returns internal as 'MODULE_PATHNAME','vops_int4_avg_accumulate' language C parallel safe;
 CREATE AGGREGATE avg(vops_date) (
 	SFUNC = vops_date_avg_accumulate,
@@ -752,6 +1005,67 @@ CREATE AGGREGATE sum(vops_timestamp) (
 	SFUNC = vops_timestamp_sum_accumulate,
 	STYPE = int8,
     COMBINEFUNC = int8pl,
+	PARALLEL = SAFE
+);
+
+create function vops_timestamp_var_accumulate(state internal, val vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int8_var_accumulate' language C parallel safe;
+CREATE AGGREGATE var_pop(vops_timestamp) (
+	SFUNC = vops_timestamp_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE var_samp(vops_timestamp) (
+	SFUNC = vops_timestamp_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE variance(vops_timestamp) (
+	SFUNC = vops_timestamp_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_pop(vops_timestamp) (
+	SFUNC = vops_timestamp_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_samp(vops_timestamp) (
+	SFUNC = vops_timestamp_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev(vops_timestamp) (
+	SFUNC = vops_timestamp_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
 	PARALLEL = SAFE
 );
 
@@ -892,6 +1206,67 @@ CREATE AGGREGATE sum(vops_int8) (
 	PARALLEL = SAFE
 );
 
+create function vops_int8_var_accumulate(state internal, val vops_int8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE var_pop(vops_int8) (
+	SFUNC = vops_int8_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE var_samp(vops_int8) (
+	SFUNC = vops_int8_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE variance(vops_int8) (
+	SFUNC = vops_int8_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_pop(vops_int8) (
+	SFUNC = vops_int8_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_samp(vops_int8) (
+	SFUNC = vops_int8_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev(vops_int8) (
+	SFUNC = vops_int8_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
 create function vops_int8_avg_accumulate(state internal, val vops_int8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 CREATE AGGREGATE avg(vops_int8) (
 	SFUNC = vops_int8_avg_accumulate,
@@ -1018,6 +1393,67 @@ CREATE AGGREGATE sum(vops_float4) (
 	PARALLEL = SAFE
 );
 
+create function vops_float4_var_accumulate(state internal, val vops_float4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE var_pop(vops_float4) (
+	SFUNC = vops_float4_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE var_samp(vops_float4) (
+	SFUNC = vops_float4_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE variance(vops_float4) (
+	SFUNC = vops_float4_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_pop(vops_float4) (
+	SFUNC = vops_float4_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_samp(vops_float4) (
+	SFUNC = vops_float4_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev(vops_float4) (
+	SFUNC = vops_float4_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
 create function vops_float4_avg_accumulate(state internal, val vops_float4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 CREATE AGGREGATE avg(vops_float4) (
 	SFUNC = vops_float4_avg_accumulate,
@@ -1141,6 +1577,67 @@ CREATE AGGREGATE sum(vops_float8) (
 	SFUNC = vops_float8_sum_accumulate,
 	STYPE = float8,
     COMBINEFUNC = float8pl,
+	PARALLEL = SAFE
+);
+
+create function vops_float8_var_accumulate(state internal, val vops_float8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE var_pop(vops_float8) (
+	SFUNC = vops_float8_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE var_samp(vops_float8) (
+	SFUNC = vops_float8_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE variance(vops_float8) (
+	SFUNC = vops_float8_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_pop(vops_float8) (
+	SFUNC = vops_float8_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_pop_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev_samp(vops_float8) (
+	SFUNC = vops_float8_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+CREATE AGGREGATE stddev(vops_float8) (
+	SFUNC = vops_float8_var_accumulate,
+	STYPE = internal,
+	FINALFUNC = vops_var_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
 	PARALLEL = SAFE
 );
 
