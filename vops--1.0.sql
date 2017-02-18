@@ -191,6 +191,8 @@ create operator <= (leftarg=int4, rightarg=vops_char, procedure=vops_char_le_lco
 
 create function betwixt(opd vops_char, low int4, high int4) returns vops_bool as 'MODULE_PATHNAME','vops_betwixt_char' language C parallel safe immutable strict;
 
+create function ifnull(opd vops_char, subst int4) returns vops_char as 'MODULE_PATHNAME','vops_ifnull_char' language C parallel safe immutable;
+
 create function vops_char_neg(right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator - (rightarg=vops_char, procedure=vops_char_neg);
 
@@ -402,6 +404,8 @@ create operator <= (leftarg=int4, rightarg=vops_int2, procedure=vops_int2_le_lco
 
 create function betwixt(opd vops_int2, low int4, high int4) returns vops_bool as 'MODULE_PATHNAME','vops_betwixt_int2' language C parallel safe immutable strict;
 
+create function ifnull(opd vops_int2, subst int4) returns vops_int2 as 'MODULE_PATHNAME','vops_ifnull_int2' language C parallel safe immutable;
+
 create function vops_int2_neg(right vops_int2) returns vops_int2 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator - (rightarg=vops_int2, procedure=vops_int2_neg);
 
@@ -603,6 +607,8 @@ create operator <= (leftarg=int4, rightarg=vops_int4, procedure=vops_int4_le_lco
 
 create function betwixt(opd vops_int4, low int4, high int4) returns vops_bool as 'MODULE_PATHNAME','vops_betwixt_int4' language C parallel safe immutable strict;
 
+create function ifnull(opd vops_int4, subst int4) returns vops_int4 as 'MODULE_PATHNAME','vops_ifnull_int4' language C parallel safe immutable;
+
 create function vops_int4_neg(right vops_int4) returns vops_int4 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator - (rightarg=vops_int4, procedure=vops_int4_neg);
 
@@ -799,6 +805,8 @@ create operator <= (leftarg=vops_date, rightarg=date, procedure=vops_date_le_rco
 create operator <= (leftarg=date, rightarg=vops_date, procedure=vops_date_le_lconst, commutator= >=);
 
 create function betwixt(opd vops_date, low date, high date) returns vops_bool as 'MODULE_PATHNAME','vops_betwixt_int4' language C parallel safe immutable strict;
+
+create function ifnull(opd vops_date, subst date) returns vops_date as 'MODULE_PATHNAME','vops_ifnull_int4' language C parallel safe immutable;
 
 create function vops_date_neg(right vops_date) returns vops_date as 'MODULE_PATHNAME','vops_int4_neg' language C parallel safe immutable strict;
 create operator - (rightarg=vops_date, procedure=vops_date_neg);
@@ -997,6 +1005,8 @@ create operator <= (leftarg=timestamp, rightarg=vops_timestamp, procedure=vops_t
 
 create function betwixt(opd vops_timestamp, low timestamp, high timestamp) returns vops_bool as 'MODULE_PATHNAME','vops_betwixt_int8' language C parallel safe immutable strict;
 
+create function ifnull(opd vops_timestamp, subst timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_ifnull_int8' language C parallel safe immutable;
+
 create function vops_timestamp_neg(right vops_timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_neg' language C parallel safe immutable strict;
 create operator - (rightarg=vops_timestamp, procedure=vops_timestamp_neg);
 
@@ -1194,6 +1204,8 @@ create operator <= (leftarg=int8, rightarg=vops_int8, procedure=vops_int8_le_lco
 
 create function betwixt(opd vops_int8, low int8, high int8) returns vops_bool as 'MODULE_PATHNAME','vops_betwixt_int8' language C parallel safe immutable strict;
 
+create function ifnull(opd vops_int8, subst int8) returns vops_int8 as 'MODULE_PATHNAME','vops_ifnull_int8' language C parallel safe immutable;
+
 create function vops_int8_neg(right vops_int8) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator - (rightarg=vops_int8, procedure=vops_int8_neg);
 
@@ -1382,6 +1394,8 @@ create operator <= (leftarg=float8, rightarg=vops_float4, procedure=vops_float4_
 
 create function betwixt(opd vops_float4, low float8, high float8) returns vops_bool as 'MODULE_PATHNAME','vops_betwixt_float4' language C parallel safe immutable strict;
 
+create function ifnull(opd vops_float4, subst float8) returns vops_float4 as 'MODULE_PATHNAME','vops_ifnull_float4' language C parallel safe immutable;
+
 create function vops_float4_neg(right vops_float4) returns vops_float4 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator - (rightarg=vops_float4, procedure=vops_float4_neg);
 
@@ -1569,6 +1583,8 @@ create operator <= (leftarg=float8, rightarg=vops_float8, procedure=vops_float8_
 
 create function betwixt(opd vops_float8, low float8, high float8) returns vops_bool as 'MODULE_PATHNAME','vops_betwixt_float8' language C parallel safe immutable strict;
 
+create function ifnull(opd vops_float8, subst float8) returns vops_float8 as 'MODULE_PATHNAME','vops_ifnull_float8' language C parallel safe immutable;
+
 create function vops_float8_neg(right vops_float8) returns vops_float8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator - (rightarg=vops_float8, procedure=vops_float8_neg);
 
@@ -1706,6 +1722,9 @@ CREATE AGGREGATE countall(*) (
 
 -- Generic functions
 
+-- Call this function to force loading of VOPS extension (if it is not registered in shared_preload_libraries list
+create function vops_initialize() returns void as 'MODULE_PATHNAME' language C;
+
 create function filter(condition vops_bool) returns bool as 'MODULE_PATHNAME','vops_filter' language C parallel safe strict immutable;
 
 create function populate(destination regclass, source regclass, predicate cstring default null, sort cstring default null) returns void as 'MODULE_PATHNAME','vops_populate' language C;
@@ -1719,3 +1738,4 @@ create cast (vops_bool as bool) with function filter(vops_bool) AS IMPLICIT;
 
 create function is_null(anyelement) returns vops_bool as 'MODULE_PATHNAME','vops_is_null'  language C parallel safe immutable;
 create function is_not_null(anyelement) returns vops_bool as 'MODULE_PATHNAME','vops_is_not_null'  language C parallel safe immutable;
+

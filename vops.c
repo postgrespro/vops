@@ -299,6 +299,21 @@ static bool is_vops_type(Oid typeid)
 		PG_RETURN_POINTER(result);										\
 	}																	\
 
+#define IFNULL_OP(TYPE,CTYPE,GXTYPE)									\
+	PG_FUNCTION_INFO_V1(vops_ifnull_##TYPE);							\
+	Datum vops_ifnull_##TYPE(PG_FUNCTION_ARGS)							\
+	{																	\
+	    vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
+		CTYPE subst = (CTYPE)PG_GETARG_##GXTYPE(1);						\
+		vops_##TYPE* result = (vops_##TYPE*)palloc(sizeof(vops_##TYPE)); \
+		int i;															\
+		for (i = 0; i < TILE_SIZE; i++) {								\
+			result->payload[i] = (opd->nullmask & ((uint64)1 << i)) ? subst : opd->payload[i]; \
+		}																\
+		result->nullmask = 0;						                    \
+		PG_RETURN_POINTER(result);										\
+	}																	\
+
 #define BIN_RCONST_OP(TYPE,XTYPE,GXTYPE,OP,COP)							\
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_##OP##_rconst);	                \
 	Datum vops_##TYPE##_##OP##_rconst(PG_FUNCTION_ARGS)					\
@@ -1056,6 +1071,7 @@ Datum vops_agg_deserial(PG_FUNCTION_ARGS)
 	CMP_LCONST_OP(TYPE,XTYPE,GXTYPE,ge,>=)					\
 	CMP_RCONST_OP(TYPE,XTYPE,GXTYPE,ge,>=)					\
 	BETWIXT_OP(TYPE,XTYPE,GXTYPE)							\
+	IFNULL_OP(TYPE,CTYPE,GXTYPE)							\
     COUNT_AGG(TYPE)											\
 	SUM_AGG(TYPE,STYPE,GSTYPE)								\
 	AVG_AGG(TYPE)											\
@@ -1963,6 +1979,13 @@ Datum vops_is_not_null(PG_FUNCTION_ARGS)
 	}
 	PG_RETURN_POINTER(result);
 }
+
+PG_FUNCTION_INFO_V1(vops_initialize);
+Datum vops_initialize(PG_FUNCTION_ARGS) 
+{
+	PG_RETURN_VOID();
+}
+
 		
 static Oid vops_bool_oid;
 static Oid filter_oid;

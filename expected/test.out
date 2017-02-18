@@ -58,3 +58,9 @@ select count(*),count(x),sum(x),avg(x),min(x),max(x),variance(x),var_pop(x),var_
      3 |     3 |   9 |   3 |   2 |   4 |        1 | 0.666666666666667 |        1 |      1 | 0.816496580927726 |           1
 (1 row)
 
+select count(*) from v where ifnull(x, 0) >= 0;
+ count 
+-------
+    64
+(1 row)
+

@@ -256,7 +256,10 @@ Them can be used for grouping by several columns (see below).
 <tr><td><code>&</code></td><td>Boolean AND</td></tr>
 <tr><td><code>|</code></td><td>Boolean OR</td></tr>
 <tr><td><code>!</code></td><td>Boolean NOT</td></tr>
-<tr><td><code>BITWIXT</code></td><td>Analog of BETWEEN</td></tr>
+<tr><td><code>bitwixt(x,low,high)</code></td><td>Analog of BETWEEN</td></tr>
+<tr><td><code>is_null(x)</code></td><td>Analog of IS NULL</td></tr>
+<tr><td><code>is_not_null(x)</code></td><td>Analog of IS NOT NULL</td></tr>
+<tr><td><code>ifnull(x,subst)</code></td><td>Analog of COALESCE</td></tr>
 </table>
 
 <h3><a name="aggregates">Vector aggregates</a></h3>
@@ -571,6 +574,8 @@ There is one pitfall with post parse analyze hook: it is initialized in the exte
 But if extension was not registered in <code>shared_preload_libraries</code> list, then it will be loaded on demand when any function of this extension is requested.
 Unfortunately it happens <b>after</b> parse analyze is done. So first time you execute VOPS query, it will not be transformed. You can get wrong result in this case.
 Either take it in account, either add <code>vops</code> to <code>shared_preload_libraries</code> configuration string.
+VOPS extension provides special function <code>vops_initialize()</code> which can be invoked to force initialization of VOPS extension.
+After invocation of this function, extension will be loaded and all subsequent queries will be normally transformed and produce expected results.
 </p>
 
 <h2><a name="example">Example</a></h2>

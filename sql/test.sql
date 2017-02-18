@@ -11,3 +11,4 @@ select count(*),count(x),sum(x),avg(x),min(x),max(x),variance(x),var_pop(x),var_
 select count(*),count(x),sum(x),avg(x),min(x),max(x),variance(x),var_pop(x),var_samp(x),stddev(x),stddev_pop(x),stddev_samp(x) from s where x >= 0.0;
 select count(*),count(x),sum(x),avg(x),min(x),max(x),variance(x),var_pop(x),var_samp(x),stddev(x),stddev_pop(x),stddev_samp(x) from v where x > 1.0;
 select count(*),count(x),sum(x),avg(x),min(x),max(x),variance(x),var_pop(x),var_samp(x),stddev(x),stddev_pop(x),stddev_samp(x) from s where x > 1.0;
+select count(*) from v where ifnull(x, 0) >= 0;
