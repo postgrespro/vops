@@ -12,6 +12,7 @@
  <li><a href="#types">Types</a></li>
  <li><a href="#operators">Vector operators</a></li>
  <li><a href="#aggregates">Vector aggregates</a></li>
+ <li><a href="#window">Vector window functions</a></li>
  <li><a href="#indexes">Using indexes</a></li>
  <li><a href="#populating">Preparing data for VOPS</a></li>
  <li><a href="#unnest">Back to normal tuples</a></li>
@@ -353,6 +354,28 @@ while all other used fields - tile types (<code>l_shipdate</code> has type <code
 The query above is executed even faster than query with <code>reduce(map(...))</code>.
 The main problem with this approach is that you have to create projection for each combination of group by keys you want to use in queries.
 </p>
+
+<h3><a name="window">Vector window functions</a></h3>
+<p>
+VOPS provides limited support of Postgres window functions. It implements <code>count, sum, min, max, avg</code> and <code>lag</code> functions.
+But unfortunately Postgres requires aggregates to have to similar final type for moving (window) and plain implementations.
+This is why VOPS has to choose define this aggregate under different names: <code>mcount, msum, mmin, mmax, mavg</code>.
+</p>
+<p>
+There are also two important restrictions:
+</p>
+<ol>
+<li>Grouping and sorting can be done only by scalar (non-tile) attributes</li>
+<li>Only <code>rows between unbounded preceding and current row</code> frame is supported.
+</ol>
+
+<p>
+Example of using window functions with VOPS:
+</p>
+<pre>
+select unnest(t.*) from (select mcount(*) over w,mcount(x) over w,msum(x) over w,mavg(x) over w,mmin(x) over w,mmax(x) over w,x - lag(x) over w 
+from v window w as (rows between unbounded preceding and current row)) t;
+</pre>
 
 <h3><a name="indexes">Using indexes</a></h3>
 <p>
