@@ -2416,7 +2416,10 @@ create function vops_initialize() returns void as 'MODULE_PATHNAME' language C;
 
 create function filter(condition vops_bool) returns bool as 'MODULE_PATHNAME','vops_filter' language C parallel safe strict immutable;
 
-create function populate(destination regclass, source regclass, predicate cstring default null, sort cstring default null) returns void as 'MODULE_PATHNAME','vops_populate' language C;
+create function populate(destination regclass, source regclass, predicate cstring default null, sort cstring default null) returns bigint as 'MODULE_PATHNAME','vops_populate' language C;
+create function import(destination regclass, csv_path cstring, separator cstring default ',', skip integer default 0) returns bigint as 'MODULE_PATHNAME','vops_import' language C strict;
+
+
 
 create type vops_aggregates as(group_by int8, count int8, aggs float8[]);
 create function reduce(bigint) returns setof vops_aggregates as 'MODULE_PATHNAME','vops_reduce' language C parallel safe strict immutable;

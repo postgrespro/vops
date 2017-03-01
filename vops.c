@@ -77,6 +77,7 @@ typedef enum
 
 #define TILE_SIZE 64 /* just because of maximum size of bitmask */
 #define MAX_SQL_STMT_LEN 1024
+#define MAX_CSV_LINE_LEN 4096
 #define MAX_TILE_STRLEN (TILE_SIZE*16)
 #define INIT_MAP_SIZE (1024*1024)
 
@@ -180,6 +181,8 @@ typedef struct {
 	int16     len;
 	bool      byval;
 	char      align;
+	FmgrInfo  inproc;
+	Oid       inproc_param_oid;
 } vops_type_info;
 
 static struct {
@@ -664,7 +667,7 @@ static bool is_vops_type(Oid typeid)
 		state->tile.payload[0] = state->lag;							\
 		state->lag = opd->payload[TILE_SIZE-1];							\
 		state->tile.nullmask = (opd->nullmask << 1) | state->is_null;	\
-		state->is_null = opd->nullmask >> 63;							\
+		state->is_null = opd->nullmask >> (TILE_SIZE-1);				\
 		PG_RETURN_POINTER(state);										\
 	}																	\
     PG_FUNCTION_INFO_V1(vops_##TYPE##_lag_reduce);						\
@@ -1433,6 +1436,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
     Portal portal;
 	int rc;
 	bool is_null;
+	int64 loaded;
     char stmt[MAX_SQL_STMT_LEN];
 
     SPI_connect();
@@ -1484,7 +1488,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 		values[i] = PointerGetDatum(types[i].tid != VOPS_LAST ? palloc(vops_sizeof[types[i].tid]) : NULL);
 	}
 
-	for (j = 0; ; j++) {
+	for (j = 0, loaded = 0; ; j++, loaded++) {
         SPI_cursor_fetch(portal, true, 1);
         if (SPI_processed) {
             HeapTuple spi_tuple = SPI_tuptable->vals[0];
@@ -1581,7 +1585,255 @@ Datum vops_populate(PG_FUNCTION_ARGS)
     SPI_cursor_close(portal);
  	SPI_finish();
 
-	PG_RETURN_VOID();
+	PG_RETURN_INT64(loaded);
+}
+
+static int64 vops_import_lineno;
+static int   vops_import_attno;
+static int   vops_import_relid;
+
+static void vops_import_error_callback(void* arg)
+{
+	errcontext("IMPORT %s, line %lld, column %d",			   
+			   get_rel_name(vops_import_relid),
+			   (long long)vops_import_lineno,
+			   vops_import_attno);
+}
+
+PG_FUNCTION_INFO_V1(vops_import);
+Datum vops_import(PG_FUNCTION_ARGS)
+{
+    Oid destination = PG_GETARG_OID(0);
+    char const* csv_path = PG_GETARG_CSTRING(1);
+    char sep = *(char*)PG_GETARG_CSTRING(2);
+	int skip = PG_GETARG_INT32(3);
+	char* sql;
+	TupleDesc spi_tupdesc;
+	int i, j, k, n_attrs;
+	vops_type_info* types;
+	Datum* values;
+	bool*  nulls;
+	int rc;
+	FILE* in;
+	bool is_null;
+	int64 loaded;
+	ErrorContextCallback errcallback;
+    char buf[MAX_CSV_LINE_LEN];
+
+    SPI_connect();
+	sql = psprintf("select atttypid from pg_attribute where attrelid=%d and attnum>0 order by attnum", destination);
+    rc = SPI_execute(sql, true, 0);
+    if (rc != SPI_OK_SELECT) {
+        elog(ERROR, "Select failed with status %d", rc);
+    }
+    n_attrs = SPI_processed;
+    if (n_attrs == 0) {
+        elog(ERROR, "Table %s.%s doesn't exist",
+			 get_namespace_name(get_rel_namespace(destination)),
+			 get_rel_name(destination));
+    }
+	types = (vops_type_info*)palloc(sizeof(vops_type_info)*n_attrs);
+	values = (Datum*)palloc(sizeof(Datum)*n_attrs);
+	nulls = (bool*)palloc0(sizeof(bool)*n_attrs);
+
+	spi_tupdesc = SPI_tuptable->tupdesc;
+	for (i = 0; i < n_attrs; i++) {
+        HeapTuple spi_tuple = SPI_tuptable->vals[i];
+        Oid type_id = DatumGetObjectId(SPI_getbinval(spi_tuple, spi_tupdesc, 1, &is_null));
+		Oid input_oid;
+		types[i].tid = vops_get_type(type_id);
+		if (types[i].tid != VOPS_LAST) { 
+			type_id = vops_map_tid[types[i].tid];
+		}
+		get_typlenbyvalalign(type_id, &types[i].len, &types[i].byval, &types[i].align);
+		getTypeInputInfo(type_id, &input_oid, &types[i].inproc_param_oid);			
+		fmgr_info_cxt(input_oid, &types[i].inproc, fcinfo->flinfo->fn_mcxt);
+		SPI_freetuple(spi_tuple);
+	}
+    SPI_freetuptable(SPI_tuptable);
+
+	for (i = 0; i < n_attrs; i++) {
+		values[i] = PointerGetDatum(types[i].tid != VOPS_LAST ? palloc(vops_sizeof[types[i].tid]) : NULL);
+	}
+
+	in = fopen(csv_path, "r");
+	if (in == NULL) { 
+		elog(ERROR, "Failed to open file %s: %m", csv_path);
+	}
+
+	for (vops_import_lineno = 1; --skip >= 0; vops_import_lineno++) { 
+		if (fgets(buf, sizeof buf, in) == NULL) { 
+			elog(ERROR, "File %s contains no data", csv_path);
+		}
+	}
+	
+	vops_import_relid = destination;
+	errcallback.callback = vops_import_error_callback;
+	errcallback.arg =  NULL;
+	errcallback.previous = error_context_stack;
+	error_context_stack = &errcallback;
+
+	begin_batch_insert(destination);
+
+	for (j = 0, loaded = 0; fgets(buf, sizeof buf, in) != NULL; loaded++, vops_import_lineno++, j++) {
+		char* p = buf;
+		if (j == TILE_SIZE) {
+			insert_tuple(values, nulls);
+			j = 0;
+		}
+		for (i = 0; i < n_attrs; i++) {
+			char quote = '\0';
+			char* str;
+			char* dst;
+			Datum val;
+
+			vops_import_attno = i+1;
+
+			if (*p != sep && (*p == '\'' || *p == '"')) {
+				quote = *p++;
+				dst = p;
+				str = p;
+				do { 
+					while (*p != quote) {
+						if (*p == '\0') {
+							elog(ERROR, "Unterminated string %s", str);
+						}
+						*dst++ = *p++;
+					}
+				} while (*++p == quote);
+				
+				*dst = '\0';
+				if (*p == sep) {
+					p += 1;
+				}
+				is_null = false;
+			} else {
+				str = p;
+				while (*p != sep && *p != '\n' && *p != '\r' && *p != '\0') {
+					p += 1;
+				}
+				if (*p == sep) {
+					*p++ = '\0';
+				} else {
+					*p = '\0';
+				}
+				is_null = *str == '\0';					
+			}
+			val = is_null ? Int32GetDatum(0) : InputFunctionCall(&types[i].inproc, str, types[i].inproc_param_oid, -1);
+			if (types[i].tid == VOPS_LAST) {
+				if (j == 0) {
+					nulls[i] = is_null;
+					if (types[i].byval) {
+						values[i] = val;
+					} else if (!is_null) {
+						if (DatumGetPointer(values[i]) != NULL) {
+							pfree(DatumGetPointer(values[i]));
+						}
+						values[i] = val;
+					}
+				}
+				else if (is_null != nulls[i]
+						 || !(is_null || datumIsEqual(values[i], val, types[i].byval, types[i].len)))
+				{
+					/* Mark unassigned elements as nulls */
+					for (k = 0; k < n_attrs; k++) {
+						if (types[k].tid != VOPS_LAST) {
+							vops_tile* tile = (vops_tile*)DatumGetPointer(values[k]);
+							tile->nullmask |= (uint64)~0 << j;
+						}
+					}
+					insert_tuple(values, nulls);
+					for (k = 0; k < i; k++) { 
+						if (types[k].tid != VOPS_LAST) { 
+							vops_tile* tile = (vops_tile*)DatumGetPointer(values[k]);
+							tile->nullmask = is_null;							
+							switch (types[k].tid) {
+							  case VOPS_BOOL:
+								((vops_bool*)tile)->payload >>= j;
+								break;
+							  case VOPS_CHAR:
+								((vops_char*)tile)->payload[0] = ((vops_char*)tile)->payload[j];
+								break;
+							  case VOPS_INT2:
+								((vops_int2*)tile)->payload[0] = ((vops_int2*)tile)->payload[j];
+								break;
+							  case VOPS_INT4:
+							  case VOPS_DATE:
+								((vops_int4*)tile)->payload[0] = ((vops_int4*)tile)->payload[j];
+								break;
+							  case VOPS_INT8:
+							  case VOPS_TIMESTAMP:
+								((vops_int8*)tile)->payload[0] = ((vops_int8*)tile)->payload[j];
+								break;
+							  case VOPS_FLOAT4:
+								((vops_float4*)tile)->payload[0] = ((vops_float4*)tile)->payload[j];
+								break;
+							  case VOPS_FLOAT8:
+								((vops_float8*)tile)->payload[0] = ((vops_float8*)tile)->payload[j];
+								break;
+							  default:
+								Assert(false);
+							}
+						}
+					}
+					j = 0;
+					values[i] = val;
+					nulls[i] = is_null;
+				}
+			} else {
+				vops_tile* tile = (vops_tile*)DatumGetPointer(values[i]);
+				tile->nullmask &= ~((uint64)1 << j);
+				tile->nullmask |= (uint64)is_null << j;
+				switch (types[i].tid) {
+				  case VOPS_BOOL:
+					((vops_bool*)tile)->payload &= ~((uint64)1 << j);
+					((vops_bool*)tile)->payload |= (uint64)DatumGetBool(val) << j;
+					break;
+				  case VOPS_CHAR:
+					((vops_char*)tile)->payload[j] = DatumGetChar(val);
+					break;
+				  case VOPS_INT2:
+					((vops_int2*)tile)->payload[j] = DatumGetInt16(val);
+					break;
+				  case VOPS_INT4:
+				  case VOPS_DATE:
+					((vops_int4*)tile)->payload[j] = DatumGetInt32(val);
+					break;
+				  case VOPS_INT8:
+				  case VOPS_TIMESTAMP:
+					((vops_int8*)tile)->payload[j] = DatumGetInt64(val);
+					break;
+				  case VOPS_FLOAT4:
+					((vops_float4*)tile)->payload[j] = DatumGetFloat4(val);
+					break;
+				  case VOPS_FLOAT8:
+					((vops_float8*)tile)->payload[j] = DatumGetFloat8(val);
+					break;
+				  default:
+					Assert(false);
+				}
+			}
+		}
+	}
+	if (j != 0) {
+		if (j != TILE_SIZE) {
+			/* Mark unassigned elements as nulls */
+			for (i = 0; i < n_attrs; i++) {
+				if (types[i].tid != VOPS_LAST) {
+					vops_tile* tile = (vops_tile*)DatumGetPointer(values[i]);
+					tile->nullmask |= (uint64)~0 << j;
+				}
+			}
+		}
+		insert_tuple(values, nulls);
+	}
+	end_batch_insert();
+
+	error_context_stack = errcallback.previous;
+	fclose(in);
+ 	SPI_finish();
+
+	PG_RETURN_INT64(loaded);
 }
 
 PG_FUNCTION_INFO_V1(vops_win_final);

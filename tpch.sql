@@ -46,7 +46,23 @@ create table vops_lineitem_projection(
 
 select populate(destination := 'vops_lineitem'::regclass, source := 'lineitem'::regclass);
 
-create table lineitem_projection as (select l_shipdate,l_quantity,l_extendedprice,l_discount,l_tax,l_returnflag::"char",l_linestatus::"char" from lineitem);
+-- Load data directly from CSV file
+-- select import(destination := 'vops_lineitem'::regclass, csv_path := '/mnt/data/lineitem.csv', separator := '|');
+
+
+create table lineitem_projection (                                          
+   l_shipdate date not null,
+   l_quantity float4 not null,
+   l_extendedprice float4 not null,
+   l_discount float4 not null,
+   l_tax      float4 not null,
+   l_returnflag "char" not null,
+   l_linestatus "char" not null
+);
+
+insert into lineitem_projection (select l_shipdate,l_quantity,l_extendedprice,l_discount,l_tax,l_returnflag::"char",l_linestatus::"char" from lineitem);
+
+-- create table lineitem_projection as (select l_shipdate,l_quantity,l_extendedprice,l_discount,l_tax,l_returnflag::"char",l_linestatus::"char" from lineitem);
 
 select populate(destination := 'vops_lineitem_projection'::regclass, source := 'lineitem_projection'::regclass, sort := 'l_returnflag,l_linestatus');
 

@@ -472,12 +472,13 @@ Data can be transferred from original to projected table using VOPS <code>popula
 create function populate(destination regclass, 
                         source regclass, 
                         predicate cstring default null, 
-                        sort cstring default null);
+                        sort cstring default null) returns bigint;
 </pre>
 <p>
 Two first mandatory arguments of this function specify target and source tables.
 Optional predicate and sort clauses allow to restrict amount of imported data and enforce requested order.
 By specifying predicate it is possible to update VOPS table using only most recently received records.
+This functions returns number of loaded records.
 Example of populate function invocation:
 </p>
 
@@ -518,6 +519,31 @@ select populate(destination := 'vops_lineitem_projection'::regclass, source := '
 <p>
 Now we can create normal index on partitioning keys, define standard predicates for them and use them in <code>group by</code> and 
 <code>order by</code> clauses.
+</p>
+
+<p>
+Sometimes it is not possible or not desirable to store two copies of the same dataset. VOPS allows to load data directly from CSV file into VOPS
+table with tiles, bypassing creation of normal (plain) table. It can be done using <code>import</code> function:
+</p>
+
+<pre>
+select import(destination := 'vops_lineitem'::regclass, csv_path := '/mnt/data/lineitem.csv', separator := '|');
+</pre>
+
+<p>
+<code>import</code> function is defined in this way:
+</p>
+
+<pre>
+create function import(destination regclass, 
+                       csv_path cstring, 
+                       separator cstring default ',', 
+                       skip integer default 0) returns bigint;
+</pre>
+
+<p>
+It accepts name of target VOPS table, path to CSV file, optional separator (default is ',') and number of lines in CSV header 
+(no header by default). The function returns number of imported rows.
 </p>
 
 <h3><a name="unnest">Back to normal tuples</a></h3>
