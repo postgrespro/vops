@@ -267,7 +267,7 @@ Them can be used for grouping by several columns (see below).
 <p>
 OLAP queries usually perform some kind of aggregation of large volumes of data. These includes <code>grand</code> aggregates which are calculated for the whole
 table or aggregates with <code>group by</code> which are calculated for each group.
-VOPS implements all standard SQL aggregates: <code>count, min, max, sum, avg</code>. Them can be used exactly in the same way as in normal SQL queries:
+VOPS implements all standard SQL aggregates: <code>count, min, max, sum, avg, var_pop, var_sampl, variance, stddev_pop, stddev_samp, stddev</code>. Them can be used exactly in the same way as in normal SQL queries:
 </p>
 <pre>
 select sum(l_extendedprice*l_discount) as revenue
@@ -275,6 +275,14 @@ from vops_lineitem
 where filter(betwixt(l_shipdate, '1996-01-01', '1997-01-01')
         & betwixt(l_discount, 0.08, 0.1)
         & (l_quantity &lt; 24));
+</pre>
+
+<p>
+Also VOPS provides weighted average aggregate VWAP which can be used to calculate volume-weighted average price:
+</p>
+
+<pre>
+select wavg(l_extendedprice,l_quantity) from vops_lineitem;
 </pre>
 
 <p>

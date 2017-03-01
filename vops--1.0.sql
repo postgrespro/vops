@@ -256,6 +256,7 @@ create function vops_var_pop_final(state internal) returns float8 as 'MODULE_PAT
 create function vops_var_samp_final(state internal) returns float8 as 'MODULE_PATHNAME' language C parallel safe strict;
 create function vops_stddev_pop_final(state internal) returns float8 as 'MODULE_PATHNAME' language C parallel safe strict;
 create function vops_stddev_samp_final(state internal) returns float8 as 'MODULE_PATHNAME' language C parallel safe strict;
+create function vops_wavg_final(state internal) returns float8 as 'MODULE_PATHNAME' language C parallel safe;
 
 create function vops_char_var_accumulate(state internal, val vops_char) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 CREATE AGGREGATE var_pop(vops_char) (
@@ -318,6 +319,18 @@ CREATE AGGREGATE stddev(vops_char) (
 	STYPE = internal,
 	SSPACE = 24,
 	FINALFUNC = vops_stddev_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+create function vops_char_wavg_accumulate(state internal, x vops_char, y vops_char) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE wavg(vops_char, vops_char) (
+	SFUNC = vops_char_wavg_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_wavg_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -584,6 +597,17 @@ CREATE AGGREGATE stddev(vops_int2) (
 	PARALLEL = SAFE
 );
 
+create function vops_int2_wavg_accumulate(state internal, x vops_int2, y vops_int2) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE wavg(vops_int2, vops_int2) (
+	SFUNC = vops_int2_wavg_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_wavg_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
 
 create function vops_int2_avg_accumulate(state internal, val vops_int2) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 CREATE AGGREGATE avg(vops_int2) (
@@ -864,6 +888,18 @@ CREATE AGGREGATE stddev(vops_int4) (
 	STYPE = internal,
 	SSPACE = 24,
 	FINALFUNC = vops_stddev_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+create function vops_int4_wavg_accumulate(state internal, x vops_int4, y vops_int4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE wavg(vops_int4, vops_int4) (
+	SFUNC = vops_int4_wavg_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_wavg_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1152,6 +1188,18 @@ CREATE AGGREGATE stddev(vops_date) (
 	PARALLEL = SAFE
 );
 
+create function vops_date_wavg_accumulate(state internal, x vops_date, y vops_date) returns internal as 'MODULE_PATHNAME','vops_int4_wavg_accumulate' language C parallel safe;
+CREATE AGGREGATE wavg(vops_date, vops_date) (
+	SFUNC = vops_date_wavg_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_wavg_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
 create function vops_date_avg_accumulate(state internal, val vops_date) returns internal as 'MODULE_PATHNAME','vops_int4_avg_accumulate' language C parallel safe;
 CREATE AGGREGATE avg(vops_date) (
 	SFUNC = vops_date_avg_accumulate,
@@ -1430,6 +1478,18 @@ CREATE AGGREGATE stddev(vops_timestamp) (
 	STYPE = internal,
 	SSPACE = 24,
 	FINALFUNC = vops_stddev_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+create function vops_timestamp_wavg_accumulate(state internal, x vops_timestamp, y vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int8_wavg_accumulate' language C parallel safe;
+CREATE AGGREGATE wavg(vops_timestamp, vops_timestamp) (
+	SFUNC = vops_timestamp_wavg_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_wavg_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -1721,6 +1781,18 @@ CREATE AGGREGATE stddev(vops_int8) (
 	PARALLEL = SAFE
 );
 
+create function vops_int8_wavg_accumulate(state internal, x vops_int8, y vops_int8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE wavg(vops_int8, vops_int8) (
+	SFUNC = vops_int8_wavg_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_wavg_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
 create function vops_int8_avg_accumulate(state internal, val vops_int8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 CREATE AGGREGATE avg(vops_int8) (
 	SFUNC = vops_int8_avg_accumulate,
@@ -1989,6 +2061,18 @@ CREATE AGGREGATE stddev(vops_float4) (
 	STYPE = internal,
 	SSPACE = 24,
 	FINALFUNC = vops_stddev_samp_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
+create function vops_float4_wavg_accumulate(state internal, x vops_float4, y vops_float4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE wavg(vops_float4,vops_float4) (
+	SFUNC = vops_float4_wavg_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_wavg_final,
 	COMBINEFUNC = vops_var_combine,
 	SERIALFUNC = vops_var_serial,
 	DESERIALFUNC = vops_var_deserial,
@@ -2268,6 +2352,19 @@ CREATE AGGREGATE stddev(vops_float8) (
 	DESERIALFUNC = vops_var_deserial,
 	PARALLEL = SAFE
 );
+
+create function vops_float8_wavg_accumulate(state internal, x vops_float8, y vops_float8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE wavg(vops_float8, vops_float8) (
+	SFUNC = vops_float8_wavg_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_wavg_final,
+	COMBINEFUNC = vops_var_combine,
+	SERIALFUNC = vops_var_serial,
+	DESERIALFUNC = vops_var_deserial,
+	PARALLEL = SAFE
+);
+
 
 create function vops_float8_avg_accumulate(state internal, val vops_float8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 CREATE AGGREGATE avg(vops_float8) (

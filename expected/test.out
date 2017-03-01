@@ -5,7 +5,7 @@ insert into s values(1.0),(2.0),(null),(3.0),(null),(4.0);
 select populate(destination:='v'::regclass, source:='s'::regclass);
  populate 
 ----------
- 
+        6
 (1 row)
 
 select unnest(v.*) from v where x > 1;

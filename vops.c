@@ -710,6 +710,36 @@ static bool is_vops_type(Oid typeid)
 		}																\
 	}																    \
 
+#define WAVG_AGG(TYPE)													\
+	PG_FUNCTION_INFO_V1(vops_##TYPE##_wavg_accumulate);					\
+	Datum vops_##TYPE##_wavg_accumulate(PG_FUNCTION_ARGS)				\
+	{																	\
+		int i;															\
+		vops_var_state* state = PG_ARGISNULL(0) ? NULL : (vops_var_state*)PG_GETARG_POINTER(0); \
+	    vops_##TYPE* price = (vops_##TYPE*)PG_GETARG_POINTER(1);		\
+		vops_##TYPE* volume = (vops_##TYPE*)PG_GETARG_POINTER(2);		\
+		for (i = 0; i < TILE_SIZE; i++) {								\
+			if ((filter_mask & ~price->nullmask & ~volume->nullmask) & ((uint64)1 << i)) { \
+				if (state == NULL) {									\
+					MemoryContext agg_context;							\
+					MemoryContext old_context;							\
+					if (!AggCheckCallContext(fcinfo, &agg_context))		\
+						elog(ERROR, "aggregate function called in non-aggregate context"); \
+					old_context = MemoryContextSwitchTo(agg_context);	\
+					state = (vops_var_state*)palloc0(sizeof(vops_var_state)); \
+					MemoryContextSwitchTo(old_context);					\
+				}														\
+				state->sum += (double)price->payload[i]*volume->payload[i]; \
+				state->sum2 += volume->payload[i];						\
+			}															\
+		}																\
+		if (state == NULL) {											\
+			PG_RETURN_NULL();											\
+		} else {														\
+			PG_RETURN_POINTER(state);									\
+		}																\
+	}																    \
+			
 #define VAR_AGG(TYPE)													\
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_var_accumulate);					\
 	Datum vops_##TYPE##_var_accumulate(PG_FUNCTION_ARGS)				\
@@ -1108,7 +1138,6 @@ static void end_batch_insert()
     FreeExecutorState(estate);
 }
 
-
 PG_FUNCTION_INFO_V1(vops_avg_final);
 Datum vops_avg_final(PG_FUNCTION_ARGS)
 {
@@ -1171,6 +1200,13 @@ Datum vops_avg_deserial(PG_FUNCTION_ARGS)
 	pfree(buf.data);
 
 	PG_RETURN_POINTER(state);
+}
+
+PG_FUNCTION_INFO_V1(vops_wavg_final);
+Datum vops_wavg_final(PG_FUNCTION_ARGS)
+{
+	vops_var_state* state = (vops_var_state*)PG_GETARG_POINTER(0);
+	PG_RETURN_FLOAT8(state->sum / state->sum2);
 }
 
 PG_FUNCTION_INFO_V1(vops_var_samp_final);
@@ -1385,6 +1421,7 @@ Datum vops_agg_deserial(PG_FUNCTION_ARGS)
 	LAG_WIN(TYPE,CTYPE)										\
 	AVG_AGG(TYPE)											\
 	VAR_AGG(TYPE)											\
+	WAVG_AGG(TYPE)											\
 	MINMAX_AGG(TYPE,CTYPE,GCTYPE,min,<)						\
 	MINMAX_AGG(TYPE,CTYPE,GCTYPE,max,>)						\
 	MINMAX_WIN(TYPE,CTYPE,min,<)							\
