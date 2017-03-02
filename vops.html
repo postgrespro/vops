@@ -373,8 +373,8 @@ This is why VOPS has to choose define this aggregate under different names: <cod
 There are also two important restrictions:
 </p>
 <ol>
-<li>Grouping and sorting can be done only by scalar (non-tile) attributes</li>
-<li>Only <code>rows between unbounded preceding and current row</code> frame is supported.
+<li>Filtering, grouping and sorting can be done only by scalar (non-tile) attributes</li>
+<li>Only <code>rows between unbounded preceding and current row</code> frame is supported (but there is special version of <code>msum</code> which accepts extra window size parameter)</li>
 </ol>
 
 <p>
