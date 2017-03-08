@@ -37,14 +37,14 @@ create type vops_bool (
 	input = vops_bool_input, 
 	output = vops_bool_output, 
 	alignment = double,
-    internallength = 16
+    internallength = 24
 );
 
 create type vops_char (
 	input = vops_char_input, 
 	output = vops_char_output, 
 	alignment = double,
-    internallength = 72 -- 8+64
+    internallength = 80 -- 16+64
 );
 
 
@@ -52,7 +52,7 @@ create type vops_int2 (
 	input = vops_int2_input, 
 	output = vops_int2_output, 
 	alignment = double,
-    internallength = 136 -- 8+64*2
+    internallength = 144 -- 16+64*2
 );
 
 
@@ -60,14 +60,14 @@ create type vops_int4 (
 	input = vops_int4_input, 
 	output = vops_int4_output, 
 	alignment = double,
-    internallength = 264 -- 8 + 64*4
+    internallength = 272 -- 16 + 64*4
 );
 
 create type vops_date (
 	input = vops_date_input, 
 	output = vops_date_output, 
 	alignment = double,
-    internallength = 264 -- 8 + 64*4
+    internallength = 272 -- 16 + 64*4
 );
 
 
@@ -75,7 +75,7 @@ create type vops_int8 (
 	input = vops_int8_input, 
 	output = vops_int8_output, 
 	alignment = double,
-    internallength = 520 -- 8 + 64*8
+    internallength = 528 -- 16 + 64*8
 );
 
 
@@ -83,21 +83,21 @@ create type vops_float4 (
 	input = vops_float4_input, 
 	output = vops_float4_output, 
 	alignment = double,
-    internallength = 264 -- 8 + 64*4
+    internallength = 272 -- 16 + 64*4
 );
 
 create type vops_float8 (
 	input = vops_float8_input, 
 	output = vops_float8_output, 
 	alignment = double,
-    internallength = 520 -- 8 + 64*8
+    internallength = 528 -- 16 + 64*8
 );
 
 create type vops_timestamp (
 	input = vops_timestamp_input, 
 	output = vops_timestamp_output, 
 	alignment = double,
-    internallength = 520 -- 8 + 64*8
+    internallength = 528 -- 16 + 64*8
 );
 
 -- char tile
