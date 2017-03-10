@@ -166,6 +166,7 @@ typedef struct {
     TupleDesc       desc;
 	int             n_attrs;
 	int             tile_pos;
+	uint64          filter_mask;
 	vops_tile_hdr** tiles;
 } vops_unnest_context;
 
@@ -2494,7 +2495,9 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
         func_ctx->user_fctx = user_ctx;
         user_ctx->n_attrs = n_attrs;
 		user_ctx->tile_pos = 0;
-
+		user_ctx->filter_mask = filter_mask;
+		filter_mask = ~0;
+		
         for (i = 0; i < n_attrs; i++) {
 			Form_pg_attribute attr = src_desc->attrs[i];
 			vops_type tid = vops_get_type(attr->atttypid);
@@ -2521,7 +2524,8 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
 	n_attrs = user_ctx->n_attrs;
 
 	for (j = user_ctx->tile_pos; j < TILE_SIZE; j++) {
-		if (filter_mask & ((uint64)1 << j)) {
+		if (user_ctx->filter_mask & ((uint64)1 << j)) 
+		{
 			for (i = 0; i < n_attrs; i++) {
 				if (user_ctx->types[i] != VOPS_LAST) {
 					vops_tile_hdr* tile = user_ctx->tiles[i];
