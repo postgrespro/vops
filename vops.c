@@ -1,5 +1,7 @@
 #include "postgres.h"
 
+#include <float.h>
+#include <math.h>
 #include "funcapi.h"
 #include "miscadmin.h"
 
