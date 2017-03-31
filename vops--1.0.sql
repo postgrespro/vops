@@ -2651,3 +2651,19 @@ create cast (vops_bool as bool) with function filter(vops_bool) AS IMPLICIT;
 create function is_null(anyelement) returns vops_bool as 'MODULE_PATHNAME','vops_is_null'  language C parallel safe immutable;
 create function is_not_null(anyelement) returns vops_bool as 'MODULE_PATHNAME','vops_is_not_null'  language C parallel safe immutable;
 
+CREATE FUNCTION vops_fdw_handler()
+RETURNS fdw_handler
+AS 'MODULE_PATHNAME'
+LANGUAGE C STRICT;
+
+CREATE FUNCTION vops_fdw_validator(text[], oid)
+RETURNS void
+AS 'MODULE_PATHNAME'
+LANGUAGE C STRICT;
+
+CREATE FOREIGN DATA WRAPPER vops_fdw
+  HANDLER vops_fdw_handler
+  VALIDATOR vops_fdw_validator;
+
+CREATE SERVER vops_server FOREIGN DATA WRAPPER vops_fdw;
+ 

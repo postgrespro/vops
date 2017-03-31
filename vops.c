@@ -43,6 +43,7 @@
 #include "nodes/nodeFuncs.h"
 #include "nodes/makefuncs.h"
 #include "nodes/pg_list.h"
+#include "vops.h"
 
 #ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
@@ -52,142 +53,7 @@ PG_MODULE_MAGIC;
 void _PG_init(void);
 void _PG_fini(void);
 
-typedef enum
-{
-	VOPS_BOOL,
-	VOPS_CHAR,
-	VOPS_INT2,
-	VOPS_INT4,
-	VOPS_INT8,
-	VOPS_DATE,
-	VOPS_TIMESTAMP,
-	VOPS_FLOAT4,
-	VOPS_FLOAT8,
-	VOPS_LAST,
-} vops_type;
-
-typedef enum
-{
-	VOPS_AGG_SUM,
-	VOPS_AGG_AVG,
-	VOPS_AGG_MAX,
-	VOPS_AGG_MIN,
-	VOPS_AGG_COUNT,
-	VOPS_AGG_LAST
-} vops_agg_kind;
-
-
-#define TILE_SIZE 64 /* just because of maximum size of bitmask */
-#define MAX_SQL_STMT_LEN 1024
-#define MAX_CSV_LINE_LEN 4096
-#define MAX_TILE_STRLEN (TILE_SIZE*16)
-#define INIT_MAP_SIZE (1024*1024)
-
-static uint64 filter_mask;
-typedef long long long64;
-
-/* Common prefix for all tile */
-typedef struct {
-	uint64 null_mask;
-	uint64 empty_mask;
-} vops_tile_hdr;
-
-#define TILE(TYPE,CTYPE)						\
-	typedef struct {							\
-	    vops_tile_hdr hdr;						\
-		CTYPE  payload[TILE_SIZE];				\
-	} vops_##TYPE
-
-TILE(char,char);
-TILE(int2,int16);
-TILE(int4,int32);
-TILE(int8,int64);
-TILE(float4,float4);
-TILE(float8,float8);
-
-typedef struct {
-	vops_tile_hdr hdr;
-	uint64 payload;
-} vops_bool;
-
-typedef struct {
-	uint64 count;
-	double sum;
-} vops_avg_state;
-
-typedef struct {
-	uint64 count;
-	double sum;
-	double sum2;
-} vops_var_state;
-
-typedef struct {
-	HTAB* htab;
-	int   n_aggs;
-	vops_type agg_type;
-	vops_agg_kind* agg_kinds;
-} vops_agg_state;
-
-typedef union {
-	bool b;
-	char ch;
-	int16 i2;
-	int32 i4;
-	int64 i8;
-	float f4;
-	double f8;
-} vops_value;
-
-typedef struct {
-	vops_value acc;
-	uint64     count;
-} vops_agg_value;
-
-typedef struct {
-	int64  group_by;
-	uint64 count;
-	vops_agg_value values[1];
-} vops_group_by_entry;
-
-#define VOPS_AGGREGATES_ATTRIBUTES 3
-
-typedef struct {
-	HASH_SEQ_STATUS iter;
-	TupleDesc       desc;
-	Datum*          elems;
-	bool*           nulls;
-    int16           elmlen;
-    bool            elmbyval;
-    char            elmalign;
-} vops_reduce_context;
-
-typedef struct {
-    Datum*          values;
-    bool*           nulls;
-	vops_type*      types;
-    TupleDesc       desc;
-	int             n_attrs;
-	int             tile_pos;
-	uint64          filter_mask;
-	vops_tile_hdr** tiles;
-} vops_unnest_context;
-
-typedef struct {
-	vops_float8 tile;
-	double sum;
-	double sum2;
-	uint64 count;
-} vops_window_state;
-
-
-typedef struct {
-	vops_type tid;
-	int16     len;
-	bool      byval;
-	char      align;
-	FmgrInfo  inproc;
-	Oid       inproc_param_oid;
-} vops_type_info;
+uint64 filter_mask;
 
 static struct {
 	char const* name;
@@ -233,7 +99,7 @@ static vops_agg_state* vops_init_agg_state(char const* aggregates, Oid elem_type
 static vops_agg_state* vops_create_agg_state(int n_aggregates);
 static void vops_agg_state_accumulate(vops_agg_state* state, int64 group_by, int i, Datum* tiles, bool* nulls);
 
-static vops_type vops_get_type(Oid typid)
+vops_type vops_get_type(Oid typid)
 {
 	int i;
 	if (vops_type_map[0].oid == InvalidOid) { 
@@ -1587,6 +1453,12 @@ Datum vops_populate(PG_FUNCTION_ARGS)
             HeapTuple spi_tuple = SPI_tuptable->vals[0];
             spi_tupdesc = SPI_tuptable->tupdesc;
 			if (j == TILE_SIZE) {
+				for (i = 0; i < n_attrs; i++) {
+					if (types[i].tid != VOPS_LAST) {
+						vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[i]);
+						tile->empty_mask = 0;
+					}
+				}
 				insert_tuple(values, nulls);
 				j = 0;
 			}

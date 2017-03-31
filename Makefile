@@ -1,12 +1,12 @@
 # contrib/vops/Makefile
 
 MODULE_big = vops
-OBJS = vops.o
+OBJS = vops.o vops_fdw.o deparse.o
 
 EXTENSION = vops
 DATA = vops--1.0.sql
 PGFILEDESC = "vops - vectorized operations"
-CUSTOM_COPT = -O3
+CUSTOM_COPT = -O0
 
 REGRESS = test
 
