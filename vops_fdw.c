@@ -81,8 +81,8 @@ typedef struct PgFdwScanState
 	Portal      portal;			/* SPI portal */
 	int			numParams;		/* number of parameters passed to query */
 	int         tile_pos;
+	uint64      table_pos;
 	HeapTuple   spi_tuple;
-	SPITupleTable* spi_tuptable;	
 	Datum*      src_values;
 	Datum*      dst_values;
 	bool*       src_nulls;
@@ -629,9 +629,13 @@ postgresIterateForeignScan(ForeignScanState *node)
 	MemoryContext oldcontext = MemoryContextSwitchTo(fsstate->spi_context);
 
 	while (true) {
-		if (fsstate->spi_tuptable == NULL) { 
-			SPI_cursor_fetch(fsstate->portal, true, 1);
-			if (!SPI_processed) {
+		if (fsstate->spi_tuple == NULL) { 
+			if (fsstate->portal != NULL) { 
+				filter_mask = ~0;
+				SPI_cursor_fetch(fsstate->portal, true, 1);
+				fsstate->table_pos = 0;
+			}
+			if (fsstate->table_pos == SPI_processed) {
 				MemoryContextSwitchTo(oldcontext);
 				return ExecClearTuple(slot);
 			}
@@ -642,8 +646,7 @@ postgresIterateForeignScan(ForeignScanState *node)
 				fsstate->tile_pos = 0;
 				fsstate->filter_mask = filter_mask;
 			}
-			fsstate->spi_tuptable = SPI_tuptable;
-			fsstate->spi_tuple = SPI_tuptable->vals[0];
+			fsstate->spi_tuple = SPI_tuptable->vals[fsstate->table_pos++];
 			if (fsstate->vops_types == NULL) { 
 				fsstate->vops_types = palloc(sizeof(vops_type_info)*n_attrs);
 				fsstate->attr_types = palloc(sizeof(Oid)*n_attrs);
@@ -672,7 +675,7 @@ postgresIterateForeignScan(ForeignScanState *node)
 				if (i > 0)
 				{
 					/* ordinary column */
-					fsstate->src_values[i - 1] = SPI_getbinval(fsstate->spi_tuple, fsstate->spi_tuptable->tupdesc, j+1, &fsstate->src_nulls[i - 1]);
+					fsstate->src_values[i - 1] = SPI_getbinval(fsstate->spi_tuple, SPI_tuptable->tupdesc, j+1, &fsstate->src_nulls[i - 1]);
 				}
 				j += 1;
 			}
@@ -742,8 +745,10 @@ postgresIterateForeignScan(ForeignScanState *node)
 		  NextTuple:;
 		}
 		SPI_freetuple(fsstate->spi_tuple);
-		SPI_freetuptable(fsstate->spi_tuptable);
-		fsstate->spi_tuptable = NULL;
+		if (fsstate->portal) { 
+			SPI_freetuptable(SPI_tuptable);
+		}
+		fsstate->spi_tuple = NULL;
 	}
 }
 
@@ -760,6 +765,8 @@ postgresReScanForeignScan(ForeignScanState *node)
 	bool*       nulls = NULL;
 	MemoryContext oldcontext = MemoryContextSwitchTo(fsstate->spi_context);
 	Oid* argtypes = NULL;
+	int rc;
+
 	if (fsstate->numParams > 0) {
 		ExprContext *econtext = node->ss.ps.ps_ExprContext;
 		ForeignScan *fsplan = (ForeignScan *) node->ss.ps.plan;
@@ -780,8 +787,17 @@ postgresReScanForeignScan(ForeignScanState *node)
 			i += 1;
 		}
 	}
-	fsstate->portal = SPI_cursor_open_with_args(NULL, fsstate->query, fsstate->numParams, argtypes, values, nulls, true, CURSOR_OPT_PARALLEL_OK);
-	fsstate->spi_tuptable = NULL;
+	if (fsstate->rel == NULL) { /* aggregate is pushed down: do not use cusror to allow parallel query execution */
+		rc = SPI_execute_with_args(fsstate->query, fsstate->numParams, argtypes, values, nulls, true, 0);
+		if (rc != SPI_OK_SELECT) { 
+			elog(ERROR, "Failed to execute VOPS query %s: %d", fsstate->query, rc);
+		}
+		fsstate->portal = NULL;
+	} else { 
+		fsstate->portal = SPI_cursor_open_with_args(NULL, fsstate->query, fsstate->numParams, argtypes, values, nulls, true, CURSOR_OPT_PARALLEL_OK);
+	}
+	fsstate->table_pos = 0;
+	fsstate->spi_tuple = NULL;
 
 	MemoryContextSwitchTo(oldcontext);
 }
@@ -800,7 +816,9 @@ postgresEndForeignScan(ForeignScanState *node)
 	{
 		MemoryContext oldcontext = MemoryContextSwitchTo(fsstate->spi_context);
 
-		SPI_cursor_close(fsstate->portal);
+		if (fsstate->portal) {
+			SPI_cursor_close(fsstate->portal);
+		}
 		SPI_finish();
 
 		MemoryContextSwitchTo(oldcontext);

@@ -161,6 +161,70 @@ order by
     revenue desc;
 -- Time: 30911.679 ms (00:30.912)
 
+
+
+create foreign table lineitem_fdw  (                                          
+   l_suppkey int4 not null,
+   l_orderkey int4 not null,
+   l_partkey int4 not null,
+   l_shipdate date not null,
+   l_quantity float4 not null,
+   l_extendedprice float4 not null,
+   l_discount float4 not null,
+   l_tax      float4 not null,
+   l_returnflag "char" not null,
+   l_linestatus "char" not null
+) server vops_server options (table_name 'vlineitem');
+
+create foreign table orders_fdw  (                                          
+    o_orderkey int4 not null,
+    o_custkey int4 not null,
+    o_orderstatus "char" not null,
+    o_totalprice float4 not null,
+    o_orderdate date not null,
+    o_shippriority int4 not null
+) server vops_server options (table_name 'vorders');
+
+create foreign table customer_fdw  (                                          
+    c_custkey int4 not null,
+    c_nationkey int4 not null,
+    c_acctbal float4 not null
+) server vops_server options (table_name 'vcustomer');
+
+create foreign table supplier_fdw  (                                          
+    s_suppkey int4 not null,
+    s_nationkey int4 not null,
+    s_acctbal float4 not null
+) server vops_server options (table_name 'vsupplier');
+
+set enable_material=false;
+set enable_mergejoin=false;
+
+
+select
+    n_name,
+    count(*),
+    sum(l_extendedprice * (1-l_discount)) as revenue
+from                                       
+    customer_fdw join orders_fdw on c_custkey = o_custkey
+    join lineitem_fdw on l_orderkey = o_orderkey
+    join supplier_fdw on l_suppkey = s_suppkey
+    join nation on c_nationkey = n_nationkey
+    join region on n_regionkey = r_regionkey
+where                      
+    c_nationkey = s_nationkey
+    and r_name = 'ASIA'
+    and o_orderdate >= '1996-01-01'
+    and o_orderdate < '1997-01-01'
+group by
+    n_name
+order by
+    revenue desc;
+-- Time: 55101.292 ms (00:55.101)
+
+
+\echo Foreign data wrapper result
+
 create table hlineitem(
    l_suppkey int4 not null,
    l_orderkey int4 not null,
@@ -201,10 +265,6 @@ create function unnest_customer(vcustomer) returns setof hcustomer as 'vops','vo
 create function unnest_supplier(vsupplier) returns setof hsupplier as 'vops','vops_unnest' language C parallel safe immutable strict;
 create function unnest_lineitem(vlineitem) returns setof hlineitem as 'vops','vops_unnest' language C parallel safe immutable strict;
 create function unnest_orders(vorders) returns setof horders as 'vops','vops_unnest' language C parallel safe immutable strict;
-
-set enable_material=false;
-set enable_mergejoin=false;
-
 
 select
     n_name,
