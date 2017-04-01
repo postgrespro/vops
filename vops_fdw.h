@@ -146,5 +146,7 @@ extern void deparseSelectStmtForRel(StringInfo buf, PlannerInfo *root,
 						RelOptInfo *foreignrel, List *tlist,
 						List *remote_conds, List *pathkeys,
 						List **retrieved_attrs, List **params_list);
+extern char *deparse_type_name(Oid type_oid, int32 typemod);
+extern void deparseRelation(StringInfo buf, Relation rel);
 
 #endif   /* POSTGRES_FDW_H */

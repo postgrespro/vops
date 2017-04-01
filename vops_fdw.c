@@ -127,6 +127,9 @@ static void postgresGetForeignUpperPaths(PlannerInfo *root,
 							 RelOptInfo *output_rel);
 static bool postgresIsForeignScanParallelSafe(PlannerInfo *root, RelOptInfo *rel,
 											  RangeTblEntry *rte);
+static bool postgresAnalyzeForeignTable(Relation relation,
+							AcquireSampleRowsFunc *func,
+							BlockNumber *totalpages);
 /*
  * Helper functions
  */
@@ -141,6 +144,10 @@ static bool foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel);
 static void add_foreign_grouping_paths(PlannerInfo *root,
 						   RelOptInfo *input_rel,
 						   RelOptInfo *grouped_rel);
+static int postgresAcquireSampleRowsFunc(Relation relation, int elevel,
+							  HeapTuple *rows, int targrows,
+							  double *totalrows,
+							  double *totaldeadrows);
 
 
 /*
@@ -161,6 +168,9 @@ vops_fdw_handler(PG_FUNCTION_ARGS)
 	routine->ReScanForeignScan = postgresReScanForeignScan;
 	routine->EndForeignScan = postgresEndForeignScan;
 	routine->IsForeignScanParallelSafe = postgresIsForeignScanParallelSafe;
+
+	/* Support functions for ANALYZE */
+	routine->AnalyzeForeignTable = postgresAnalyzeForeignTable;
 
 	/* Support functions for EXPLAIN */
 	routine->ExplainForeignScan = postgresExplainForeignScan;
@@ -213,6 +223,32 @@ vops_fdw_validator(PG_FUNCTION_ARGS)
 	PG_RETURN_VOID();
 }	
 
+
+static Relation open_vops_relation(ForeignTable* table)
+{
+	ListCell   *lc;
+	char       *nspname = NULL;
+	char       *relname = NULL;
+	RangeVar   *rv;
+
+
+	foreach(lc, table->options)
+	{
+		DefElem    *def = (DefElem *) lfirst(lc);
+
+		if (strcmp(def->defname, "schema_name") == 0)
+			nspname = defGetString(def);
+		else if (strcmp(def->defname, "table_name") == 0)
+			relname = defGetString(def);
+	}
+	Assert(relname != NULL);
+	if (nspname == NULL) {
+		nspname = get_namespace_name(get_rel_namespace(table->relid));
+	}
+	rv = makeRangeVar(nspname, relname, -1);
+	return heap_openrv_extended(rv, RowExclusiveLock, false);
+}
+
 /*
  * postgresGetForeignRelSize
  *		Estimate # of rows and width of the result of the scan
@@ -225,13 +261,12 @@ postgresGetForeignRelSize(PlannerInfo *root,
 						  RelOptInfo *baserel,
 						  Oid foreigntableid)
 {
-	PgFdwRelationInfo *fpinfo;
 	ListCell   *lc;
+	PgFdwRelationInfo *fpinfo;
 	RangeTblEntry *rte = planner_rt_fetch(baserel->relid, root);
 	char       *nspname = NULL;
 	char       *relname = NULL;
 	char       *refname = NULL;
-	RangeVar   *rv;
 	Relation    fdw_rel;
 	Relation    vops_rel;
 	TupleDesc	fdw_tupdesc;	
@@ -251,20 +286,8 @@ postgresGetForeignRelSize(PlannerInfo *root,
 	/* Look up foreign-table catalog info. */
 	fpinfo->table = GetForeignTable(foreigntableid);
 	fpinfo->server = GetForeignServer(fpinfo->table->serverid);
-
-	foreach(lc, fpinfo->table->options)
-	{
-		DefElem    *def = (DefElem *) lfirst(lc);
-
-		if (strcmp(def->defname, "schema_name") == 0)
-			nspname = defGetString(def);
-		else if (strcmp(def->defname, "table_name") == 0)
-			relname = defGetString(def);
-	}
-	Assert(relname != NULL);
-	if (nspname == NULL) {
-		nspname =  get_namespace_name(get_rel_namespace(foreigntableid));
-	}
+	
+	Assert(foreigntableid == fpinfo->table->relid);
 	
 	/*
 	 * Build mappnig with VOPS table
@@ -272,8 +295,7 @@ postgresGetForeignRelSize(PlannerInfo *root,
 	fpinfo->tile_attrs = NULL;
 	fpinfo->vops_attrs = NULL;
 
-	rv = makeRangeVar(nspname, relname, -1);
-	vops_rel = heap_openrv_extended(rv, RowExclusiveLock, false);
+	vops_rel = open_vops_relation(fpinfo->table);
 	fdw_rel = heap_open(rte->relid, NoLock);
 	
 	estimate_rel_size(vops_rel, baserel->attr_widths, 
@@ -1334,4 +1356,126 @@ add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 
 	/* Add generated path into grouped_rel by add_path(). */
 	add_path(grouped_rel, (Path *) grouppath);
+}
+
+/*
+ * postgresAnalyzeForeignTable
+ *		Test whether analyzing this foreign table is supported
+ */
+static bool
+postgresAnalyzeForeignTable(Relation relation,
+							AcquireSampleRowsFunc *func,
+							BlockNumber *totalpages)
+{
+	ForeignTable *table;
+	Relation vops_rel;
+	double tuples;
+	double allvisfrac;
+
+	/* Return the row-analysis function pointer */
+	*func = postgresAcquireSampleRowsFunc;
+
+	table = GetForeignTable(RelationGetRelid(relation));
+	vops_rel = open_vops_relation(table);
+	estimate_rel_size(vops_rel, NULL, totalpages, &tuples, &allvisfrac);
+    heap_close(vops_rel, RowExclusiveLock);
+
+	return true;
+}
+
+/*
+ * Acquire a random sample of rows from VOPS table
+ */
+static int
+postgresAcquireSampleRowsFunc(Relation relation, int elevel,
+							  HeapTuple *rows, int targrows,
+							  double *totalrows,
+							  double *totaldeadrows)
+{
+	TupleDesc tupdesc = RelationGetDescr(relation);
+	StringInfoData sql;
+	StringInfoData record;
+	double samplerows;
+	Portal portal;
+	int i;
+	bool first = true;
+	char*colname;
+
+    SPI_connect();
+	
+	initStringInfo(&sql);
+	initStringInfo(&record);
+	appendStringInfoString(&sql, "SELECT ");
+
+	for (i = 0; i < tupdesc->natts; i++)
+	{
+		/* Ignore dropped columns. */
+		if (tupdesc->attrs[i]->attisdropped)
+			continue;
+		if (!first) {
+			appendStringInfoString(&record, ", ");
+			appendStringInfoString(&sql, ", ");
+		}
+		first = false;
+
+		/* Use attribute name or column_name option. */
+		colname = NameStr(tupdesc->attrs[i]->attname);
+		appendStringInfoString(&sql, "r.");                                         
+ 		appendStringInfoString(&sql, quote_identifier(colname));
+		
+		appendStringInfo(&record, "%s %s", quote_identifier(colname), deparse_type_name(tupdesc->attrs[i]->atttypid, tupdesc->attrs[i]->atttypmod));
+	}
+	appendStringInfoString(&sql, " FROM ");
+	deparseRelation(&sql, relation);
+	appendStringInfo(&sql, " t,unnest(t) r(%s)", record.data);
+	
+	portal = SPI_cursor_open_with_args(NULL, sql.data, 0, NULL, NULL, NULL, true, 0);
+
+	/* First targrows rows are always included into the sample */
+	SPI_cursor_fetch(portal, true, targrows);
+	for (i = 0; i < SPI_processed; i++)
+	{
+		rows[i] = SPI_copytuple(SPI_tuptable->vals[i]);
+	}
+	samplerows = i;
+
+	if (i == targrows) 
+	{ 
+		ReservoirStateData rstate; /* state for reservoir sampling */
+		double rowstoskip = -1;    /* -1 means not set yet */
+
+		reservoir_init_selection_state(&rstate, targrows);
+
+		while (true) 
+		{ 
+			SPI_freetuptable(SPI_tuptable);
+			SPI_cursor_fetch(portal, true, 1);
+			if (!SPI_processed) { 
+				break;
+			}
+			samplerows += 1;
+			if (rowstoskip < 0) {
+				rowstoskip = reservoir_get_next_S(&rstate, samplerows, targrows);
+			}
+			if (rowstoskip <= 0)
+			{
+				/* Choose a random reservoir element to replace. */
+				int pos = (int) (targrows * sampler_random_fract(rstate.randstate));
+				Assert(pos >= 0 && pos < targrows);
+				SPI_freetuple(rows[pos]);
+				rows[pos] = SPI_copytuple(SPI_tuptable->vals[0]);
+			}
+			rowstoskip -= 1;
+		}
+	}
+	SPI_cursor_close(portal);
+	SPI_finish();
+
+	/* We assume that we have no dead tuple. */
+	*totaldeadrows = 0.0;
+
+	/* We've retrieved all living tuples from foreign server. */
+	*totalrows = samplerows;
+
+	return i;
 }

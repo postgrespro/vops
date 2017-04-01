@@ -85,7 +85,6 @@ typedef struct deparse_expr_cxt
  */
 static bool foreign_expr_walker(Node *node,
 								foreign_glob_cxt *glob_cxt);
-static char *deparse_type_name(Oid type_oid, int32 typemod);
 
 /*
  * Functions to construct string representation of a node tree.
@@ -107,7 +106,6 @@ static void deparseReturningList(StringInfo buf, PlannerInfo *root,
 					 List **retrieved_attrs);
 static void deparseColumnRef(StringInfo buf, int varno, int varattno,
 				 PlannerInfo *root, bool qualify_col);
-static void deparseRelation(StringInfo buf, Relation rel);
 static void deparseExpr(Expr *expr, deparse_expr_cxt *context);
 static void deparseVar(Var *node, deparse_expr_cxt *context);
 static void deparseConst(Const *node, deparse_expr_cxt *context, int showtype);
@@ -388,7 +386,7 @@ foreign_expr_walker(Node *node,
  * type names that are not in pg_catalog.  We assume here that built-in types
  * are all in pg_catalog and need not be qualified; otherwise, qualify.
  */
-static char *
+char *
 deparse_type_name(Oid type_oid, int32 typemod)
 {
 	if (type_oid < FirstBootstrapObjectId)
@@ -1381,7 +1379,7 @@ deparseColumnRef(StringInfo buf, int varno, int varattno, PlannerInfo *root,
  * Use value of table_name FDW option (if any) instead of relation's name.
  * Similarly, schema_name FDW option overrides schema name.
  */
-static void
+void
 deparseRelation(StringInfo buf, Relation rel)
 {
 	ForeignTable *table;
