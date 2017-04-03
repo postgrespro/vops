@@ -159,7 +159,9 @@ group by
     n_name
 order by
     revenue desc;
--- Time: 30911.679 ms (00:30.912)
+-- Seq: Time: 30186.833 ms (00:30.187)
+-- Par: Time: 15492.048 ms (00:15.492)
+
 
 
 
@@ -197,10 +199,6 @@ create foreign table supplier_fdw  (
     s_acctbal float4 not null
 ) server vops_server options (table_name 'vsupplier');
 
-set enable_material=false;
-set enable_mergejoin=false;
-
-
 select
     n_name,
     count(*),
@@ -220,10 +218,8 @@ group by
     n_name
 order by
     revenue desc;
--- Time: 55101.292 ms (00:55.101)
+-- Time: 41108.297 ms (00:41.108)
 
-
-\echo Foreign data wrapper result
 
 create table hlineitem(
    l_suppkey int4 not null,

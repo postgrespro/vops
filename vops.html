@@ -16,6 +16,7 @@
  <li><a href="#indexes">Using indexes</a></li>
  <li><a href="#populating">Preparing data for VOPS</a></li>
  <li><a href="#unnest">Back to normal tuples</a></li>
+ <li><a href="#fdw">Back to normal tables</a></li>
 </ul>
 <li><a href="#transform">Standard SQL query transformation</a></li>
 <li><a href="#example">Example</a></li>
@@ -568,6 +569,122 @@ postgres=# select unnest(l.*) from vops_lineitem l where filter(l_shipdate &lt;=
  (1996-04-12,36,38306.2,0.09,0.06,N,O)
  (1996-01-29,8,15479.7,0.1,0.02,N,O)
 (3 rows)
+</pre>
+
+
+<h3><a name="fdw">Back to normal tables</a></h3>
+<p>
+As it was mentioned in previous section, <code>unnest</code> function can scatter records with VOPS types into normal records with scalar types.
+So it is possible to use this records in arbitrary SQL queries.
+But there are two problems with unnest function:
+</p>
+<ol>
+<li>It is not convenient to use. This function has no static knowledge about the format of output record and this is why programmer has to specify it manually, 
+if here wants to decompose this record.</li>
+<li>PostgreSQL optimizer has completely no knowledge on result of transformation performed by unnest() function. 
+This is why it is not able to choose optimal query execution plan for data retrieved from VOPS table.</li>
+</ol>
+<p>
+Fortunately Postgres provides solution for both of this problem: foreign data wrappers (FDW). In our case data is not really "foreign": it is stored inside our own database.
+But in alternatives (VOPS) format. VOPS FDW allows to "hide" specific of VOPS format and run normal SQL queries on VOPS tables.
+FDW allows the following:
+</p>
+<ol>
+<li>Extract data from VOPS table in normal (horizontal) format so that it can be proceeded by upper nodes in query execution plan.</li>
+<li>Pushdown to VOPS operations that can be efficiently executed using vectorized operations on VOPS types: filtering and aggregation.</li>
+<li>Provide statistic for underlying table which can be used by query optimizer.</li>
+</ol>
+
+<p>
+So, by placing VOPS projection under FDW, we can efficiently perform sequential scan and aggregation queries as if them will be explicitly written for VOPS table
+and at the same time be able to execute any other queries on this data, including joins, CTEs,...
+Query can be written in standard SQL without usage of any VOPS specific functions.
+</p>
+
+<p>
+Below is an example of creating VOPS FDW and running some queries on it:
+</p>
+
+<pre>
+create foreign table lineitem_fdw  (
+   l_suppkey int4 not null,
+   l_orderkey int4 not null,
+   l_partkey int4 not null,
+   l_shipdate date not null,
+   l_quantity float4 not null,
+   l_extendedprice float4 not null,
+   l_discount float4 not null,
+   l_tax      float4 not null,
+   l_returnflag "char" not null,
+   l_linestatus "char" not null
+) server vops_server options (table_name 'vops_lineitem');
+
+explain select
+   sum(l_extendedprice*l_discount) as revenue
+from
+   lineitem_fdw
+where
+   l_shipdate between '1996-01-01' and '1997-01-01'
+   and l_discount between 0.08 and 0.1
+   and l_quantity < 24;
+                       QUERY PLAN                        
+---------------------------------------------------------
+ Foreign Scan  (cost=1903.26..1664020.23 rows=1 width=4)
+(1 row)
+
+-- Filter was pushed down to FDW
+
+explain select
+    n_name,
+    count(*),
+    sum(l_extendedprice * (1-l_discount)) as revenue
+from
+    customer_fdw join orders_fdw on c_custkey = o_custkey
+    join lineitem_fdw on l_orderkey = o_orderkey
+    join supplier_fdw on l_suppkey = s_suppkey
+    join nation on c_nationkey = n_nationkey
+    join region on n_regionkey = r_regionkey
+where
+    c_nationkey = s_nationkey
+    and r_name = 'ASIA'
+    and o_orderdate >= '1996-01-01'
+    and o_orderdate < '1997-01-01'
+group by
+    n_name
+order by
+    revenue desc;
+                                                              QUERY PLAN                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=2337312.28..2337312.78 rows=200 width=48)
+   Sort Key: (sum((lineitem_fdw.l_extendedprice * ('1'::double precision - lineitem_fdw.l_discount)))) DESC
+   ->  GroupAggregate  (cost=2336881.54..2337304.64 rows=200 width=48)
+         Group Key: nation.n_name
+         ->  Sort  (cost=2336881.54..2336951.73 rows=28073 width=40)
+               Sort Key: nation.n_name
+               ->  Hash Join  (cost=396050.65..2334807.39 rows=28073 width=40)
+                     Hash Cond: ((orders_fdw.o_custkey = customer_fdw.c_custkey) AND (nation.n_nationkey = customer_fdw.c_nationkey))
+                     ->  Hash Join  (cost=335084.53..2247223.46 rows=701672 width=52)
+                           Hash Cond: (lineitem_fdw.l_orderkey = orders_fdw.o_orderkey)
+                           ->  Hash Join  (cost=2887.07..1786058.18 rows=4607421 width=52)
+                                 Hash Cond: (lineitem_fdw.l_suppkey = supplier_fdw.s_suppkey)
+                                 ->  Foreign Scan on lineitem_fdw  (cost=0.00..1512151.52 rows=59986176 width=16)
+                                 ->  Hash  (cost=2790.80..2790.80 rows=7702 width=44)
+                                       ->  Hash Join  (cost=40.97..2790.80 rows=7702 width=44)
+                                             Hash Cond: (supplier_fdw.s_nationkey = nation.n_nationkey)
+                                             ->  Foreign Scan on supplier_fdw  (cost=0.00..2174.64 rows=100032 width=8)
+                                             ->  Hash  (cost=40.79..40.79 rows=15 width=36)
+                                                   ->  Hash Join  (cost=20.05..40.79 rows=15 width=36)
+                                                         Hash Cond: (nation.n_regionkey = region.r_regionkey)
+                                                         ->  Seq Scan on nation  (cost=0.00..17.70 rows=770 width=40)
+                                                         ->  Hash  (cost=20.00..20.00 rows=4 width=4)
+                                                               ->  Seq Scan on region  (cost=0.00..20.00 rows=4 width=4)
+                                                                     Filter: ((r_name)::text = 'ASIA'::text)
+                           ->  Hash  (cost=294718.76..294718.76 rows=2284376 width=8)
+                                 ->  Foreign Scan on orders_fdw  (cost=0.00..294718.76 rows=2284376 width=8)
+                     ->  Hash  (cost=32605.64..32605.64 rows=1500032 width=8)
+                           ->  Foreign Scan on customer_fdw  (cost=0.00..32605.64 rows=1500032 width=8)
+
+-- filter on orders range is pushed to FDW
 </pre>
 
 
