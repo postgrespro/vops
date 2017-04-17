@@ -199,6 +199,11 @@ create foreign table supplier_fdw  (
     s_acctbal float4 not null
 ) server vops_server options (table_name 'vsupplier');
 
+analyze lineitem_fdw;
+analyze customer_fdw;
+analyze supplier_fdw;
+analyze orders_fdw;
+
 select
     n_name,
     count(*),
