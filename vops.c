@@ -2702,7 +2702,8 @@ vops_expression_tree_mutator(Node *node, void *context)
 			}
 		} else if (!agg->aggstar && !ctx->has_vector_ops) {
 			Assert(list_length(agg->aggargtypes) >= 1);
-			if (is_vops_type(linitial_oid(agg->aggargtypes))) {
+			if (is_vops_type(linitial_oid(agg->aggargtypes)))
+			{
 				ctx->has_vector_ops = true;
 				if (ctx->countall) {
 					ctx->countall->aggfnoid = countall_oid;

@@ -423,7 +423,8 @@ postgresGetForeignPaths(PlannerInfo *root,
 	 * actually be an indexscan happening there).  We already did all the work
 	 * to estimate cost and size of this path.
 	 */
-	path = create_foreignscan_path(root, baserel,
+	path = create_foreignscan_path(root,
+								   baserel,
 								   NULL,		/* default pathtarget */
 								   fpinfo->rows,
 								   fpinfo->startup_cost,
@@ -795,7 +796,7 @@ postgresReScanForeignScan(ForeignScanState *node)
 		List* param_exprs = (List *)ExecInitExpr((Expr *)fsplan->fdw_exprs, (PlanState *) node);
 		ListCell *lc;
 		int i = 0;
-		
+
 		values = palloc(sizeof(Datum)*fsstate->numParams);
 		nulls = palloc(sizeof(bool)*fsstate->numParams);
 		argtypes = palloc(sizeof(Oid)*fsstate->numParams);
@@ -804,7 +805,12 @@ postgresReScanForeignScan(ForeignScanState *node)
 		{
 			ExprState  *expr_state = (ExprState *) lfirst(lc);
 			/* Evaluate the parameter expression */
+#if PG_VERSION_NUM<90602
+			ExprDoneCond isDone;
+			values[i] = ExecEvalExpr(expr_state, econtext, &nulls[i], &isDone);
+#else
 			values[i] = ExecEvalExpr(expr_state, econtext, &nulls[i]);
+#endif
 			argtypes[i] = exprType((Node*)expr_state->expr);
 			i += 1;
 		}
@@ -1083,7 +1089,6 @@ foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
 	fpinfo->vops_attrs = ofpinfo->vops_attrs;
 	fpinfo->tile_attrs = ofpinfo->tile_attrs;
 
-
 	/*
 	 * The targetlist expected from this node and the targetlist pushed down
 	 * to the foreign server may be different. The latter requires
@@ -1093,7 +1098,6 @@ foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
 	 * target to record the new sortgrouprefs.
 	 */
 	grouping_target = copy_pathtarget(root->upper_targets[UPPERREL_GROUP_AGG]);
-
 
 	/*
 	 * Evaluate grouping targets and check whether they are safe to push down
@@ -1317,7 +1321,6 @@ add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 		return;
 
 	grouping_target = root->upper_targets[UPPERREL_GROUP_AGG];
-
 	/* save the input_rel as upperrel in fpinfo */
 	fpinfo->upperrel = input_rel;
 
