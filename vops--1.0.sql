@@ -102,8 +102,8 @@ create type vops_timestamp (
 
 -- char tile
 
-create function vops_char_const(opd int4) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create cast (int4 as vops_char) with function vops_char_const(int4) AS IMPLICIT;
+create function vops_char_const(opd "char") returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create cast ("char" as vops_char) with function vops_char_const("char") AS IMPLICIT;
 
 create function vops_char_concat(left vops_char, right vops_char) returns vops_int2 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator || (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_concat);
@@ -123,78 +123,78 @@ create aggregate map(group_by vops_char, aggregates cstring, variadic anyarray) 
 	   parallel = safe);
 
 create function vops_char_sub(left vops_char, right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_sub_rconst(left vops_char, right int4) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_sub_lconst(left int4, right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_sub_rconst(left vops_char, right "char") returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_sub_lconst(left "char", right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator - (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_sub);
-create operator - (leftarg=vops_char, rightarg=int4, procedure=vops_char_sub_rconst);
-create operator - (leftarg=int4, rightarg=vops_char, procedure=vops_char_sub_lconst);
+create operator - (leftarg=vops_char, rightarg="char", procedure=vops_char_sub_rconst);
+create operator - (leftarg="char", rightarg=vops_char, procedure=vops_char_sub_lconst);
 
 create function vops_char_add(left vops_char, right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_add_rconst(left vops_char, right int4) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_add_lconst(left int4, right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_add_rconst(left vops_char, right "char") returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_add_lconst(left "char", right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator + (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_add, commutator= +);
-create operator + (leftarg=vops_char, rightarg=int4, procedure=vops_char_add_rconst, commutator= +);
-create operator + (leftarg=int4, rightarg=vops_char, procedure=vops_char_add_lconst, commutator= +);
+create operator + (leftarg=vops_char, rightarg="char", procedure=vops_char_add_rconst, commutator= +);
+create operator + (leftarg="char", rightarg=vops_char, procedure=vops_char_add_lconst, commutator= +);
 
 create function vops_char_mul(left vops_char, right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_mul_rconst(left vops_char, right int4) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_mul_lconst(left int4, right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_mul_rconst(left vops_char, right "char") returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_mul_lconst(left "char", right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator * (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_mul, commutator= *);
-create operator * (leftarg=vops_char, rightarg=int4, procedure=vops_char_mul_rconst, commutator= *);
-create operator * (leftarg=int4, rightarg=vops_char, procedure=vops_char_mul_lconst, commutator= *);
+create operator * (leftarg=vops_char, rightarg="char", procedure=vops_char_mul_rconst, commutator= *);
+create operator * (leftarg="char", rightarg=vops_char, procedure=vops_char_mul_lconst, commutator= *);
 
 create function vops_char_div(left vops_char, right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_div_rconst(left vops_char, right int4) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_div_lconst(left int4, right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_div_rconst(left vops_char, right "char") returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_div_lconst(left "char", right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator / (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_div);
-create operator / (leftarg=vops_char, rightarg=int4, procedure=vops_char_div_rconst);
-create operator / (leftarg=int4, rightarg=vops_char, procedure=vops_char_div_lconst);
+create operator / (leftarg=vops_char, rightarg="char", procedure=vops_char_div_rconst);
+create operator / (leftarg="char", rightarg=vops_char, procedure=vops_char_div_lconst);
 
 create function vops_char_eq(left vops_char, right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_eq_rconst(left vops_char, right int4) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_eq_lconst(left int4, right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_eq_rconst(left vops_char, right "char") returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_eq_lconst(left "char", right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator = (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_eq, commutator= =);
-create operator = (leftarg=vops_char, rightarg=int4, procedure=vops_char_eq_rconst, commutator= =);
-create operator = (leftarg=int4, rightarg=vops_char, procedure=vops_char_eq_lconst, commutator= =);
+create operator = (leftarg=vops_char, rightarg="char", procedure=vops_char_eq_rconst, commutator= =);
+create operator = (leftarg="char", rightarg=vops_char, procedure=vops_char_eq_lconst, commutator= =);
 
 create function vops_char_ne(left vops_char, right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_ne_rconst(left vops_char, right int4) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_ne_lconst(left int4, right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_ne_rconst(left vops_char, right "char") returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_ne_lconst(left "char", right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator <> (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_ne, commutator= <>);
-create operator <> (leftarg=vops_char, rightarg=int4, procedure=vops_char_ne_rconst, commutator= <>);
-create operator <> (leftarg=int4, rightarg=vops_char, procedure=vops_char_ne_lconst, commutator= <>);
+create operator <> (leftarg=vops_char, rightarg="char", procedure=vops_char_ne_rconst, commutator= <>);
+create operator <> (leftarg="char", rightarg=vops_char, procedure=vops_char_ne_lconst, commutator= <>);
 
 create function vops_char_gt(left vops_char, right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_gt_rconst(left vops_char, right int4) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_gt_lconst(left int4, right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_gt_rconst(left vops_char, right "char") returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_gt_lconst(left "char", right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator > (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_gt, commutator= <);
-create operator > (leftarg=vops_char, rightarg=int4, procedure=vops_char_gt_rconst, commutator= <);
-create operator > (leftarg=int4, rightarg=vops_char, procedure=vops_char_gt_lconst, commutator= <);
+create operator > (leftarg=vops_char, rightarg="char", procedure=vops_char_gt_rconst, commutator= <);
+create operator > (leftarg="char", rightarg=vops_char, procedure=vops_char_gt_lconst, commutator= <);
 
 create function vops_char_lt(left vops_char, right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_lt_rconst(left vops_char, right int4) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_lt_lconst(left int4, right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_lt_rconst(left vops_char, right "char") returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_lt_lconst(left "char", right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator < (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_lt, commutator= >);
-create operator < (leftarg=vops_char, rightarg=int4, procedure=vops_char_lt_rconst, commutator= >);
-create operator < (leftarg=int4, rightarg=vops_char, procedure=vops_char_lt_lconst, commutator= >);
+create operator < (leftarg=vops_char, rightarg="char", procedure=vops_char_lt_rconst, commutator= >);
+create operator < (leftarg="char", rightarg=vops_char, procedure=vops_char_lt_lconst, commutator= >);
 
 create function vops_char_ge(left vops_char, right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_ge_rconst(left vops_char, right int4) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_ge_lconst(left int4, right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_ge_rconst(left vops_char, right "char") returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_ge_lconst(left "char", right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator >= (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_ge, commutator= <=);
-create operator >= (leftarg=vops_char, rightarg=int4, procedure=vops_char_ge_rconst, commutator= <=);
-create operator >= (leftarg=int4, rightarg=vops_char, procedure=vops_char_ge_lconst, commutator= <=);
+create operator >= (leftarg=vops_char, rightarg="char", procedure=vops_char_ge_rconst, commutator= <=);
+create operator >= (leftarg="char", rightarg=vops_char, procedure=vops_char_ge_lconst, commutator= <=);
 
 create function vops_char_le(left vops_char, right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_le_rconst(left vops_char, right int4) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create function vops_char_le_lconst(left int4, right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_le_rconst(left vops_char, right "char") returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_le_lconst(left "char", right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator <= (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_le, commutator= >=);
-create operator <= (leftarg=vops_char, rightarg=int4, procedure=vops_char_le_rconst, commutator= >=);
-create operator <= (leftarg=int4, rightarg=vops_char, procedure=vops_char_le_lconst, commutator= >=);
+create operator <= (leftarg=vops_char, rightarg="char", procedure=vops_char_le_rconst, commutator= >=);
+create operator <= (leftarg="char", rightarg=vops_char, procedure=vops_char_le_lconst, commutator= >=);
 
-create function betwixt(opd vops_char, low int4, high int4) returns vops_bool as 'MODULE_PATHNAME','vops_betwixt_char' language C parallel safe immutable strict;
+create function betwixt(opd vops_char, low "char", high "char") returns vops_bool as 'MODULE_PATHNAME','vops_betwixt_char' language C parallel safe immutable strict;
 
-create function ifnull(opd vops_char, subst int4) returns vops_char as 'MODULE_PATHNAME','vops_ifnull_char' language C parallel safe immutable strict;
+create function ifnull(opd vops_char, subst "char") returns vops_char as 'MODULE_PATHNAME','vops_ifnull_char' language C parallel safe immutable strict;
 create function ifnull(opd vops_char, subst vops_char) returns vops_char as 'MODULE_PATHNAME','vops_coalesce_char' language C parallel safe immutable strict;
 
 create function vops_char_neg(right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;

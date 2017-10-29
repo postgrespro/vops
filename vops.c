@@ -1357,7 +1357,7 @@ Datum vops_agg_deserial(PG_FUNCTION_ARGS)
     GROUP_BY_FUNC(TYPE)
 
 /*             TYPE,   SSTYPE, CTYPE,  XTYPE,  STYPE, GCTYPE, GXTYPE, GSTYPE, FORMAT, PREC */
-REGISTER_TYPE( char,    int8,   char,  int32, long64,   CHAR,  INT32,  INT64, lld, 0)
+REGISTER_TYPE( char,    int8,   char,   char, long64,   CHAR,   CHAR,  INT64, lld, 0)
 REGISTER_TYPE( int2,    int8,  int16,  int32, long64,  INT16,  INT32,  INT64, lld, 0)
 REGISTER_TYPE( int4,    int8,  int32,  int32, long64,  INT32,  INT32,  INT64, lld, 0)
 REGISTER_TYPE( int8,    int8,  int64,  int64, long64,  INT64,  INT64,  INT64, lld, 0)
