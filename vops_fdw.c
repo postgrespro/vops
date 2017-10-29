@@ -805,7 +805,7 @@ postgresReScanForeignScan(ForeignScanState *node)
 		{
 			ExprState  *expr_state = (ExprState *) lfirst(lc);
 			/* Evaluate the parameter expression */
-#if PG_VERSION_NUM<90602
+#if PG_VERSION_NUM<100000
 			ExprDoneCond isDone;
 			values[i] = ExecEvalExpr(expr_state, econtext, &nulls[i], &isDone);
 #else

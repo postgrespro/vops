@@ -2,11 +2,14 @@
 
 MODULE_big = vops
 OBJS = vops.o vops_fdw.o deparse.o
+PGFILEDESC = "VOPS - vectorized operations for PostgreSQL"
+
+PG_CPPFLAGS = -I$(libpq_srcdir)
+SHLIB_LINK = $(libpq)
 
 EXTENSION = vops
 DATA = vops--1.0.sql
-PGFILEDESC = "vops - vectorized operations"
-CUSTOM_COPT = -O0
+#CUSTOM_COPT = -O0
 
 REGRESS = test
 
