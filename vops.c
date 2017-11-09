@@ -49,11 +49,15 @@
 PG_MODULE_MAGIC;
 #endif
 
+#if !USE_FLOAT8_BYVAL
+#error VOPS requires 64-bit version of Postgres
+#endif
+
 /* pg module functions */
 void _PG_init(void);
 void _PG_fini(void);
 
-uint64 filter_mask;
+uint64 filter_mask = ~0;
 
 static struct {
 	char const* name;
