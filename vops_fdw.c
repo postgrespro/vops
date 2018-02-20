@@ -310,10 +310,10 @@ postgresGetForeignRelSize(PlannerInfo *root,
 	{
 		for (j = 0; j < vops_tupdesc->natts; j++) 
 		{
-			if (strcmp(NameStr(vops_tupdesc->attrs[j]->attname), NameStr(fdw_tupdesc->attrs[i]->attname)) == 0)
+			if (strcmp(NameStr(TupleDescAttr(vops_tupdesc, j)->attname), NameStr(TupleDescAttr(fdw_tupdesc, i)->attname)) == 0)
 			{
 				fpinfo->vops_attrs = bms_add_member(fpinfo->vops_attrs, i + 1 - FirstLowInvalidHeapAttributeNumber);
-				if (vops_get_type(vops_tupdesc->attrs[j]->atttypid) != VOPS_LAST)
+				if (vops_get_type(TupleDescAttr(vops_tupdesc, j)->atttypid) != VOPS_LAST)
 				{
 					fpinfo->tile_attrs = bms_add_member(fpinfo->tile_attrs, i + 1 - FirstLowInvalidHeapAttributeNumber);
 				}						
@@ -685,7 +685,7 @@ postgresIterateForeignScan(ForeignScanState *node)
 						/* ordinary column */
 						Assert(i <= n_attrs);
 						Assert(j < SPI_tuptable->tupdesc->natts);
-						fsstate->attr_types[i-1] = SPI_tuptable->tupdesc->attrs[j]->atttypid;
+						fsstate->attr_types[i-1] = TupleDescAttr(SPI_tuptable->tupdesc, j)->atttypid;
 						fsstate->vops_types[i-1] = vops_get_type(fsstate->attr_types[i-1]);
 					}
 					j += 1;
@@ -747,7 +747,7 @@ postgresIterateForeignScan(ForeignScanState *node)
 							fsstate->dst_nulls[i] = false;
 						}
 					} else { 
-						if (fsstate->attr_types[i] == FLOAT8OID	&& fsstate->tupdesc->attrs[i]->atttypid == FLOAT4OID)
+						if (fsstate->attr_types[i] == FLOAT8OID	&& TupleDescAttr(fsstate->tupdesc, i)->atttypid == FLOAT4OID)
 						{
 							fsstate->dst_values[i] = Float4GetDatum((float)DatumGetFloat8(fsstate->src_values[i]));
 						} else { 
@@ -1413,7 +1413,7 @@ postgresAcquireSampleRowsFunc(Relation relation, int elevel,
 	for (i = 0; i < tupdesc->natts; i++)
 	{
 		/* Ignore dropped columns. */
-		if (tupdesc->attrs[i]->attisdropped)
+		if (TupleDescAttr(tupdesc, i)->attisdropped)
 			continue;
 		if (!first) {
 			appendStringInfoString(&record, ", ");
@@ -1422,11 +1422,11 @@ postgresAcquireSampleRowsFunc(Relation relation, int elevel,
 		first = false;
 
 		/* Use attribute name or column_name option. */
-		colname = NameStr(tupdesc->attrs[i]->attname);
+		colname = NameStr(TupleDescAttr(tupdesc, i)->attname);
 		appendStringInfoString(&sql, "r.");                                         
  		appendStringInfoString(&sql, quote_identifier(colname));
 		
-		appendStringInfo(&record, "%s %s", quote_identifier(colname), deparse_type_name(tupdesc->attrs[i]->atttypid, tupdesc->attrs[i]->atttypmod));
+		appendStringInfo(&record, "%s %s", quote_identifier(colname), deparse_type_name(TupleDescAttr(tupdesc, i)->atttypid, TupleDescAttr(tupdesc, i)->atttypmod));
 	}
 	appendStringInfoString(&sql, " FROM ");
 	deparseRelation(&sql, relation);

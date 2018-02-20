@@ -2375,9 +2375,9 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
 		user_ctx->tile_pos = 0;
 		user_ctx->filter_mask = filter_mask;
 		filter_mask = ~0;
-		
+
         for (i = 0; i < n_attrs; i++) {
-			Form_pg_attribute attr = src_desc->attrs[i];
+			Form_pg_attribute attr = TupleDescAttr(src_desc, i);
 			vops_type tid = vops_get_type(attr->atttypid);
 			Datum val = GetAttributeByNum(t, attr->attnum, &user_ctx->nulls[i]);
 			user_ctx->types[i] = tid;
