@@ -1039,10 +1039,13 @@ static void begin_batch_insert(Oid oid)
 	estate->es_result_relations = resultRelInfo;
 	estate->es_num_result_relations = 1;
 	estate->es_result_relation_info = resultRelInfo;
-
 	ExecOpenIndices(estate->es_result_relation_info, false);
+#if PG_VERSION_NUM>=110000
+	slot = ExecInitExtraTupleSlot(estate, RelationGetDescr(rel));
+#else
 	slot = ExecInitExtraTupleSlot(estate);
 	ExecSetSlotDescriptor(slot, RelationGetDescr(rel));
+#endif
 }
 
 static void insert_tuple(Datum* values, bool* nulls)

@@ -389,10 +389,19 @@ foreign_expr_walker(Node *node,
 char *
 deparse_type_name(Oid type_oid, int32 typemod)
 {
+#if PG_VERSION_NUM>=110000
+	uint8 flags = FORMAT_TYPE_TYPEMOD_GIVEN;
+
+	if (type_oid >= FirstBootstrapObjectId)
+		flags |= FORMAT_TYPE_FORCE_QUALIFY;
+
+	return format_type_extended(type_oid, typemod, flags);
+#else
 	if (type_oid < FirstBootstrapObjectId)
 		return format_type_with_typemod(type_oid, typemod);
 	else
 		return format_type_with_typemod_qualified(type_oid, typemod);
+#endif
 }
 
 /*
@@ -1365,8 +1374,11 @@ deparseColumnRef(StringInfo buf, int varno, int varattno, PlannerInfo *root,
 		 * FDW option, use attribute name.
 		 */
 		if (colname == NULL)
+#if PG_VERSION_NUM>=110000
+			colname = get_attname(rte->relid, varattno, false);
+#else
 			colname = get_relid_attribute_name(rte->relid, varattno);
-
+#endif
 		if (qualify_col)
 			ADD_REL_QUALIFIER(buf, varno);
 
