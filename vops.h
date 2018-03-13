@@ -119,7 +119,7 @@ typedef struct {
 	int             n_attrs;
 	int             tile_pos;
 	uint64          filter_mask;
-	vops_tile_hdr** tiles;
+	Datum*          tiles;
 } vops_unnest_context;
 
 typedef struct {
