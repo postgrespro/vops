@@ -92,7 +92,7 @@ static struct {
 #define PG_GETARG_VOPS(type,n) ((vops_##type*)VARDATA_ANY(PG_GETARG_VARLENA_PP(n)))
 static void* vops_new(size_t size)
 {
-	text *result = (text *) palloc(size + VARHDRSZ);
+	text *result = (text *) palloc0(size + VARHDRSZ);
 	SET_VARSIZE(result, size + VARHDRSZ);
 	return result;
 }
