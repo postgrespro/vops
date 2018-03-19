@@ -1491,7 +1491,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 						for (i = 0; i < n_attrs; i++) {
 							if (types[i].tid != VOPS_LAST) {
 								vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[i]);
-								tile->empty_mask |= (uint64)~0 << j;
+								tile->empty_mask = (uint64)~0 << j;
 							}
 						}
 						insert_tuple(values, nulls);
@@ -1546,7 +1546,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 			for (i = 0; i < n_attrs; i++) {
 				if (types[i].tid != VOPS_LAST) {
 					vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[i]);
-					tile->empty_mask |= (uint64)~0 << j;
+					tile->empty_mask = (uint64)~0 << j;
 				}
 			}
 		}
@@ -1650,6 +1650,12 @@ Datum vops_import(PG_FUNCTION_ARGS)
 	for (j = 0, loaded = 0; fgets(buf, sizeof buf, in) != NULL; loaded++, vops_import_lineno++, j++) {
 		char* p = buf;
 		if (j == TILE_SIZE) {
+			for (i = 0; i < n_attrs; i++) {
+				if (types[i].tid != VOPS_LAST) {
+					vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[i]);
+					tile->empty_mask = 0;
+				}
+			}
 			insert_tuple(values, nulls);
 			j = 0;
 		}
@@ -1711,7 +1717,7 @@ Datum vops_import(PG_FUNCTION_ARGS)
 					for (k = 0; k < n_attrs; k++) {
 						if (types[k].tid != VOPS_LAST) {
 							vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[k]);
-							tile->empty_mask |= (uint64)~0 << j;
+							tile->empty_mask = (uint64)~0 << j;
 						}
 					}
 					insert_tuple(values, nulls);
@@ -1793,7 +1799,7 @@ Datum vops_import(PG_FUNCTION_ARGS)
 			for (i = 0; i < n_attrs; i++) {
 				if (types[i].tid != VOPS_LAST) {
 					vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[i]);
-					tile->empty_mask |= (uint64)~0 << j;
+					tile->empty_mask = (uint64)~0 << j;
 				}
 			}
 		}
