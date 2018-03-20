@@ -1020,8 +1020,8 @@ Datum vops_count_accumulate(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(vops_count_accumulate_any);
 Datum vops_count_accumulate_any(PG_FUNCTION_ARGS)
 {
-	vops_tile_hdr* opd = PG_GETARG_VOPS_HDR(0);
-	int64 count = PG_GETARG_INT64(1);
+	int64 count = PG_GETARG_INT64(0);
+	vops_tile_hdr* opd = PG_GETARG_VOPS_HDR(1);
 	uint64 mask = filter_mask & ~opd->empty_mask;
 	int i;
 	for (i = 0; i < TILE_SIZE; i++) {
@@ -2632,6 +2632,17 @@ typedef struct
 } vops_mutator_context;
 
 
+static Oid nodeType(Node* node)
+{
+	switch (nodeTag(node))
+	{
+	  case T_TargetEntry:
+		return exprType((Node*)((TargetEntry *)node)->expr);
+	  default:
+		return exprType(node);
+	}
+}
+
 static void replace_count(vops_mutator_context* ctx)
 {
 	Aggref* count = ctx->countall;
@@ -2641,7 +2652,7 @@ static void replace_count(vops_mutator_context* ctx)
 		{
 			count->aggfnoid = countany_oid;
 			count->aggstar = false;
-			count->aggargtypes = list_make1_oid(exprType(ctx->vector_col));
+			count->aggargtypes = list_make1_oid(nodeType(ctx->vector_col));
 			count->args = list_make1(ctx->vector_col);
 		}
 		else
@@ -2738,7 +2749,7 @@ vops_expression_tree_mutator(Node *node, void *context)
 	else if (IsA(node, NullTest))
 	{
 		NullTest* test = (NullTest*)node;
-		if (!test->argisrow && is_vops_type(exprType((Node*)test->arg)))
+		if (!test->argisrow && is_vops_type(nodeType((Node*)test->arg)))
 		{
 			ctx->has_vector_ops = true;
 			ctx->vector_col = (Node*)test->arg;
@@ -2764,11 +2775,10 @@ vops_expression_tree_mutator(Node *node, void *context)
 		Aggref* agg = (Aggref*)node;
 		if (agg->aggfnoid == count_oid) {
 			Assert(agg->aggstar);
+			ctx->countall = agg;
 			if (ctx->has_vector_ops) {
-				agg->aggfnoid = countall_oid;
+				replace_count(ctx);
 				ctx->countall = NULL;
-			} else {
-				ctx->countall = agg;
 			}
 		} else if (!agg->aggstar && !ctx->has_vector_ops) {
 			Assert(list_length(agg->aggargtypes) >= 1);
