@@ -2014,7 +2014,7 @@ create function high(tile vops_interval) returns interval as 'MODULE_PATHNAME','
 -- int8 tile
 
 create function vops_int8_const(opd int8) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create cast (int8 as vops_int8) with function vops_int8_const(int8) AS IMPLICIT;
+create cast (int8 as vops_int8) with function vops_int8_const(int8); -- Make it explicit to avoid ambiguity between count(vops_int8) and count(int8)
 
 create function vops_int8_group_by(state internal, group_by vops_int8, aggregates cstring, variadic anyarray) returns internal as 'MODULE_PATHNAME' language C parallel safe immutable;
 create aggregate map(group_by vops_int8, aggregates cstring, variadic anyarray) (
@@ -2944,6 +2944,14 @@ create operator & (leftarg=vops_bool, rightarg=vops_bool, procedure=vops_bool_an
 create function vops_count_accumulate(state int8) returns int8 as 'MODULE_PATHNAME' language C parallel safe strict;
 CREATE AGGREGATE countall(*) (
 	SFUNC = vops_count_accumulate,
+	STYPE = int8,
+	COMBINEFUNC = int8pl,
+	INITCOND = '0', 
+	PARALLEL = SAFE
+);
+create function vops_count_accumulate_any(state int8, val anyelement) returns int8 as 'MODULE_PATHNAME' language C parallel safe strict;
+CREATE AGGREGATE countany(anyelement) (
+	SFUNC = vops_count_accumulate_any,
 	STYPE = int8,
 	COMBINEFUNC = int8pl,
 	INITCOND = '0', 

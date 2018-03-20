@@ -1017,6 +1017,21 @@ Datum vops_count_accumulate(PG_FUNCTION_ARGS)
 	PG_RETURN_INT64(count);
 }
 
+PG_FUNCTION_INFO_V1(vops_count_accumulate_any);
+Datum vops_count_accumulate_any(PG_FUNCTION_ARGS)
+{
+	vops_tile_hdr* opd = PG_GETARG_VOPS_HDR(0);
+	int64 count = PG_GETARG_INT64(1);
+	uint64 mask = filter_mask & ~opd->empty_mask;
+	int i;
+	for (i = 0; i < TILE_SIZE; i++) {
+		if (mask & ((uint64)1 << i)) {
+			count += 1;
+		}
+	}
+	PG_RETURN_INT64(count);
+}
+
 static EState *estate;
 static TupleTableSlot* slot;
 static Relation rel;
@@ -2603,6 +2618,7 @@ static Oid vops_and_oid;
 static Oid vops_or_oid;
 static Oid vops_not_oid;
 static Oid countall_oid;
+static Oid countany_oid;
 static Oid count_oid;
 static Oid is_null_oid;
 static Oid is_not_null_oid;
@@ -2611,8 +2627,30 @@ static Oid coalesce_oids[VOPS_LAST];
 typedef struct
 {
 	Aggref* countall;
+	Node*   vector_col;
 	bool    has_vector_ops;
 } vops_mutator_context;
+
+
+static void replace_count(vops_mutator_context* ctx)
+{
+	Aggref* count = ctx->countall;
+	if (count != NULL)
+	{
+		if (ctx->vector_col)
+		{
+			count->aggfnoid = countany_oid;
+			count->aggstar = false;
+			count->aggargtypes = list_make1_oid(exprType(ctx->vector_col));
+			count->args = list_make1(ctx->vector_col);
+		}
+		else
+		{
+			count->aggfnoid = countall_oid;
+		}
+		ctx->countall = NULL;
+	}
+}
 
 static Node*
 vops_expression_tree_mutator(Node *node, void *context)
@@ -2626,6 +2664,7 @@ vops_expression_tree_mutator(Node *node, void *context)
 	{
 		vops_mutator_context save_ctx = *ctx;
 		ctx->countall = NULL;
+		ctx->vector_col = NULL;
 		ctx->has_vector_ops = false;
 		node = (Node *) query_tree_mutator((Query *) node,
 										   vops_expression_tree_mutator,
@@ -2702,10 +2741,8 @@ vops_expression_tree_mutator(Node *node, void *context)
 		if (!test->argisrow && is_vops_type(exprType((Node*)test->arg)))
 		{
 			ctx->has_vector_ops = true;
-			if (ctx->countall) {
-				ctx->countall->aggfnoid = countall_oid;
-				ctx->countall = NULL;
-			}
+			ctx->vector_col = (Node*)test->arg;
+			replace_count(ctx);
 			return (Node*)makeFuncExpr(filter_oid, BOOLOID,
 									   list_make1(makeFuncExpr(test->nulltesttype == IS_NULL
 															   ? is_null_oid
@@ -2720,10 +2757,7 @@ vops_expression_tree_mutator(Node *node, void *context)
 	else if (IsA(node, FuncExpr) && !ctx->has_vector_ops && ((FuncExpr*)node)->funcid == filter_oid)
 	{
 		ctx->has_vector_ops = true;
-		if (ctx->countall) {
-			ctx->countall->aggfnoid = countall_oid;
-			ctx->countall = NULL;
-		}
+		replace_count(ctx);
 	}
 	else if (IsA(node, Aggref))
 	{
@@ -2741,10 +2775,8 @@ vops_expression_tree_mutator(Node *node, void *context)
 			if (is_vops_type(linitial_oid(agg->aggargtypes)))
 			{
 				ctx->has_vector_ops = true;
-				if (ctx->countall) {
-					ctx->countall->aggfnoid = countall_oid;
-					ctx->countall = NULL;
-				}
+				ctx->vector_col = (Node*)linitial(agg->args);
+				replace_count(ctx);
 			}
 		}
 	}
@@ -2786,6 +2818,7 @@ static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
 			vops_not_oid = LookupFuncName(list_make1(makeString("vops_bool_not")), 1, profile, false);
 			count_oid = LookupFuncName(list_make1(makeString("count")), 0, profile, false);
 			countall_oid = LookupFuncName(list_make1(makeString("countall")), 0, profile, false);
+			countany_oid = LookupFuncName(list_make1(makeString("countany")), 1, &any, false);
 			is_null_oid = LookupFuncName(list_make1(makeString("is_null")), 1, &any, false);
 
 			for (i = VOPS_CHAR; i < VOPS_LAST; i++) {
