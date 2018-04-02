@@ -785,7 +785,7 @@ postgresReScanForeignScan(ForeignScanState *node)
 {
 	PgFdwScanState *fsstate = (PgFdwScanState *) node->fdw_state;
 	Datum*      values = NULL;
-	bool*       nulls = NULL;
+	char*       nulls = NULL;
 	MemoryContext oldcontext = MemoryContextSwitchTo(fsstate->spi_context);
 	Oid* argtypes = NULL;
 	int rc;
@@ -798,20 +798,22 @@ postgresReScanForeignScan(ForeignScanState *node)
 		int i = 0;
 
 		values = palloc(sizeof(Datum)*fsstate->numParams);
-		nulls = palloc(sizeof(bool)*fsstate->numParams);
+		nulls = palloc(sizeof(char)*fsstate->numParams);
 		argtypes = palloc(sizeof(Oid)*fsstate->numParams);
 
 		foreach(lc, param_exprs)
 		{
 			ExprState  *expr_state = (ExprState *) lfirst(lc);
 			/* Evaluate the parameter expression */
+			bool isNull;
 #if PG_VERSION_NUM<100000
 			ExprDoneCond isDone;
-			values[i] = ExecEvalExpr(expr_state, econtext, &nulls[i], &isDone);
+			values[i] = ExecEvalExpr(expr_state, econtext, &isNull, &isDone);
 #else
-			values[i] = ExecEvalExpr(expr_state, econtext, &nulls[i]);
+			values[i] = ExecEvalExpr(expr_state, econtext, &isNull);
 #endif
 			argtypes[i] = exprType((Node*)expr_state->expr);
+			nulls[i] = (char)isNull;
 			i += 1;
 		}
 	}
