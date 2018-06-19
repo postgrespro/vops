@@ -58,7 +58,6 @@ void _PG_init(void);
 void _PG_fini(void);
 
 uint64 filter_mask = ~0;
-
 static struct {
 	char const* name;
 	Oid         oid;
@@ -1308,38 +1307,28 @@ Datum vops_agg_deserial(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(state);
 }
 
+#define REGISTER_BIN_OP(TYPE,OP,COP,XTYPE,GXTYPE)			\
+	BIN_OP(TYPE,OP,COP)										\
+	BIN_LCONST_OP(TYPE,XTYPE,GXTYPE,OP,COP)					\
+	BIN_RCONST_OP(TYPE,XTYPE,GXTYPE,OP,COP)
+
+#define REGISTER_CMP_OP(TYPE,OP,COP,XTYPE,GXTYPE)			\
+	CMP_OP(TYPE,OP,COP)										\
+	CMP_LCONST_OP(TYPE,XTYPE,GXTYPE,OP,COP)					\
+	CMP_RCONST_OP(TYPE,XTYPE,GXTYPE,OP,COP)
+
 #define REGISTER_TYPE(TYPE,SSTYPE,CTYPE,XTYPE,STYPE,GCTYPE,GXTYPE,GSTYPE,FORMAT,PREC) \
 	UNARY_OP(TYPE,neg,-)									\
-	BIN_OP(TYPE,add,+)										\
-	BIN_LCONST_OP(TYPE,XTYPE,GXTYPE,add,+)					\
-	BIN_RCONST_OP(TYPE,XTYPE,GXTYPE,add,+)					\
-	BIN_OP(TYPE,sub,-)										\
-	BIN_LCONST_OP(TYPE,XTYPE,GXTYPE,sub,-)					\
-	BIN_RCONST_OP(TYPE,XTYPE,GXTYPE,sub,-)					\
-	BIN_OP(TYPE,mul,*)										\
-	BIN_LCONST_OP(TYPE,XTYPE,GXTYPE,mul,*)					\
-	BIN_RCONST_OP(TYPE,XTYPE,GXTYPE,mul,*)					\
-	BIN_OP(TYPE,div,/)										\
-	BIN_LCONST_OP(TYPE,XTYPE,GXTYPE,div,/)					\
-	BIN_RCONST_OP(TYPE,XTYPE,GXTYPE,div,/)					\
-	CMP_OP(TYPE,eq,==)										\
-	CMP_LCONST_OP(TYPE,XTYPE,GXTYPE,eq,==)					\
-	CMP_RCONST_OP(TYPE,XTYPE,GXTYPE,eq,==)					\
-	CMP_OP(TYPE,ne,!=)										\
-	CMP_LCONST_OP(TYPE,XTYPE,GXTYPE,ne,!=)					\
-	CMP_RCONST_OP(TYPE,XTYPE,GXTYPE,ne,!=)					\
-	CMP_OP(TYPE,lt,<)										\
-	CMP_LCONST_OP(TYPE,XTYPE,GXTYPE,lt,<)					\
-	CMP_RCONST_OP(TYPE,XTYPE,GXTYPE,lt,<)					\
-	CMP_OP(TYPE,le,<=)										\
-	CMP_LCONST_OP(TYPE,XTYPE,GXTYPE,le,<=)					\
-	CMP_RCONST_OP(TYPE,XTYPE,GXTYPE,le,<=)					\
-	CMP_OP(TYPE,gt,>)										\
-	CMP_LCONST_OP(TYPE,XTYPE,GXTYPE,gt,>)					\
-	CMP_RCONST_OP(TYPE,XTYPE,GXTYPE,gt,>)					\
-	CMP_OP(TYPE,ge,>=)										\
-	CMP_LCONST_OP(TYPE,XTYPE,GXTYPE,ge,>=)					\
-	CMP_RCONST_OP(TYPE,XTYPE,GXTYPE,ge,>=)					\
+	REGISTER_BIN_OP(TYPE,add,+,XTYPE,GXTYPE)				\
+	REGISTER_BIN_OP(TYPE,sub,-,XTYPE,GXTYPE)				\
+	REGISTER_BIN_OP(TYPE,mul,*,XTYPE,GXTYPE)				\
+	REGISTER_BIN_OP(TYPE,div,/,XTYPE,GXTYPE)				\
+	REGISTER_CMP_OP(TYPE,eq,==,XTYPE,GXTYPE)				\
+	REGISTER_CMP_OP(TYPE,ne,!=,XTYPE,GXTYPE)				\
+	REGISTER_CMP_OP(TYPE,lt,<,XTYPE,GXTYPE)					\
+	REGISTER_CMP_OP(TYPE,le,<=,XTYPE,GXTYPE)				\
+	REGISTER_CMP_OP(TYPE,gt,>,XTYPE,GXTYPE)					\
+	REGISTER_CMP_OP(TYPE,ge,>=,XTYPE,GXTYPE)				\
 	BETWIXT_OP(TYPE,XTYPE,GXTYPE)							\
 	IFNULL_OP(TYPE,CTYPE,GXTYPE)							\
 	CONST_OP(TYPE,CTYPE,GXTYPE)								\
@@ -1364,12 +1353,17 @@ Datum vops_agg_deserial(PG_FUNCTION_ARGS)
     GROUP_BY_FUNC(TYPE)
 
 /*             TYPE,   SSTYPE, CTYPE,  XTYPE,  STYPE, GCTYPE, GXTYPE, GSTYPE, FORMAT, PREC */
-REGISTER_TYPE( char,    int8,   char,   char, long64,   CHAR,   CHAR,  INT64, lld, 0)
-REGISTER_TYPE( int2,    int8,  int16,  int32, long64,  INT16,  INT32,  INT64, lld, 0)
-REGISTER_TYPE( int4,    int8,  int32,  int32, long64,  INT32,  INT32,  INT64, lld, 0)
-REGISTER_TYPE( int8,    int8,  int64,  int64, long64,  INT64,  INT64,  INT64, lld, 0)
+REGISTER_TYPE( char,    int8,   char,   char, long64,   CHAR,   CHAR,  INT64, lld, -1)
+REGISTER_TYPE( int2,    int8,  int16,  int32, long64,  INT16,  INT32,  INT64, lld, -1)
+REGISTER_TYPE( int4,    int8,  int32,  int32, long64,  INT32,  INT32,  INT64, lld, -1)
+REGISTER_TYPE( int8,    int8,  int64,  int64, long64,  INT64,  INT64,  INT64, lld, -1)
 REGISTER_TYPE(float4, float8, float4, float8, float8, FLOAT4, FLOAT8, FLOAT8, lg, Max(1, FLT_DIG + extra_float_digits))
 REGISTER_TYPE(float8, float8, float8, float8, float8, FLOAT8, FLOAT8, FLOAT8, lg, Max(1, DBL_DIG + extra_float_digits))
+
+REGISTER_BIN_OP(char,rem,%,char,CHAR)
+REGISTER_BIN_OP(int2,rem,%,int32,INT32)
+REGISTER_BIN_OP(int4,rem,%,int32,INT32)
+REGISTER_BIN_OP(int8,rem,%,int64,INT64)
 
 const size_t vops_sizeof[] =
 {

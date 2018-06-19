@@ -160,6 +160,13 @@ create operator / (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_di
 create operator / (leftarg=vops_char, rightarg="char", procedure=vops_char_div_rconst);
 create operator / (leftarg="char", rightarg=vops_char, procedure=vops_char_div_lconst);
 
+create function vops_char_rem(left vops_char, right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_rem_rconst(left vops_char, right "char") returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_char_rem_lconst(left "char", right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create operator % (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_rem);
+create operator % (leftarg=vops_char, rightarg="char", procedure=vops_char_rem_rconst);
+create operator % (leftarg="char", rightarg=vops_char, procedure=vops_char_rem_lconst);
+
 create function vops_char_eq(left vops_char, right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_char_eq_rconst(left vops_char, right "char") returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_char_eq_lconst(left "char", right vops_char) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
@@ -486,6 +493,13 @@ create operator / (leftarg=vops_int2, rightarg=vops_int2, procedure=vops_int2_di
 create operator / (leftarg=vops_int2, rightarg=int4, procedure=vops_int2_div_rconst);
 create operator / (leftarg=int4, rightarg=vops_int2, procedure=vops_int2_div_lconst);
 
+create function vops_int2_rem(left vops_int2, right vops_int2) returns vops_int2 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_int2_rem_rconst(left vops_int2, right int4) returns vops_int2 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_int2_rem_lconst(left int4, right vops_int2) returns vops_int2 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create operator % (leftarg=vops_int2, rightarg=vops_int2, procedure=vops_int2_rem);
+create operator % (leftarg=vops_int2, rightarg=int4, procedure=vops_int2_rem_rconst);
+create operator % (leftarg=int4, rightarg=vops_int2, procedure=vops_int2_rem_lconst);
+
 create function vops_int2_eq(left vops_int2, right vops_int2) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_int2_eq_rconst(left vops_int2, right int4) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_int2_eq_lconst(left int4, right vops_int2) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
@@ -798,6 +812,13 @@ create operator / (leftarg=vops_int4, rightarg=vops_int4, procedure=vops_int4_di
 create operator / (leftarg=vops_int4, rightarg=int4, procedure=vops_int4_div_rconst);
 create operator / (leftarg=int4, rightarg=vops_int4, procedure=vops_int4_div_lconst);
 
+create function vops_int4_rem(left vops_int4, right vops_int4) returns vops_int4 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_int4_rem_rconst(left vops_int4, right int4) returns vops_int4 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_int4_rem_lconst(left int4, right vops_int4) returns vops_int4 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create operator % (leftarg=vops_int4, rightarg=vops_int4, procedure=vops_int4_rem);
+create operator % (leftarg=vops_int4, rightarg=int4, procedure=vops_int4_rem_rconst);
+create operator % (leftarg=int4, rightarg=vops_int4, procedure=vops_int4_rem_lconst);
+
 create function vops_int4_eq(left vops_int4, right vops_int4) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_int4_eq_rconst(left vops_int4, right int4) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_int4_eq_lconst(left int4, right vops_int4) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
@@ -1100,12 +1121,15 @@ create operator * (leftarg=vops_date, rightarg=vops_date, procedure=vops_date_mu
 create operator * (leftarg=vops_date, rightarg=date, procedure=vops_date_mul_rconst, commutator= *);
 create operator * (leftarg=date, rightarg=vops_date, procedure=vops_date_mul_lconst, commutator= *);
 
-create function vops_date_div(left vops_date, right vops_date) returns vops_date as 'MODULE_PATHNAME','vops_int4_div' language C parallel safe immutable strict;
-create function vops_date_div_rconst(left vops_date, right date) returns vops_date as 'MODULE_PATHNAME','vops_int4_div_rconst' language C parallel safe immutable strict;
-create function vops_date_div_lconst(left date, right vops_date) returns vops_date as 'MODULE_PATHNAME','vops_int4_div_lconst' language C parallel safe immutable strict;
-create operator / (leftarg=vops_date, rightarg=vops_date, procedure=vops_date_div);
-create operator / (leftarg=vops_date, rightarg=date, procedure=vops_date_div_rconst);
-create operator / (leftarg=date, rightarg=vops_date, procedure=vops_date_div_lconst);
+create function vops_date_div(left vops_date, right vops_int4) returns vops_int4 as 'MODULE_PATHNAME','vops_int4_div' language C parallel safe immutable strict;
+create function vops_date_div_rconst(left vops_date, right int4) returns vops_int4 as 'MODULE_PATHNAME','vops_int4_div_rconst' language C parallel safe immutable strict;
+create operator / (leftarg=vops_date, rightarg=vops_int4, procedure=vops_date_div);
+create operator / (leftarg=vops_date, rightarg=int4, procedure=vops_date_div_rconst);
+
+create function vops_date_rem(left vops_date, right vops_int4) returns vops_int4 as 'MODULE_PATHNAME','vops_int4_rem' language C parallel safe immutable strict;
+create function vops_date_rem_rconst(left vops_date, right int4) returns vops_int4 as 'MODULE_PATHNAME','vops_int4_rem_rconst' language C parallel safe immutable strict;
+create operator % (leftarg=vops_date, rightarg=vops_int4, procedure=vops_date_rem);
+create operator % (leftarg=vops_date, rightarg=int4, procedure=vops_date_rem_rconst);
 
 create function vops_date_eq(left vops_date, right vops_date) returns vops_bool as 'MODULE_PATHNAME','vops_int4_eq' language C parallel safe immutable strict;
 create function vops_date_eq_rconst(left vops_date, right date) returns vops_bool as 'MODULE_PATHNAME','vops_int4_eq_rconst' language C parallel safe immutable strict;
@@ -1419,12 +1443,15 @@ create operator * (leftarg=vops_timestamp, rightarg=vops_timestamp, procedure=vo
 create operator * (leftarg=vops_timestamp, rightarg=timestamp, procedure=vops_timestamp_mul_rconst, commutator= *);
 create operator * (leftarg=timestamp, rightarg=vops_timestamp, procedure=vops_timestamp_mul_lconst, commutator= *);
 
-create function vops_timestamp_div(left vops_timestamp, right vops_timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_div' language C parallel safe immutable strict;
-create function vops_timestamp_div_rconst(left vops_timestamp, right timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_div_rconst' language C parallel safe immutable strict;
-create function vops_timestamp_div_lconst(left timestamp, right vops_timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_div_lconst' language C parallel safe immutable strict;
-create operator / (leftarg=vops_timestamp, rightarg=vops_timestamp, procedure=vops_timestamp_div);
-create operator / (leftarg=vops_timestamp, rightarg=timestamp, procedure=vops_timestamp_div_rconst);
-create operator / (leftarg=timestamp, rightarg=vops_timestamp, procedure=vops_timestamp_div_lconst);
+create function vops_timestamp_div(left vops_timestamp, right vops_int8) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_div' language C parallel safe immutable strict;
+create function vops_timestamp_div_rconst(left vops_timestamp, right int8) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_div_rconst' language C parallel safe immutable strict;
+create operator / (leftarg=vops_timestamp, rightarg=vops_int8, procedure=vops_timestamp_div);
+create operator / (leftarg=vops_timestamp, rightarg=int8, procedure=vops_timestamp_div_rconst);
+
+create function vops_timestamp_rem(left vops_timestamp, right vops_int8) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_rem' language C parallel safe immutable strict;
+create function vops_timestamp_rem_rconst(left vops_timestamp, right int8) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_rem_rconst' language C parallel safe immutable strict;
+create operator % (leftarg=vops_timestamp, rightarg=vops_int8, procedure=vops_timestamp_rem);
+create operator % (leftarg=vops_timestamp, rightarg=int8, procedure=vops_timestamp_rem_rconst);
 
 create function vops_timestamp_eq(left vops_timestamp, right vops_timestamp) returns vops_bool as 'MODULE_PATHNAME','vops_int8_eq' language C parallel safe immutable strict;
 create function vops_timestamp_eq_rconst(left vops_timestamp, right timestamp) returns vops_bool as 'MODULE_PATHNAME','vops_int8_eq_rconst' language C parallel safe immutable strict;
@@ -1743,6 +1770,17 @@ create operator / (leftarg=vops_interval, rightarg=int8, procedure=vops_interval
 create operator / (leftarg=vops_interval, rightarg=interval, procedure=vops_interval_div_rconst);
 create operator / (leftarg=interval, rightarg=vops_interval, procedure=vops_interval_div_lconst);
 
+create function vops_interval_rem(left vops_interval, right vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_rem' language C parallel safe immutable strict;
+create function vops_interval_int_rem(left vops_interval, right vops_int8) returns vops_interval as 'MODULE_PATHNAME','vops_int8_rem' language C parallel safe immutable strict;
+create function vops_interval_rem_int_rconst(left vops_interval, right int8) returns vops_interval as 'MODULE_PATHNAME','vops_int8_rem_rconst' language C parallel safe immutable strict;
+create function vops_interval_rem_rconst(left vops_interval, right interval) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_rem_rconst' language C parallel safe immutable strict;
+create function vops_interval_rem_lconst(left interval, right vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_rem_lconst' language C parallel safe immutable strict;
+create operator % (leftarg=vops_interval, rightarg=vops_interval, procedure=vops_interval_rem);
+create operator % (leftarg=vops_interval, rightarg=vops_int8, procedure=vops_interval_int_rem);
+create operator % (leftarg=vops_interval, rightarg=int8, procedure=vops_interval_rem_int_rconst);
+create operator % (leftarg=vops_interval, rightarg=interval, procedure=vops_interval_rem_rconst);
+create operator % (leftarg=interval, rightarg=vops_interval, procedure=vops_interval_rem_lconst);
+
 create function vops_interval_eq(left vops_interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_eq' language C parallel safe immutable strict;
 create function vops_interval_eq_rconst(left vops_interval, right interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_eq_rconst' language C parallel safe immutable strict;
 create function vops_interval_eq_lconst(left interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_eq_lconst' language C parallel safe immutable strict;
@@ -2053,6 +2091,13 @@ create function vops_int8_div_lconst(left int8, right vops_int8) returns vops_in
 create operator / (leftarg=vops_int8, rightarg=vops_int8, procedure=vops_int8_div);
 create operator / (leftarg=vops_int8, rightarg=int8, procedure=vops_int8_div_rconst);
 create operator / (leftarg=int8, rightarg=vops_int8, procedure=vops_int8_div_lconst);
+
+create function vops_int8_rem(left vops_int8, right vops_int8) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_int8_rem_rconst(left vops_int8, right int8) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_int8_rem_lconst(left int8, right vops_int8) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create operator % (leftarg=vops_int8, rightarg=vops_int8, procedure=vops_int8_rem);
+create operator % (leftarg=vops_int8, rightarg=int8, procedure=vops_int8_rem_rconst);
+create operator % (leftarg=int8, rightarg=vops_int8, procedure=vops_int8_rem_lconst);
 
 create function vops_int8_eq(left vops_int8, right vops_int8) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_int8_eq_rconst(left vops_int8, right int8) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;

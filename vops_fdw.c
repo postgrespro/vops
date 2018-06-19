@@ -121,10 +121,20 @@ static void postgresReScanForeignScan(ForeignScanState *node);
 static void postgresEndForeignScan(ForeignScanState *node);
 static void postgresExplainForeignScan(ForeignScanState *node,
 						   ExplainState *es);
+#if PG_VERSION_NUM>=110000
 static void postgresGetForeignUpperPaths(PlannerInfo *root,
-							 UpperRelationKind stage,
-							 RelOptInfo *input_rel,
-							 RelOptInfo *output_rel);
+										 UpperRelationKind stage,
+										 RelOptInfo *input_rel,
+										 RelOptInfo *output_rel,
+										 void* extra
+	);
+#else
+static void postgresGetForeignUpperPaths(PlannerInfo *root,
+										 UpperRelationKind stage,
+										 RelOptInfo *input_rel,
+										 RelOptInfo *output_rel
+	);
+#endif
 static bool postgresIsForeignScanParallelSafe(PlannerInfo *root, RelOptInfo *rel,
 											  RangeTblEntry *rte);
 static bool postgresAnalyzeForeignTable(Relation relation,
@@ -785,7 +795,7 @@ postgresReScanForeignScan(ForeignScanState *node)
 {
 	PgFdwScanState *fsstate = (PgFdwScanState *) node->fdw_state;
 	Datum*      values = NULL;
-	bool*       nulls = NULL;
+	char*       nulls = NULL;
 	MemoryContext oldcontext = MemoryContextSwitchTo(fsstate->spi_context);
 	Oid* argtypes = NULL;
 	int rc;
@@ -804,13 +814,15 @@ postgresReScanForeignScan(ForeignScanState *node)
 		foreach(lc, param_exprs)
 		{
 			ExprState  *expr_state = (ExprState *) lfirst(lc);
+			bool isnull;
 			/* Evaluate the parameter expression */
 #if PG_VERSION_NUM<100000
 			ExprDoneCond isDone;
-			values[i] = ExecEvalExpr(expr_state, econtext, &nulls[i], &isDone);
+			values[i] = ExecEvalExpr(expr_state, econtext, &isnull, &isDone);
 #else
-			values[i] = ExecEvalExpr(expr_state, econtext, &nulls[i]);
+			values[i] = ExecEvalExpr(expr_state, econtext, &isnull);
 #endif
+			nulls[i] = (char)isnull;
 			argtypes[i] = exprType((Node*)expr_state->expr);
 			i += 1;
 		}
@@ -1271,7 +1283,7 @@ foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
  */
 static void
 postgresGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
-							 RelOptInfo *input_rel, RelOptInfo *output_rel)
+							 RelOptInfo *input_rel, RelOptInfo *output_rel, void* extra)
 {
 	PgFdwRelationInfo *fpinfo;
 
