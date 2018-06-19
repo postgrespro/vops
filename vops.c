@@ -1481,7 +1481,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 							if (DatumGetPointer(values[i]) != NULL) {
 								pfree(DatumGetPointer(values[i]));
 							}
-							values[i] = datumCopy(val, true, types[i].len);
+							values[i] = datumCopy(val, false, types[i].len);
 						}
 					}
 					else if (is_null != nulls[i]
