@@ -85,7 +85,7 @@ static struct {
 };
 
 
-static const Oid const vops_map_tid[] =
+static const Oid vops_map_tid[] =
 {
 	BOOLOID,
 	CHAROID,
