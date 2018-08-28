@@ -1283,7 +1283,11 @@ foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
  */
 static void
 postgresGetForeignUpperPaths(PlannerInfo *root, UpperRelationKind stage,
-							 RelOptInfo *input_rel, RelOptInfo *output_rel, void* extra)
+							 RelOptInfo *input_rel, RelOptInfo *output_rel
+#if PG_VERSION_NUM>=110000
+							 , void* extra
+#endif
+	)
 {
 	PgFdwRelationInfo *fpinfo;
 
