@@ -27,6 +27,7 @@
 #include "utils/array.h"
 #include "utils/tqual.h"
 #include "utils/datum.h"
+#include "utils/float.h"
 #include "utils/builtins.h"
 #include "utils/datetime.h"
 #include <utils/typcache.h>
@@ -1052,7 +1053,7 @@ static void insert_tuple(Datum* values, bool* nulls)
 	HeapTuple tup = heap_form_tuple(RelationGetDescr(rel), values, nulls);
 	ExecStoreTuple(tup, slot, InvalidBuffer, true);
 	simple_heap_insert(rel, slot->tts_tuple);
-    UserTableUpdateOpenIndexes(estate, slot);
+    UserTableUpdateOpenIndexes();
 }
 
 static void end_batch_insert()
