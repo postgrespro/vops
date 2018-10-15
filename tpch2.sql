@@ -9,8 +9,8 @@ create table lineitem(
    l_extendedprice real,
    l_discount real,
    l_tax real,
-   l_returnflag char,
-   l_linestatus char,
+   l_returnflag "char",
+   l_linestatus "char",
    l_shipdate date,
    l_commitdate date,
    l_receiptdate date,
@@ -22,7 +22,7 @@ create table lineitem(
 create table orders(
     o_orderkey integer,
     o_custkey integer,
-    o_orderstatus char,
+    o_orderstatus "char",
     o_totalprice real,
     o_orderdate date,
     o_orderpriority varchar,
@@ -243,7 +243,7 @@ create table hlineitem(
 create table horders(
     o_orderkey int4,
     o_custkey int4,
-    o_orderstatus char,
+    o_orderstatus "char",
     o_totalprice float4,
     o_orderdate date,
     o_shippriority int4
