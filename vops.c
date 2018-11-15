@@ -27,7 +27,9 @@
 #include "utils/array.h"
 #include "utils/tqual.h"
 #include "utils/datum.h"
+#if PG_VERSION_NUM>=120000
 #include "utils/float.h"
+#endif
 #include "utils/builtins.h"
 #include "utils/datetime.h"
 #include <utils/typcache.h>
