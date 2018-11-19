@@ -189,13 +189,10 @@ Also it supports <code>date</code> and <code>timestamp</code> types but them are
 <tr><td>float8</td><td>float8</td><td>vops_float8</td></tr>
 <tr><td>date</td><td>DateADT</td><td>vops_date</td></tr>
 <tr><td>timestamp</td><td>Timestamp</td><td>vops_timestamp</td></tr>
+<tr><td>interval</td><td>Interval</td><td>vops_interval</td></tr>
+<tr><td>char(n)</td><td>text</td><td>vops_text(n)</td></tr>
+<tr><td>varchar(n)</td><td>text</td><td>vops_text(n)</td></tr>
 </table>
-
-<p>
-VOPS doesn't support work with strings (char or varchar types), except case of single character.
-If strings are used as identifiers, in most cases it is preferable to place them in some dictionary and use integer identifiers instead of
-original strings.
-</p>
 
 <h3><a name="operators">Vector operators</a></h3>
 

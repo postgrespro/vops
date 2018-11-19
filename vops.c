@@ -3554,7 +3554,7 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 			parsetree = linitial_node(RawStmt, parsetree_list);
 
 			/* Replace table with partition */
-			elog(NOTICE, "Use projection %s instead of table %d", projectionName, rte->relid);
+			elog(DEBUG1, "Use projection %s instead of table %d", projectionName, rte->relid);
 			select = (SelectStmt*)parsetree->stmt;
 			rv = linitial_node(RangeVar, select->fromClause);
 			rv->relname = projectionName;
