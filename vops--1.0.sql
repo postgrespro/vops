@@ -13,6 +13,7 @@ create type vops_float4;
 create type vops_float8;
 create type vops_timestamp;
 create type vops_interval;
+create type vops_text;
 
 
 create function vops_bool_input(cstring) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
@@ -35,6 +36,9 @@ create function vops_timestamp_input(cstring) returns vops_timestamp as 'MODULE_
 create function vops_timestamp_output(vops_timestamp) returns cstring as 'MODULE_PATHNAME','vops_int8_output' language C parallel safe immutable strict;
 create function vops_interval_input(cstring) returns vops_interval as 'MODULE_PATHNAME','vops_int8_input' language C parallel safe immutable strict;
 create function vops_interval_output(vops_interval) returns cstring as 'MODULE_PATHNAME','vops_int8_output' language C parallel safe immutable strict;
+create function vops_text_input(cstring,oid,integer) returns vops_text as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_output(vops_text) returns cstring as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_typmod_in(cstring[]) returns integer as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 
 create type vops_bool (
 	input = vops_bool_input, 
@@ -109,6 +113,72 @@ create type vops_interval (
 	alignment = double,
     internallength = 528 -- 16 + 64*8
 );
+
+create type vops_text (
+	input = vops_text_input,
+	output = vops_text_output,
+	typmod_in = vops_text_typmod_in,
+	alignment = double
+);
+
+-- text tile
+
+create function vops_text_const(opd text, width integer) returns vops_text as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+
+create function vops_text_concat(left vops_text, right vops_text) returns vops_int2 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create operator || (leftarg=vops_text, rightarg=vops_text, procedure=vops_text_concat);
+
+create function vops_text_eq(left vops_text, right vops_text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_eq_rconst(left vops_text, right text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_eq_lconst(left text, right vops_text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create operator = (leftarg=vops_text, rightarg=vops_text, procedure=vops_text_eq, commutator= =);
+create operator = (leftarg=vops_text, rightarg=text, procedure=vops_text_eq_rconst, commutator= =);
+create operator = (leftarg=text, rightarg=vops_text, procedure=vops_text_eq_lconst, commutator= =);
+
+create function vops_text_ne(left vops_text, right vops_text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_ne_rconst(left vops_text, right text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_ne_lconst(left text, right vops_text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create operator <> (leftarg=vops_text, rightarg=vops_text, procedure=vops_text_ne, commutator= <>);
+create operator <> (leftarg=vops_text, rightarg=text, procedure=vops_text_ne_rconst, commutator= <>);
+create operator <> (leftarg=text, rightarg=vops_text, procedure=vops_text_ne_lconst, commutator= <>);
+
+create function vops_text_gt(left vops_text, right vops_text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_gt_rconst(left vops_text, right text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_gt_lconst(left text, right vops_text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create operator > (leftarg=vops_text, rightarg=vops_text, procedure=vops_text_gt, commutator= <);
+create operator > (leftarg=vops_text, rightarg=text, procedure=vops_text_gt_rconst, commutator= <);
+create operator > (leftarg=text, rightarg=vops_text, procedure=vops_text_gt_lconst, commutator= <);
+
+create function vops_text_lt(left vops_text, right vops_text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_lt_rconst(left vops_text, right text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_lt_lconst(left text, right vops_text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create operator < (leftarg=vops_text, rightarg=vops_text, procedure=vops_text_lt, commutator= >);
+create operator < (leftarg=vops_text, rightarg=text, procedure=vops_text_lt_rconst, commutator= >);
+create operator < (leftarg=text, rightarg=vops_text, procedure=vops_text_lt_lconst, commutator= >);
+
+create function vops_text_ge(left vops_text, right vops_text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_ge_rconst(left vops_text, right text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_ge_lconst(left text, right vops_text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create operator >= (leftarg=vops_text, rightarg=vops_text, procedure=vops_text_ge, commutator= <=);
+create operator >= (leftarg=vops_text, rightarg=text, procedure=vops_text_ge_rconst, commutator= <=);
+create operator >= (leftarg=text, rightarg=vops_text, procedure=vops_text_ge_lconst, commutator= <=);
+
+create function vops_text_le(left vops_text, right vops_text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_le_rconst(left vops_text, right text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_le_lconst(left text, right vops_text) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create operator <= (leftarg=vops_text, rightarg=vops_text, procedure=vops_text_le, commutator= >=);
+create operator <= (leftarg=vops_text, rightarg=text, procedure=vops_text_le_rconst, commutator= >=);
+create operator <= (leftarg=text, rightarg=vops_text, procedure=vops_text_le_lconst, commutator= >=);
+
+create function betwixt(opd vops_text, low text, high text) returns vops_bool as 'MODULE_PATHNAME','vops_betwixt_text' language C parallel safe immutable strict;
+
+create function ifnull(opd vops_text, subst text) returns vops_text as 'MODULE_PATHNAME','vops_ifnull_text' language C parallel safe immutable strict;
+create function ifnull(opd vops_text, subst vops_text) returns vops_text as 'MODULE_PATHNAME','vops_coalesce_text' language C parallel safe immutable strict;
+
+create function first(tile vops_text) returns text as 'MODULE_PATHNAME','vops_text_first' language C parallel safe immutable strict;
+create function last(tile vops_text) returns text as 'MODULE_PATHNAME','vops_text_last' language C parallel safe immutable strict;
+create function low(tile vops_text) returns text as 'MODULE_PATHNAME','vops_text_low' language C parallel safe immutable strict;
+create function high(tile vops_text) returns text as 'MODULE_PATHNAME','vops_text_high' language C parallel safe immutable strict;
 
 -- char tile
 
@@ -442,10 +512,10 @@ CREATE AGGREGATE mcount(vops_char) (
 	PARALLEL = SAFE
 );
 
-create function first(tile vops_char) returns char as 'MODULE_PATHNAME','vops_char_first' language C parallel safe immutable strict;
-create function last(tile vops_char) returns char as 'MODULE_PATHNAME','vops_char_last' language C parallel safe immutable strict;
-create function low(tile vops_char) returns char as 'MODULE_PATHNAME','vops_char_low' language C parallel safe immutable strict;
-create function high(tile vops_char) returns char as 'MODULE_PATHNAME','vops_char_high' language C parallel safe immutable strict;
+create function first(tile vops_char) returns "char" as 'MODULE_PATHNAME','vops_char_first' language C parallel safe immutable strict;
+create function last(tile vops_char) returns "char" as 'MODULE_PATHNAME','vops_char_last' language C parallel safe immutable strict;
+create function low(tile vops_char) returns "char" as 'MODULE_PATHNAME','vops_char_low' language C parallel safe immutable strict;
+create function high(tile vops_char) returns "char" as 'MODULE_PATHNAME','vops_char_high' language C parallel safe immutable strict;
 
 -- int2 tile
 
@@ -3031,6 +3101,8 @@ create cast (vops_bool as bool) with function filter(vops_bool) AS IMPLICIT;
 create function is_null(anyelement) returns vops_bool as 'MODULE_PATHNAME','vops_is_null'  language C parallel safe immutable;
 create function is_not_null(anyelement) returns vops_bool as 'MODULE_PATHNAME','vops_is_not_null'  language C parallel safe immutable;
 
+-- VOPS FDW
+
 CREATE FUNCTION vops_fdw_handler()
 RETURNS fdw_handler
 AS 'MODULE_PATHNAME'
@@ -3046,4 +3118,120 @@ CREATE FOREIGN DATA WRAPPER vops_fdw
   VALIDATOR vops_fdw_validator;
 
 CREATE SERVER vops_server FOREIGN DATA WRAPPER vops_fdw;
- 
+
+-- Projection generator
+
+create table vops_projections(projection text primary key, source_table oid, vector_columns integer[], scalar_columns integer[], key_name text);
+create index on vops_projections(source_table);
+
+
+create function drop_projection(projection_name text) returns void as $drop$
+begin
+	execute 'drop table '||projection_name;
+	execute 'drop function '||projection_name||'_refresh()';
+	delete from vops_projections where projection=projection_name;
+end;
+$drop$ language plpgsql;
+
+
+create function create_projection(projection_name text, source_table regclass, vector_columns text[], scalar_columns text[] default null, order_by text default null) returns void as $create$
+declare
+    create_table text;
+    create_func  text;
+    create_index text;
+	vector_attno integer[];
+	scalar_attno integer[];
+    att_num      integer;
+    att_name     text;
+    att_typname  text;
+    att_typid    integer;
+	sep          text := '';
+	key_type     text;
+	min_value    text;
+	i            integer;
+	att_typmod   integer;
+ begin
+    create_table := 'create table '||projection_name||'(';
+    create_func := 'create function '||projection_name||'_refresh() returns bigint as $$ select populate(source:='''||source_table::text||''',destination:='''||projection_name||''',sort:=''';
+	if scalar_columns is not null
+	then
+		create_index := 'create index on '||projection_name||' using brin(';
+		foreach att_name IN ARRAY scalar_columns
+		loop
+			select atttypid,attnum,typname into att_typid,att_num,att_typname from pg_attribute,pg_type where attrelid=source_table::oid and attname=att_name and atttypid=pg_type.oid;
+        	if att_typid is null
+			then
+				raise exception 'No attribute % in table %',att_name,source_table;
+			end if;
+			scalar_attno := scalar_attno||att_num;
+			if att_typname='char'
+			then
+				att_typname:='"char"';
+			end if;
+			create_table := create_table||sep||att_name||' '||att_typname;
+			create_func := create_func||sep||att_name;
+			create_index := create_index||sep||att_name;
+			sep := ',';
+		end loop;
+	end if;
+
+    if order_by is not null
+	then
+		create_func := create_func||sep||order_by;
+	end if;
+	create_func := create_func||''''; -- end of sort list
+
+    foreach att_name IN ARRAY vector_columns
+	loop
+		select atttypid,attnum,typname,atttypmod into att_typid,att_num,att_typname,att_typmod from pg_attribute,pg_type where attrelid=source_table::oid and attname=att_name and atttypid=pg_type.oid;
+        if att_typid is null
+		then
+		    raise exception 'No attribute % in table %',att_name,source_table;
+		end if;
+		if att_typname='bpchar' or att_typname='varchar'
+		then
+			att_typname:='text('||att_typmod||')';
+		end if;
+		vector_attno := vector_attno||att_num;
+		create_table := create_table||sep||att_name||' vops_'||att_typname;
+		sep := ',';
+		if att_name=order_by
+		then
+			key_type = typname;
+		end if;
+	end loop;
+
+	create_table := create_table||')';
+	execute create_table;
+
+	if create_index is not null
+	then
+		create_index := create_index||')';
+		execute create_index;
+	end if;
+
+    if order_by is not null
+	then
+		if key_type is null
+		then
+		    raise exception 'Invalid order column % for projection %',order_by,projection_name;
+		end if;
+		create_index := 'create index on '||projection_name||' using brin(first('||order_by||'))';
+ 	    execute create_index;
+		create_index := 'create index on '||projection_name||' using brin(last('||order_by||'))';
+ 	    execute create_index;
+		if key_type='timestamp' or key_type='date'
+		then
+		    min_value := '''-infinity''';
+		else
+			min_value := '-1'; -- assume that key have only non-negative values
+		end if;
+		create_func := create_func||',predicate:='''||order_by||'>(select coalesce(max(last('||order_by||')),'||min_value||') from '||projection_name||')''';
+	end if;
+	create_func := create_func||'); $$ language sql';
+	execute create_func;
+
+	insert into vops_projections values (projection_name, source_table, vector_attno, scalar_attno, order_by);
+end;
+$create$ language plpgsql;
+

@@ -14,6 +14,7 @@
 #include "catalog/index.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_type.h"
+#include "commands/explain.h"
 #include "storage/ipc.h"
 #include "storage/lmgr.h"
 #include "storage/lwlock.h"
@@ -27,7 +28,9 @@
 #include "utils/array.h"
 #include "utils/tqual.h"
 #include "utils/datum.h"
+#if PG_VERSION_NUM>=120000
 #include "utils/float.h"
+#endif
 #include "utils/builtins.h"
 #include "utils/datetime.h"
 #include <utils/typcache.h>
@@ -71,7 +74,9 @@ static struct {
 	{"vops_date",      InvalidOid},
 	{"vops_timestamp", InvalidOid},
 	{"vops_float4",    InvalidOid},
-	{"vops_float8",    InvalidOid}
+	{"vops_float8",    InvalidOid},
+	{"vops_interval",  InvalidOid},
+	{"vops_text",      InvalidOid}
 };
 
 static struct {
@@ -96,8 +101,12 @@ static const Oid vops_map_tid[] =
 	DATEOID,
 	TIMESTAMPOID,
 	FLOAT4OID,
-	FLOAT8OID
+	FLOAT8OID,
+	INTERVALOID,
+	TEXTOID
 };
+
+static bool vops_auto_substitute_projections;
 
 static vops_agg_state* vops_init_agg_state(char const* aggregates, Oid elem_type, int n_aggregates);
 static vops_agg_state* vops_create_agg_state(int n_aggregates);
@@ -106,7 +115,7 @@ static void vops_agg_state_accumulate(vops_agg_state* state, int64 group_by, int
 vops_type vops_get_type(Oid typid)
 {
 	int i;
-	if (vops_type_map[0].oid == InvalidOid) { 
+	if (vops_type_map[0].oid == InvalidOid) {
 		for (i = 0; i < VOPS_LAST; i++) {
 			vops_type_map[i].oid = TypenameGetTypid(vops_type_map[i].name);
 		}
@@ -142,7 +151,7 @@ static bool is_vops_type(Oid typeid)
 		for (i = 0; i < TILE_SIZE; i++) payload |= (uint64)(left->payload[i] COP right->payload[i]) << i; \
 		result->payload = payload;										\
 		result->hdr.null_mask = left->hdr.null_mask | right->hdr.null_mask;	\
-		result->hdr.empty_mask = left->hdr.empty_mask;	                \
+		result->hdr.empty_mask = left->hdr.empty_mask | right->hdr.empty_mask; \
 		PG_RETURN_POINTER(result);										\
 	}
 
@@ -236,7 +245,7 @@ static bool is_vops_type(Oid typeid)
 			result->payload[i] = (opd->hdr.null_mask & ((uint64)1 << i)) ? subst->payload[i] : opd->payload[i]; \
 		}																\
 		result->hdr.null_mask = opd->hdr.null_mask & subst->hdr.null_mask; \
-		result->hdr.empty_mask = opd->hdr.empty_mask;					\
+		result->hdr.empty_mask = opd->hdr.empty_mask | subst->hdr.empty_mask; \
 		PG_RETURN_POINTER(result);										\
 	}																	\
 
@@ -276,7 +285,7 @@ static bool is_vops_type(Oid typeid)
 		int i;														    \
 		for (i = 0; i < TILE_SIZE; i++) result->payload[i] = left->payload[i] COP right->payload[i]; \
 		result->hdr.null_mask = left->hdr.null_mask | right->hdr.null_mask;	\
-		result->hdr.empty_mask = left->hdr.empty_mask;					\
+		result->hdr.empty_mask = left->hdr.empty_mask | right->hdr.empty_mask; \
 		PG_RETURN_POINTER(result);										\
 	}
 
@@ -301,7 +310,7 @@ static bool is_vops_type(Oid typeid)
 		vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));		\
 		result->payload = left->payload COP right->payload;				\
 		result->hdr.null_mask = left->hdr.null_mask | right->hdr.null_mask;	\
-		result->hdr.empty_mask = left->hdr.empty_mask;					\
+		result->hdr.empty_mask = left->hdr.empty_mask | right->hdr.empty_mask; \
 		PG_RETURN_POINTER(result);										\
 	}
 
@@ -466,7 +475,7 @@ static bool is_vops_type(Oid typeid)
 			}															\
 		}																\
 		PG_RETURN_POINTER(state);										\
-	}																	
+	}
 
 
 #define MINMAX_WIN(TYPE,CTYPE,OP,COP)									\
@@ -512,7 +521,7 @@ static bool is_vops_type(Oid typeid)
 			}															\
 		}																\
 		PG_RETURN_POINTER(state);										\
-	}																	
+	}
 
 
 #define MINMAX_AGG(TYPE,CTYPE,GCTYPE,OP,COP)							\
@@ -654,7 +663,7 @@ static bool is_vops_type(Oid typeid)
 			PG_RETURN_POINTER(state);									\
 		}																\
 	}																    \
-			
+
 #define VAR_AGG(TYPE)													\
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_var_accumulate);					\
 	Datum vops_##TYPE##_var_accumulate(PG_FUNCTION_ARGS)				\
@@ -901,7 +910,7 @@ PG_FUNCTION_INFO_V1(vops_bool_output);
 Datum vops_bool_output(PG_FUNCTION_ARGS)
 {
 	vops_bool* tile = (vops_bool*)PG_GETARG_POINTER(0);
-	PG_RETURN_CSTRING(psprintf("{%llx,%llx,%llx}", 
+	PG_RETURN_CSTRING(psprintf("{%llx,%llx,%llx}",
 							   (long64)tile->hdr.null_mask, (long64)tile->hdr.empty_mask, (long64)tile->payload));
 }
 
@@ -1366,6 +1375,502 @@ REGISTER_BIN_OP(int2,rem,%,int32,INT32)
 REGISTER_BIN_OP(int4,rem,%,int32,INT32)
 REGISTER_BIN_OP(int8,rem,%,int64,INT64)
 
+static struct varlena*
+vops_alloc_text(int width)
+{
+	struct varlena* var = (struct varlena*)palloc0(VOPS_SIZEOF_TEXT(width));
+	SET_VARSIZE(var, VOPS_SIZEOF_TEXT(width));
+	return var;
+}
+
+PG_FUNCTION_INFO_V1(vops_text_input);
+Datum vops_text_input(PG_FUNCTION_ARGS)
+{
+	char const* str = PG_GETARG_CSTRING(0);
+	int width = PG_GETARG_INT32(2);
+	struct varlena* var;
+	vops_tile_hdr* result;
+	char* dst;
+	int i, len;
+
+	if (str == NULL) {
+		PG_RETURN_NULL();
+	}
+	if (width <= 0)
+		elog(ERROR, "Invalid vops_char width");
+
+	var = vops_alloc_text(width);
+	result = (vops_tile_hdr*)VARDATA(var);
+	result->null_mask = 0;
+	result->empty_mask = 0;
+	dst = (char*)result + 1;
+	if (*str != '{')
+	{
+		len = (int)strlen(str);
+		if (len >= width) {
+			for (i=0; i < TILE_SIZE; i++) {
+				memcpy(dst, str, width);
+				dst += width;
+			}
+		} else {
+			for (i=0; i < TILE_SIZE; i++) {
+				memcpy(dst, str, len);
+				memset(dst + len, '\0', width - len);
+				dst += width;
+			}
+		}
+	} else {
+		str += 1;
+		for (i=0; i < TILE_SIZE; i++, dst += width)
+		{
+			if (*str == ',' || *str == '}') {
+				result->empty_mask |= (uint64)1 << i;
+				if (*str == ',') {
+					str += 1;
+				}
+			} else {
+				if (*str == '?') {
+					result->null_mask |= (uint64)1 << i;
+					str += 1;
+				} else {
+					char const* end = str;
+					while (*++end != '}' && *end != ',' && *end != '\0');
+					len = end - str;
+					if (len < width) {
+						memcpy(dst, str, len);
+						memset(dst + len, '\0', width - len);
+					} else {
+						memcpy(dst, str, width);
+					}
+					str = end;
+				}
+				if (*str == ',') {
+					str += 1;
+				} else if (*str != '}') {
+					elog(ERROR, "Failed to parse tile: separator expected '%s' found", str);
+				}
+			}
+		}
+		if (*str != '}') {
+			elog(ERROR, "Failed to parse tile: unexpected trailing data '%s'", str);
+		}
+	}
+	PG_RETURN_POINTER(result);
+}
+
+PG_FUNCTION_INFO_V1(vops_text_output);
+Datum vops_text_output(PG_FUNCTION_ARGS)
+{
+	struct varlena* var =  (struct varlena*)PG_GETARG_POINTER(0);
+	vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(var);
+	char* src = (char*)(tile + 1);
+	int width = VOPS_ELEM_SIZE(var);
+	int i;
+	char* buf = palloc((width+1)*TILE_SIZE + 2);
+	char* dst = buf;
+	char sep = '{';
+	for (i=0; i < TILE_SIZE; i++, src += width) {
+		*dst++ = sep;
+		if (!(tile->empty_mask & ((uint64)1 << i))) {
+			if (tile->null_mask & ((uint64)1 << i)) {
+				*dst++ = '?';
+			} else {
+				strncpy(dst, src, width);
+				dst += strnlen(src, width);
+			}
+		}
+		sep = ',';
+	}
+	*dst++ = '}';
+	*dst = '\0';
+	PG_RETURN_CSTRING(buf);
+}
+
+PG_FUNCTION_INFO_V1(vops_text_typmod_in);
+Datum vops_text_typmod_in(PG_FUNCTION_ARGS)
+{
+    ArrayType* arr = (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(PG_GETARG_DATUM(0)));
+    int n;
+    int32* typemods = ArrayGetIntegerTypmods(arr, &n);
+    int len;
+    if (n != 1)
+	   elog(ERROR, "vops_text should have exactly one type modifier");
+    len = typemods[0];
+    PG_RETURN_INT32(len);
+}
+
+#define VOPS_TEXT_CMP(op,cmp)										    \
+PG_FUNCTION_INFO_V1(vops_text_##op);								    \
+Datum vops_text_##op(PG_FUNCTION_ARGS)									\
+{																		\
+	struct varlena* vl = PG_GETARG_VARLENA_PP(0);						\
+	struct varlena* vr = PG_GETARG_VARLENA_PP(1);						\
+    vops_tile_hdr* left = (vops_tile_hdr*)VARDATA(vl);					\
+    vops_tile_hdr* right = (vops_tile_hdr*)VARDATA(vl);					\
+	size_t left_elem_size = VOPS_ELEM_SIZE(vl);							\
+	size_t right_elem_size = VOPS_ELEM_SIZE(vr);						\
+	char* l = (char*)(left + 1);										\
+	char* r = (char*)(right + 1);										\
+	vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));			\
+	int i;																\
+	uint64 payload = 0;													\
+	if (left_elem_size < right_elem_size) {								\
+		for (i = 0; i < TILE_SIZE; i++) {								\
+			int diff = memcmp(l + left_elem_size*i, r + right_elem_size*i, left_elem_size); \
+			if (diff == 0 && r[right_elem_size*i + left_elem_size] != '\0') diff = -1;	\
+			payload |= (uint64)(diff cmp 0) << i;						\
+		}																\
+	} else if (left_elem_size > right_elem_size) {						\
+		for (i = 0; i < TILE_SIZE; i++) {								\
+			int diff = memcmp(l + left_elem_size*i, r + right_elem_size*i, right_elem_size); \
+			if (diff == 0 && l[left_elem_size*i + right_elem_size] != '\0') diff = 1;	\
+			payload |= (uint64)(diff cmp 0) << i;						\
+		}																\
+	} else {															\
+		for (i = 0; i < TILE_SIZE; i++) payload |= (uint64)(memcmp(l + left_elem_size*i, r + right_elem_size*i, left_elem_size) cmp 0) << i; \
+	}																	\
+	result->payload = payload;											\
+	result->hdr.null_mask = left->null_mask | right->null_mask;			\
+	result->hdr.empty_mask = left->empty_mask | right->empty_mask;		\
+	PG_RETURN_POINTER(result);											\
+}																		\
+PG_FUNCTION_INFO_V1(vops_text_##op##_rconst);						    \
+Datum vops_text_##op##_rconst(PG_FUNCTION_ARGS)						    \
+{																		\
+	struct varlena* var = PG_GETARG_VARLENA_PP(0);						\
+	text* t = PG_GETARG_TEXT_P(1);										\
+	vops_tile_hdr* left = (vops_tile_hdr*)VARDATA(var);					\
+	size_t elem_size = VOPS_ELEM_SIZE(var);								\
+	char* const_data = (char*)VARDATA(t);								\
+	size_t const_size = VARSIZE(t) - VARHDRSZ;							\
+	char* l = (char*)(left + 1);										\
+	vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));			\
+	int i;																\
+	uint64 payload = 0;													\
+	if (elem_size > const_size) {										\
+        for (i = 0; i < TILE_SIZE; i++) {								\
+			int diff = memcmp(l + elem_size*i, const_data, const_size); \
+			if (diff == 0) diff = (l[elem_size*i + const_size] == '\0') ? 0 : 1; \
+			payload |= (uint64)(diff cmp 0) << i;						\
+		}																\
+	} else if (elem_size < const_size) {								\
+        for (i = 0; i < TILE_SIZE; i++) {								\
+			int diff = memcmp(l + elem_size*i, const_data, elem_size);	\
+			if (diff == 0) diff = -1;									\
+			payload |= (uint64)(diff cmp 0) << i;						\
+		}																\
+	} else {															\
+        for (i = 0; i < TILE_SIZE; i++) {								\
+			int diff = memcmp(l + elem_size*i, const_data, elem_size);	\
+			payload |= (uint64)(diff cmp 0) << i;						\
+		}																\
+	}																	\
+	result->payload = payload;											\
+	result->hdr = *left;												\
+	PG_RETURN_POINTER(result);											\
+}																		\
+PG_FUNCTION_INFO_V1(vops_text_##op##_lconst);						    \
+Datum vops_text_##op##_lconst(PG_FUNCTION_ARGS)							\
+{																		\
+	struct varlena* var = PG_GETARG_VARLENA_PP(1);						\
+	text* t = PG_GETARG_TEXT_P(0);										\
+    vops_tile_hdr* right = (vops_tile_hdr*)VARDATA(var);				\
+	size_t elem_size = VOPS_ELEM_SIZE(var);								\
+	char* const_data = (char*)VARDATA(t);								\
+	size_t const_size = VARSIZE(t) - VARHDRSZ;							\
+	char* r = (char*)(right + 1);										\
+	vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));			\
+	int i;																\
+	uint64 payload = 0;													\
+	if (elem_size > const_size) {										\
+        for (i = 0; i < TILE_SIZE; i++) {								\
+			int diff = memcmp(const_data, r + elem_size*i, const_size);	\
+			if (diff == 0) diff = (r[elem_size*i + const_size] == '\0') ? 0 : -1; \
+			payload |= (uint64)(diff cmp 0) << i;						\
+		}																\
+	} else if (elem_size < const_size) {								\
+        for (i = 0; i < TILE_SIZE; i++) {								\
+			int diff = memcmp(const_data, r + elem_size*i, elem_size);	\
+			if (diff == 0) diff = 1;									\
+			payload |= (uint64)(diff cmp 0) << i;						\
+		}																\
+	} else {															\
+        for (i = 0; i < TILE_SIZE; i++) {								\
+			int diff = memcmp(const_data, r + elem_size*i, elem_size);	\
+			payload |= (uint64)(diff cmp 0) << i;						\
+		}																\
+	}																	\
+	result->payload = payload;											\
+	result->hdr = *right;												\
+	PG_RETURN_POINTER(result);											\
+}																		\
+
+VOPS_TEXT_CMP(eq, ==);
+VOPS_TEXT_CMP(ne, !=);
+VOPS_TEXT_CMP(le, <=);
+VOPS_TEXT_CMP(lt, <);
+VOPS_TEXT_CMP(ge, >=);
+VOPS_TEXT_CMP(gt, >);
+
+PG_FUNCTION_INFO_V1(vops_text_const);
+Datum vops_text_const(PG_FUNCTION_ARGS)
+{
+	text* t = PG_GETARG_TEXT_P(0);
+	char* const_data = (char*)VARDATA(t);
+	size_t const_size = VARSIZE(t) - VARHDRSZ;
+	int width = PG_GETARG_INT32(1);
+	struct varlena* var = vops_alloc_text(width);
+	vops_tile_hdr* result = (vops_tile_hdr*)VARDATA(var);
+	char* dst = (char*)(result + 1);
+	int i;
+	for (i = 0; i < TILE_SIZE; i++)
+	{
+		if (const_size < width)
+		{
+			memcpy(dst, const_data, const_size);
+			memset(dst + const_size, 0, width - const_size);
+		}
+		else
+		{
+			memcpy(dst, const_data, width);
+		}
+		dst += width;
+	}
+	result->null_mask = 0;
+	result->empty_mask = 0;
+	PG_RETURN_POINTER(var);
+}
+
+PG_FUNCTION_INFO_V1(vops_text_concat);
+Datum vops_text_concat(PG_FUNCTION_ARGS)
+{
+	struct varlena* vl = PG_GETARG_VARLENA_PP(0);
+	struct varlena* vr = PG_GETARG_VARLENA_PP(1);
+    vops_tile_hdr* left = (vops_tile_hdr*)VARDATA(vl);
+    vops_tile_hdr* right = (vops_tile_hdr*)VARDATA(vl);
+	size_t left_elem_size = VOPS_ELEM_SIZE(vl);
+	size_t right_elem_size = VOPS_ELEM_SIZE(vr);
+	char* l = (char*)(left + 1);
+	char* r = (char*)(right + 1);
+	struct varlena* var = vops_alloc_text(left_elem_size + right_elem_size);
+	vops_tile_hdr* result = (vops_tile_hdr*)VARDATA(var);
+	char* dst = (char*)(result + 1);
+	int i;
+	for (i = 0; i < TILE_SIZE; i++) {
+		memcpy(dst + i*(left_elem_size + right_elem_size), l + left_elem_size*i, left_elem_size);
+		memcpy(dst + i*(left_elem_size + right_elem_size) + left_elem_size, r + right_elem_size*i, right_elem_size);
+	}
+	result->null_mask = left->null_mask | right->null_mask;
+	result->empty_mask = left->empty_mask | right->empty_mask;
+	PG_RETURN_POINTER(var);
+}
+
+PG_FUNCTION_INFO_V1(vops_betwixt_text);
+Datum vops_betwixt_text(PG_FUNCTION_ARGS)
+{
+	struct varlena* var = PG_GETARG_VARLENA_PP(0);
+	text* from = PG_GETARG_TEXT_P(1);
+	text* till = PG_GETARG_TEXT_P(2);
+	size_t elem_size = VOPS_ELEM_SIZE(var);
+	char* from_data = (char*)VARDATA(from);
+	size_t from_size = VARSIZE(from) - VARHDRSZ;
+	char* till_data = (char*)VARDATA(till);
+	size_t till_size = VARSIZE(till) - VARHDRSZ;
+    vops_tile_hdr* left = (vops_tile_hdr*)VARDATA(var);
+	char* l = (char*)(left + 1);
+	vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));
+	int i;
+	uint64 payload = 0;
+	size_t min_from_size = Min(elem_size, from_size);
+	size_t min_till_size = Min(elem_size, till_size);
+	for (i = 0; i < TILE_SIZE; i++) {
+		int diff = memcmp(l + elem_size*i, from_data, min_from_size);
+		if (diff == 0 && elem_size != from_size)
+			diff = (elem_size < from_size) ? ((from_data[elem_size] == '\0') ? 0 : -1) : ((l[elem_size*i + from_size] == '\0') ? 0 : 1);
+		if (diff >= 0) {
+			diff = memcmp(l + elem_size*i, till_data, min_till_size);
+			if (diff == 0 && elem_size != till_size)
+				diff = (elem_size < till_size) ? ((till_data[elem_size] == '\0') ? 0 : -1) : ((l[elem_size*i + till_size] == '\0') ? 0 : 1);
+			if (diff <= 0)
+				payload |= (uint64)1 << i;
+		}
+	}
+	result->payload = payload;
+	result->hdr = *left;
+	PG_RETURN_POINTER(result);
+}
+
+PG_FUNCTION_INFO_V1(vops_ifnull_text);
+Datum vops_ifnull_text(PG_FUNCTION_ARGS)
+{
+	struct varlena* var = PG_GETARG_VARLENA_PP(0);
+	vops_tile_hdr* opd = (vops_tile_hdr*)VARDATA(var);
+	size_t elem_size = VOPS_ELEM_SIZE(var);
+	text* subst = PG_GETARG_TEXT_P(1);
+	char* subst_data = (char*)VARDATA(subst);
+	size_t subst_size = VARSIZE(subst) - VARHDRSZ;
+	struct varlena* result = vops_alloc_text(elem_size);
+	vops_tile_hdr* res = (vops_tile_hdr*)VARDATA(result);
+	char* dst = (char*)(res + 1);
+	char* src = (char*)(opd + 1);
+	int i;
+	for (i = 0; i < TILE_SIZE; i++) {
+		if (opd->null_mask & ((uint64)1 << i)) {
+			if (subst_size < elem_size) {
+				memcpy(dst + elem_size*i, subst_data, subst_size);
+				memset(dst + elem_size*i + subst_size, 0, elem_size - subst_size);
+			} else {
+				memcpy(dst + elem_size*i, subst_data, elem_size);
+			}
+		} else {
+			memcpy(dst + elem_size*i, src + elem_size*i, elem_size);
+		}
+	}
+	res->null_mask = 0;
+	res->empty_mask = opd->empty_mask;
+	PG_RETURN_POINTER(result);
+}
+
+PG_FUNCTION_INFO_V1(vops_coalesce_text);
+Datum vops_coalesce_text(PG_FUNCTION_ARGS)
+{
+	struct varlena* left = PG_GETARG_VARLENA_PP(0);
+	vops_tile_hdr* opd = (vops_tile_hdr*)VARDATA(left);
+	size_t elem_size = VOPS_ELEM_SIZE(left);
+
+	struct varlena* right = PG_GETARG_VARLENA_PP(1);
+	vops_tile_hdr* subst = (vops_tile_hdr*)VARDATA(right);
+	size_t subst_elem_size = VOPS_ELEM_SIZE(right);
+
+	struct varlena* result = vops_alloc_text(elem_size);
+	vops_tile_hdr* res = (vops_tile_hdr*)VARDATA(result);
+	char* dst = (char*)(res + 1);
+	char* src = (char*)(opd + 1);
+	int i;
+	for (i = 0; i < TILE_SIZE; i++) {
+		if (opd->null_mask & ((uint64)1 << i)) {
+			if (subst_elem_size < elem_size) {
+				memcpy(dst + elem_size*i, src + subst_elem_size*i, subst_elem_size);
+				memset(dst + elem_size*i + subst_elem_size, 0, elem_size - subst_elem_size);
+			} else {
+				memcpy(dst + elem_size*i, src + subst_elem_size*i, elem_size);
+			}
+		}
+	}
+	res->null_mask = opd->null_mask & subst->null_mask;
+	res->empty_mask = opd->empty_mask | subst->empty_mask;
+	PG_RETURN_POINTER(result);
+}
+
+PG_FUNCTION_INFO_V1(vops_text_first);
+Datum vops_text_first(PG_FUNCTION_ARGS)
+{
+	struct varlena* var = PG_GETARG_VARLENA_PP(0);
+	vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(var);
+	size_t elem_size = VOPS_ELEM_SIZE(var);
+
+	uint64 mask = ~(tile->empty_mask | tile->null_mask);
+	int i;
+	for (i = 0; i < TILE_SIZE; i++) {
+		if (mask & ((uint64)1 << i)) {
+			char* src = (char*)(tile + 1) + i*elem_size;
+			size_t len = strnlen(src, elem_size);
+			text* t = (text*)palloc(VARHDRSZ + len);
+			SET_VARSIZE(t, VARHDRSZ + len);
+			memcpy(VARDATA(t), src, len);
+			PG_RETURN_POINTER(t);
+		}
+	}
+	PG_RETURN_NULL();
+}
+
+PG_FUNCTION_INFO_V1(vops_text_last);
+Datum vops_text_last(PG_FUNCTION_ARGS)
+{
+	struct varlena* var = PG_GETARG_VARLENA_PP(0);
+	vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(var);
+	size_t elem_size = VOPS_ELEM_SIZE(var);
+
+	uint64 mask = ~(tile->empty_mask | tile->null_mask);
+	int i;
+	for (i = TILE_SIZE; --i >= 0;) {
+		if (mask & ((uint64)1 << i)) {
+			char* src = (char*)(tile + 1) + i*elem_size;
+			size_t len = strnlen(src, elem_size);
+			text* t = (text*)palloc(VARHDRSZ + len);
+			SET_VARSIZE(t, VARHDRSZ + len);
+			memcpy(VARDATA(t), src, len);
+			PG_RETURN_POINTER(t);
+		}
+	}
+	PG_RETURN_NULL();
+}
+
+PG_FUNCTION_INFO_V1(vops_text_low);
+Datum vops_text_low(PG_FUNCTION_ARGS)
+{
+	struct varlena* var = PG_GETARG_VARLENA_PP(0);
+	vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(var);
+	size_t elem_size = VOPS_ELEM_SIZE(var);
+
+	uint64 mask = ~(tile->empty_mask | tile->null_mask);
+	bool is_null = true;
+	int min = 0;
+	int i;
+	char* src = (char*)(tile + 1);
+
+	for (i = 0; i < TILE_SIZE; i++) {
+		if (mask & ((uint64)1 << i)) {
+			if (is_null || memcmp(src + elem_size*i, src + elem_size*min, elem_size) < 0) {
+				is_null = false;
+				min = i;
+			}
+		}
+	}
+	if (is_null) {
+		PG_RETURN_NULL();
+	} else {
+		size_t len = strnlen(src + min*elem_size, elem_size);
+		text* t = (text*)palloc(VARHDRSZ + len);
+		SET_VARSIZE(t, VARHDRSZ + len);
+		memcpy(VARDATA(t), src + min*elem_size, len);
+		PG_RETURN_POINTER(t);
+	}
+}
+
+PG_FUNCTION_INFO_V1(vops_text_high);
+Datum vops_text_high(PG_FUNCTION_ARGS)
+{
+	struct varlena* var = PG_GETARG_VARLENA_PP(0);
+	vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(var);
+	size_t elem_size = VOPS_ELEM_SIZE(var);
+
+	uint64 mask = ~(tile->empty_mask | tile->null_mask);
+	bool is_null = true;
+	int max = 0;
+	int i;
+	char* src = (char*)(tile + 1);
+
+	for (i = 0; i < TILE_SIZE; i++) {
+		if (mask & ((uint64)1 << i)) {
+			if (is_null || memcmp(src + elem_size*i, src + elem_size*max, elem_size) > 0) {
+				is_null = false;
+				max = i;
+			}
+		}
+	}
+	if (is_null) {
+		PG_RETURN_NULL();
+	} else {
+		size_t len = strnlen(src + max*elem_size, elem_size);
+		text* t = (text*)palloc(VARHDRSZ + len);
+		SET_VARSIZE(t, VARHDRSZ + len);
+		memcpy(VARDATA(t), src + max*elem_size, len);
+		PG_RETURN_POINTER(t);
+	}
+}
+
+
 const size_t vops_sizeof[] =
 {
 	sizeof(vops_bool),
@@ -1376,7 +1881,9 @@ const size_t vops_sizeof[] =
 	sizeof(vops_int4),
 	sizeof(vops_int8),
 	sizeof(vops_float4),
-	sizeof(vops_float8)
+	sizeof(vops_float8),
+	sizeof(vops_int8),
+	0
 };
 
 PG_FUNCTION_INFO_V1(vops_populate);
@@ -1401,7 +1908,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
     char stmt[MAX_SQL_STMT_LEN];
 
     SPI_connect();
-	sql = psprintf("select attname,atttypid from pg_attribute where attrelid=%d and attnum>0 order by attnum", destination);
+	sql = psprintf("select attname,atttypid,atttypmod from pg_attribute where attrelid=%d and attnum>0 order by attnum", destination);
     rc = SPI_execute(sql, true, 0);
     if (rc != SPI_OK_SELECT) {
         elog(ERROR, "Select failed with status %d", rc);
@@ -1425,6 +1932,12 @@ Datum vops_populate(PG_FUNCTION_ARGS)
         Oid type_id = DatumGetObjectId(SPI_getbinval(spi_tuple, spi_tupdesc, 2, &is_null));
 		types[i].tid = vops_get_type(type_id);
 		get_typlenbyvalalign(type_id, &types[i].len, &types[i].byval, &types[i].align);
+		if (types[i].len < 0) { /* varying length type: extract size from atttypmod */
+			types[i].len = DatumGetInt32(SPI_getbinval(spi_tuple, spi_tupdesc, 3, &is_null)) - VARHDRSZ;
+			if (types[i].len < 0) {
+				elog(ERROR, "Size of column %s is unknown", name);
+			}
+		}
 		n += sprintf(stmt + n, "%c%s", sep, name);
 		sep = ',';
 		SPI_freetuple(spi_tuple);
@@ -1434,10 +1947,10 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 	n += sprintf(stmt + n, " from %s.%s",
 				 get_namespace_name(get_rel_namespace(source)),
 				 get_rel_name(source));
-	if (predicate) {
+	if (predicate && *predicate) {
 		n += sprintf(stmt + n, " where %s", predicate);
 	}
-	if (sort) {
+	if (sort && *sort) {
 		n += sprintf(stmt + n, " order by %s", sort);
 	}
     plan = SPI_prepare(stmt, 0, NULL);
@@ -1446,7 +1959,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 	begin_batch_insert(destination);
 
 	for (i = 0; i < n_attrs; i++) {
-		values[i] = PointerGetDatum(types[i].tid != VOPS_LAST ? palloc0(vops_sizeof[types[i].tid]) : NULL);
+		values[i] = PointerGetDatum(types[i].tid != VOPS_LAST ? types[i].tid == VOPS_TEXT ? vops_alloc_text(types[i].len) : palloc0(vops_sizeof[types[i].tid]) : NULL);
 	}
 
 	for (j = 0, loaded = 0; ; j++, loaded++) {
@@ -1457,7 +1970,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 			if (j == TILE_SIZE) {
 				for (i = 0; i < n_attrs; i++) {
 					if (types[i].tid != VOPS_LAST) {
-						vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[i]);
+						vops_tile_hdr* tile = VOPS_GET_TILE(values[i], types[i].tid);
 						tile->empty_mask = 0;
 					}
 				}
@@ -1485,7 +1998,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 						/* Mark unassigned elements as empty */
 						for (i = 0; i < n_attrs; i++) {
 							if (types[i].tid != VOPS_LAST) {
-								vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[i]);
+								vops_tile_hdr* tile = VOPS_GET_TILE(values[i], types[i].tid);
 								tile->empty_mask = (uint64)~0 << j;
 							}
 						}
@@ -1494,14 +2007,14 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 						goto Pack;
 					}
 				} else {
-					vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[i]);
+					vops_tile_hdr* tile = VOPS_GET_TILE(values[i], types[i].tid);
 					tile->null_mask &= ~((uint64)1 << j);
 					tile->null_mask |= (uint64)is_null << j;
 					switch (types[i].tid) {
 					  case VOPS_BOOL:
 						((vops_bool*)tile)->payload &= ~((uint64)1 << j);
 						((vops_bool*)tile)->payload |= (uint64)DatumGetBool(val) << j;
-					break;
+						break;
 					  case VOPS_CHAR:
 						((vops_char*)tile)->payload[j] = SPI_gettypeid(spi_tupdesc, i+1) == CHAROID
 							? DatumGetChar(val)
@@ -1524,6 +2037,28 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 					  case VOPS_FLOAT8:
 						((vops_float8*)tile)->payload[j] = DatumGetFloat8(val);
 						break;
+					  case VOPS_INTERVAL:
+					  {
+						  Interval* it = DatumGetIntervalP(val);
+						  if (it->day || it->month)
+							  elog(ERROR, "Day, month and year intervals are not supported");
+						  ((vops_int8*)tile)->payload[j] = it->time;
+						  break;
+					  }
+					  case VOPS_TEXT:
+					  {
+						  text* t = DatumGetTextP(val);
+						  int elem_size = types[i].len;
+						  int len = VARSIZE(t) - VARHDRSZ;
+						  char* dst = (char*)(tile + 1);
+						  if (len < elem_size) {
+							  memcpy(dst + j*elem_size, VARDATA(t), len);
+							  memset(dst + j*elem_size + len, 0, elem_size - len);
+						  } else {
+							  memcpy(dst + j*elem_size, VARDATA(t), elem_size);
+						  }
+						  break;
+					  }
 					  default:
 						Assert(false);
 					}
@@ -1540,7 +2075,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 			/* Mark unassigned elements as empty */
 			for (i = 0; i < n_attrs; i++) {
 				if (types[i].tid != VOPS_LAST) {
-					vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[i]);
+					vops_tile_hdr* tile = VOPS_GET_TILE(values[i], types[i].tid);
 					tile->empty_mask = (uint64)~0 << j;
 				}
 			}
@@ -1561,7 +2096,7 @@ static int   vops_import_relid;
 
 static void vops_import_error_callback(void* arg)
 {
-	errcontext("IMPORT %s, line %lld, column %d",			   
+	errcontext("IMPORT %s, line %lld, column %d",
 			   get_rel_name(vops_import_relid),
 			   (long long)vops_import_lineno,
 			   vops_import_attno);
@@ -1588,7 +2123,7 @@ Datum vops_import(PG_FUNCTION_ARGS)
     char buf[MAX_CSV_LINE_LEN];
 
     SPI_connect();
-	sql = psprintf("select atttypid from pg_attribute where attrelid=%d and attnum>0 order by attnum", destination);
+	sql = psprintf("select attname,atttypid,atttypmod from pg_attribute where attrelid=%d and attnum>0 order by attnum", destination);
     rc = SPI_execute(sql, true, 0);
     if (rc != SPI_OK_SELECT) {
         elog(ERROR, "Select failed with status %d", rc);
@@ -1606,34 +2141,41 @@ Datum vops_import(PG_FUNCTION_ARGS)
 	spi_tupdesc = SPI_tuptable->tupdesc;
 	for (i = 0; i < n_attrs; i++) {
         HeapTuple spi_tuple = SPI_tuptable->vals[i];
-        Oid type_id = DatumGetObjectId(SPI_getbinval(spi_tuple, spi_tupdesc, 1, &is_null));
+        char const* name = SPI_getvalue(spi_tuple, spi_tupdesc, 1);
+        Oid type_id = DatumGetObjectId(SPI_getbinval(spi_tuple, spi_tupdesc, 2, &is_null));
 		Oid input_oid;
 		types[i].tid = vops_get_type(type_id);
-		if (types[i].tid != VOPS_LAST) { 
+		if (types[i].tid != VOPS_LAST) {
 			type_id = vops_map_tid[types[i].tid];
 		}
 		get_typlenbyvalalign(type_id, &types[i].len, &types[i].byval, &types[i].align);
-		getTypeInputInfo(type_id, &input_oid, &types[i].inproc_param_oid);			
+		if (types[i].len < 0) { /* varying length type: extract size from atttypmod */
+			types[i].len = DatumGetInt32(SPI_getbinval(spi_tuple, spi_tupdesc, 3, &is_null)) - VARHDRSZ;
+			if (types[i].len < 0) {
+				elog(ERROR, "Size of column %s is unknown", name);
+			}
+		}
+		getTypeInputInfo(type_id, &input_oid, &types[i].inproc_param_oid);
 		fmgr_info_cxt(input_oid, &types[i].inproc, fcinfo->flinfo->fn_mcxt);
 		SPI_freetuple(spi_tuple);
 	}
     SPI_freetuptable(SPI_tuptable);
 
 	for (i = 0; i < n_attrs; i++) {
-		values[i] = PointerGetDatum(types[i].tid != VOPS_LAST ? palloc0(vops_sizeof[types[i].tid]) : NULL);
+		values[i] = PointerGetDatum(types[i].tid != VOPS_LAST ? types[i].tid == VOPS_TEXT ? vops_alloc_text(types[i].len) : palloc0(vops_sizeof[types[i].tid]) : NULL);
 	}
 
 	in = fopen(csv_path, "r");
-	if (in == NULL) { 
+	if (in == NULL) {
 		elog(ERROR, "Failed to open file %s: %m", csv_path);
 	}
 
-	for (vops_import_lineno = 1; --skip >= 0; vops_import_lineno++) { 
-		if (fgets(buf, sizeof buf, in) == NULL) { 
+	for (vops_import_lineno = 1; --skip >= 0; vops_import_lineno++) {
+		if (fgets(buf, sizeof buf, in) == NULL) {
 			elog(ERROR, "File %s contains no data", csv_path);
 		}
 	}
-	
+
 	vops_import_relid = destination;
 	errcallback.callback = vops_import_error_callback;
 	errcallback.arg =  NULL;
@@ -1647,7 +2189,7 @@ Datum vops_import(PG_FUNCTION_ARGS)
 		if (j == TILE_SIZE) {
 			for (i = 0; i < n_attrs; i++) {
 				if (types[i].tid != VOPS_LAST) {
-					vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[i]);
+					vops_tile_hdr* tile = VOPS_GET_TILE(values[i], types[i].tid);
 					tile->empty_mask = 0;
 				}
 			}
@@ -1666,7 +2208,7 @@ Datum vops_import(PG_FUNCTION_ARGS)
 				quote = *p++;
 				dst = p;
 				str = p;
-				do { 
+				do {
 					while (*p != quote) {
 						if (*p == '\0') {
 							elog(ERROR, "Unterminated string %s", str);
@@ -1674,7 +2216,7 @@ Datum vops_import(PG_FUNCTION_ARGS)
 						*dst++ = *p++;
 					}
 				} while (*++p == quote);
-				
+
 				*dst = '\0';
 				if (*p == sep) {
 					p += 1;
@@ -1690,7 +2232,7 @@ Datum vops_import(PG_FUNCTION_ARGS)
 				} else {
 					*p = '\0';
 				}
-				is_null = *str == '\0';					
+				is_null = *str == '\0';
 			}
 			val = is_null ? Int32GetDatum(0) : InputFunctionCall(&types[i].inproc, str, types[i].inproc_param_oid, -1);
 			if (types[i].tid == VOPS_LAST) {
@@ -1711,15 +2253,15 @@ Datum vops_import(PG_FUNCTION_ARGS)
 					/* Mark unassigned elements as empty */
 					for (k = 0; k < n_attrs; k++) {
 						if (types[k].tid != VOPS_LAST) {
-							vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[k]);
+							vops_tile_hdr* tile = VOPS_GET_TILE(values[k], types[k].tid);
 							tile->empty_mask = (uint64)~0 << j;
 						}
 					}
 					insert_tuple(values, nulls);
-					for (k = 0; k < i; k++) { 
-						if (types[k].tid != VOPS_LAST) { 
-							vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[k]);
-							tile->null_mask = is_null;							
+					for (k = 0; k < i; k++) {
+						if (types[k].tid != VOPS_LAST) {
+							vops_tile_hdr* tile = VOPS_GET_TILE(values[k], types[k].tid);
+							tile->null_mask = is_null;
 							switch (types[k].tid) {
 							  case VOPS_BOOL:
 								((vops_bool*)tile)->payload >>= j;
@@ -1736,6 +2278,7 @@ Datum vops_import(PG_FUNCTION_ARGS)
 								break;
 							  case VOPS_INT8:
 							  case VOPS_TIMESTAMP:
+							  case VOPS_INTERVAL:
 								((vops_int8*)tile)->payload[0] = ((vops_int8*)tile)->payload[j];
 								break;
 							  case VOPS_FLOAT4:
@@ -1754,7 +2297,7 @@ Datum vops_import(PG_FUNCTION_ARGS)
 					nulls[i] = is_null;
 				}
 			} else {
-				vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[i]);
+				vops_tile_hdr* tile = VOPS_GET_TILE(values[i], types[i].tid);
 				tile->null_mask &= ~((uint64)1 << j);
 				tile->null_mask |= (uint64)is_null << j;
 				switch (types[i].tid) {
@@ -1782,6 +2325,28 @@ Datum vops_import(PG_FUNCTION_ARGS)
 				  case VOPS_FLOAT8:
 					((vops_float8*)tile)->payload[j] = DatumGetFloat8(val);
 					break;
+				  case VOPS_INTERVAL:
+				  {
+					  Interval* it = DatumGetIntervalP(val);
+					  if (it->day || it->month)
+						  elog(ERROR, "Day, month and year intervals are not supported");
+					  ((vops_int8*)tile)->payload[j] = it->time;
+					  break;
+				  }
+				  case VOPS_TEXT:
+				  {
+					  text* t = DatumGetTextP(val);
+					  int elem_size = types[i].len;
+					  int len = VARSIZE(t) - VARHDRSZ;
+					  char* dst = (char*)(tile + 1);
+					  if (len < elem_size) {
+						  memcpy(dst + j*elem_size, VARDATA(t), len);
+						  memset(dst + j*elem_size + len, 0, elem_size - len);
+					  } else {
+						  memcpy(dst + j*elem_size, VARDATA(t), elem_size);
+					  }
+					  break;
+				  }
 				  default:
 					Assert(false);
 				}
@@ -1793,7 +2358,7 @@ Datum vops_import(PG_FUNCTION_ARGS)
 			/* Mark unassigned elements as empty */
 			for (i = 0; i < n_attrs; i++) {
 				if (types[i].tid != VOPS_LAST) {
-					vops_tile_hdr* tile = (vops_tile_hdr*)DatumGetPointer(values[i]);
+					vops_tile_hdr* tile = VOPS_GET_TILE(values[i], types[i].tid);
 					tile->empty_mask = (uint64)~0 << j;
 				}
 			}
@@ -1991,6 +2556,7 @@ static void vops_agg_state_accumulate(vops_agg_state* state, int64 group_by, int
 		break;
 	  case VOPS_INT8:
 	  case VOPS_TIMESTAMP:
+	  case VOPS_INTERVAL:
 		for (j = 0; j < n_aggregates; j++) {
 			vops_int8* tile = (vops_int8*)DatumGetPointer(tiles[j]);
 			if (!nulls[j] && !(tile->hdr.null_mask & ((uint64)1 << i)))
@@ -2169,6 +2735,7 @@ Datum vops_agg_combine(PG_FUNCTION_ARGS)
 						break;
 					  case VOPS_INT8:
 					  case VOPS_TIMESTAMP:
+					  case VOPS_INTERVAL:
 						if (entry0->values[i].acc.i8 < entry1->values[i].acc.i8) {
 							entry0->values[i].acc.i8 = entry1->values[i].acc.i8;
 						}
@@ -2216,6 +2783,7 @@ Datum vops_agg_combine(PG_FUNCTION_ARGS)
 						break;
 					  case VOPS_INT8:
 					  case VOPS_TIMESTAMP:
+					  case VOPS_INTERVAL:
 						if (entry0->values[i].acc.i8 > entry1->values[i].acc.i8) {
 							entry0->values[i].acc.i8 = entry1->values[i].acc.i8;
 						}
@@ -2314,6 +2882,7 @@ Datum vops_reduce(PG_FUNCTION_ARGS)
 						break;
 					  case VOPS_INT8:
 					  case VOPS_TIMESTAMP:
+					  case VOPS_INTERVAL:
 						val = (double)entry->values[i].acc.i8;
 						break;
 					  case VOPS_FLOAT4:
@@ -2392,7 +2961,7 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
 				if (user_ctx->nulls[i]) {
 					user_ctx->tiles[i] = NULL;
 				} else {
-					user_ctx->tiles[i] = (vops_tile_hdr*)PointerGetDatum(val);
+					user_ctx->tiles[i] = VOPS_GET_TILE(val, tid);
 				}
 				TupleDescInitEntry(user_ctx->desc, attr->attnum, attr->attname.data, vops_map_tid[tid], -1, 0);
 			}
@@ -2406,7 +2975,7 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
 	n_attrs = user_ctx->n_attrs;
 
 	for (j = user_ctx->tile_pos; j < TILE_SIZE; j++) {
-		if (user_ctx->filter_mask & ((uint64)1 << j)) 
+		if (user_ctx->filter_mask & ((uint64)1 << j))
 		{
 			for (i = 0; i < n_attrs; i++) {
 				if (user_ctx->types[i] != VOPS_LAST) {
@@ -2434,6 +3003,7 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
 							break;
 						  case VOPS_INT8:
 						  case VOPS_TIMESTAMP:
+						  case VOPS_INTERVAL:
 							value = Int64GetDatum(((vops_int8*)tile)->payload[j]);
 							break;
 						  case VOPS_FLOAT4:
@@ -2442,6 +3012,17 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
 						  case VOPS_FLOAT8:
 							value = Float8GetDatum(((vops_float8*)tile)->payload[j]);
 							break;
+						  case VOPS_TEXT:
+						  {
+							  size_t elem_size = VOPS_ELEM_SIZE((char*)tile - VARHDRSZ);
+							  char* src = (char*)(tile + 1) + elem_size * j;
+							  size_t len = strnlen(src, elem_size);
+							  text* t = (text*)palloc(VARHDRSZ + len);
+							  SET_VARSIZE(t, VARHDRSZ + len);
+							  memcpy(VARDATA(t), src, len);
+							  value = PointerGetDatum(t);
+							  break;
+						  }
 						  default:
 							Assert(false);
 						}
@@ -2470,7 +3051,7 @@ Datum vops_char_concat(PG_FUNCTION_ARGS)
 		result->payload[i] = ((uint16)(uint8)left->payload[i] << 8) | (uint8)right->payload[i];
 	}
 	result->hdr.null_mask = left->hdr.null_mask | right->hdr.null_mask;
-	result->hdr.empty_mask = left->hdr.empty_mask;
+	result->hdr.empty_mask = left->hdr.empty_mask | right->hdr.empty_mask;
 	PG_RETURN_POINTER(result);
 }
 
@@ -2485,7 +3066,7 @@ Datum vops_int2_concat(PG_FUNCTION_ARGS)
 		result->payload[i] = ((uint32)(uint16)left->payload[i] << 16) | (uint16)right->payload[i];
 	}
 	result->hdr.null_mask = left->hdr.null_mask | right->hdr.null_mask;
-	result->hdr.empty_mask = left->hdr.empty_mask;
+	result->hdr.empty_mask = left->hdr.empty_mask | right->hdr.empty_mask;
 	PG_RETURN_POINTER(result);
 }
 
@@ -2500,7 +3081,7 @@ Datum vops_int4_concat(PG_FUNCTION_ARGS)
 		result->payload[i] = ((uint64)(uint32)left->payload[i] << 32) | (uint32)right->payload[i];
 	}
 	result->hdr.null_mask = left->hdr.null_mask | right->hdr.null_mask;
-	result->hdr.empty_mask = left->hdr.empty_mask;
+	result->hdr.empty_mask = left->hdr.empty_mask | right->hdr.empty_mask;
 	PG_RETURN_POINTER(result);
 }
 
@@ -2513,7 +3094,8 @@ Datum vops_is_null(PG_FUNCTION_ARGS)
 		result->payload = 0;
 		result->hdr.empty_mask = ~0;
 	} else {
-		vops_tile_hdr* opd = (vops_tile_hdr*)PG_GETARG_POINTER(0);
+		vops_type tid = vops_get_type(get_fn_expr_argtype(fcinfo->flinfo, 0));
+		vops_tile_hdr* opd = VOPS_GET_TILE(PG_GETARG_DATUM(0), tid);
 		result->payload = opd->null_mask;
 		result->hdr.empty_mask = opd->empty_mask;
 	}
@@ -2529,19 +3111,20 @@ Datum vops_is_not_null(PG_FUNCTION_ARGS)
 		result->payload = 0;
 		result->hdr.empty_mask = ~0;
 	} else {
-		vops_tile_hdr* opd = (vops_tile_hdr*)PG_GETARG_POINTER(0);
+		vops_type tid = vops_get_type(get_fn_expr_argtype(fcinfo->flinfo, 0));
+		vops_tile_hdr* opd = VOPS_GET_TILE(PG_GETARG_DATUM(0), tid);
 		result->payload = ~opd->null_mask;
 		result->hdr.empty_mask = opd->empty_mask;
 	}
 	PG_RETURN_POINTER(result);
 }
 
-PG_FUNCTION_INFO_V1(vops_window_accumulate);						
-Datum vops_window_accumulate(PG_FUNCTION_ARGS)					
-{																		
-	elog(ERROR, "window function requires an OVER clause");			
-	PG_RETURN_NULL();													
-}																		
+PG_FUNCTION_INFO_V1(vops_window_accumulate);
+Datum vops_window_accumulate(PG_FUNCTION_ARGS)
+{
+	elog(ERROR, "window function requires an OVER clause");
+	PG_RETURN_NULL();
+}
 
 PG_FUNCTION_INFO_V1(vops_window_reduce);
 Datum vops_window_reduce(PG_FUNCTION_ARGS)
@@ -2603,7 +3186,7 @@ vops_expression_tree_mutator(Node *node, void *context)
 										   vops_expression_tree_mutator,
 										   context,
 										   QTW_DONT_COPY_QUERY);
-		*(vops_mutator_context*)context = save_ctx; /* restore qurye context */
+		*(vops_mutator_context*)context = save_ctx; /* restore query context */
 		return node;
 	}
 	/* depth first traversal */
@@ -2733,21 +3316,308 @@ vops_expression_tree_mutator(Node *node, void *context)
 }
 
 static post_parse_analyze_hook_type	post_parse_analyze_hook_next;
+static ExplainOneQuery_hook_type save_explain_hook;
 
-static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
+
+typedef enum
 {
-	vops_mutator_context ctx = {NULL,false};
-	/* Invoke original hook if needed */
-	if (post_parse_analyze_hook_next) {
-		post_parse_analyze_hook_next(pstate, query);
-	}
+	SCOPE_WHERE       = 1,
+	SCOPE_AGGREGATE   = 2,
+	SCOPE_TARGET_LIST = 4
+} vops_clause_scope;
 
-	if (is_not_null_oid == InvalidOid) {
+typedef struct
+{
+	Bitmapset* whereVars;
+	Bitmapset* aggVars;
+	Bitmapset* otherVars;
+	int        maxAttNo;
+	int        scope;
+    Const**    consts;
+} vops_pullvar_context;
+
+static bool
+vops_pullvars_walker(Node *node, vops_pullvar_context *ctx)
+{
+	int scope = ctx->scope;
+	bool done;
+
+	if (node == NULL)
+		return false;
+
+	if (IsA(node, Var))
+	{
+		Var		   *var = (Var *) node;
+
+		if (!IS_SPECIAL_VARNO(var->varno) && var->varattno >= 0)
+		{
+			int attno = var->varattno;
+			if (var->varattno > ctx->maxAttNo)
+				ctx->maxAttNo = var->varattno;
+			if (scope & SCOPE_AGGREGATE)
+				ctx->aggVars = bms_add_member(ctx->aggVars, attno);
+			else if (scope & SCOPE_WHERE)
+				ctx->whereVars = bms_add_member(ctx->whereVars, attno);
+			else
+				ctx->otherVars = bms_add_member(ctx->otherVars, attno);
+		}
+		return false;
+	}
+	else if (IsA(node, Const))
+	{
+		Const* c = (Const*)node;
+		if (c->location >= 0)
+			ctx->consts[c->location] = c;
+	}
+	else if (IsA(node, Aggref))
+	{
+		ctx->scope |= SCOPE_AGGREGATE;
+	}
+	else if (IsA(node, TargetEntry))
+	{
+		ctx->scope |= SCOPE_TARGET_LIST;
+	}
+	else if (IsA(node, FromExpr))
+	{
+		ctx->scope |= SCOPE_WHERE;
+	}
+	else if (IsA(node, Query))
+	{
+		return query_tree_walker((Query*)node, vops_pullvars_walker, ctx, 0);
+	}
+	done = expression_tree_walker(node, vops_pullvars_walker, ctx);
+	ctx->scope = scope;
+	return done;
+}
+
+static List*
+vops_add_index_cond(Node* clause, List* conjuncts, char const* keyName)
+{
+	conjuncts = lappend(conjuncts, clause);
+
+	if (IsA(clause, A_Expr))
+	{
+		A_Expr* expr = (A_Expr*)clause;
+		if (list_length(expr->name) == 1 && IsA(expr->lexpr, ColumnRef))
+		{
+			ColumnRef* col = (ColumnRef*)expr->lexpr;
+			if (list_length(col->fields) == 1
+				&& strcmp(strVal(linitial_node(Value, col->fields)), keyName) == 0)
+			{
+				char* op = strVal(linitial_node(Value,expr->name));
+				if (*op == '<' || *op == '>') {
+					A_Expr* bound = makeNode(A_Expr);
+					FuncCall* call = makeFuncCall(list_make1(makeString(*op == '<' ? "last" : "first")),
+												  list_make1(expr->lexpr), -1);
+					bound->kind = expr->kind;
+					bound->name = expr->name;
+					bound->lexpr = (Node*)call;
+					bound->rexpr = expr->rexpr;
+					bound->location = -1;
+					conjuncts = lappend(conjuncts, bound);
+				} else if (*op == '=') {
+					A_Expr* bound = makeNode(A_Expr);
+					FuncCall* call = makeFuncCall(list_make1(makeString("first")),
+												  list_make1(expr->lexpr), -1);
+					bound->kind = expr->kind;
+					bound->name = list_make1(makeString(">="));
+					bound->lexpr = (Node*)call;
+					bound->rexpr = expr->rexpr;
+					bound->location = -1;
+					conjuncts = lappend(conjuncts, bound);
+
+					bound = makeNode(A_Expr);
+					call = makeFuncCall(list_make1(makeString("last")),
+										list_make1(expr->lexpr), -1);
+					bound->kind = expr->kind;
+					bound->name = list_make1(makeString("<="));
+					bound->lexpr = (Node*)call;
+					bound->rexpr = expr->rexpr;
+					bound->location = -1;
+					conjuncts = lappend(conjuncts, bound);
+				}
+			}
+		}
+	}
+	return conjuncts;
+}
+
+
+static Node*
+vops_add_literal_type_casts(Node* node, Const** consts)
+{
+	if (IsA(node, BoolExpr))
+	{
+		ListCell* cell;
+		BoolExpr* andExpr = (BoolExpr*)node;
+		foreach (cell, andExpr->args)
+		{
+			Node* conjunct = (Node*)lfirst(cell);
+			vops_add_literal_type_casts(conjunct, consts);
+		}
+	}
+	else if (IsA(node, A_Expr))
+	{
+		A_Expr* expr = (A_Expr*)node;
+		expr->lexpr = vops_add_literal_type_casts(expr->lexpr, consts);
+		expr->rexpr = vops_add_literal_type_casts(expr->rexpr, consts);
+	}
+	else if (IsA(node, A_Const))
+	{
+		A_Const* ac = (A_Const*)node;
+		if (ac->val.type == T_String && ac->location >= 0)
+		{
+			Const* c = consts[ac->location];
+			if (c != NULL && c->consttype != TEXTOID) {
+				TypeCast* cast = makeNode(TypeCast);
+				cast->arg = (Node*)ac;
+				cast->typeName = makeTypeName(format_type_extended(c->consttype, c->consttypmod, FORMAT_TYPE_TYPEMOD_GIVEN));
+				cast->location = ac->location;
+				node = (Node*)cast;
+			}
+		}
+	}
+	return node;
+}
+
+static void
+vops_substitute_tables_with_projections(char const* queryString, Query *query)
+{
+	vops_pullvar_context pullvar_ctx = {NULL};
+	Oid argtype = OIDOID;
+	RangeTblEntry* rte = linitial_node(RangeTblEntry, query->rtable);
+	Datum reloid = ObjectIdGetDatum(rte->relid);
+	int i, j, rc;
+	MemoryContext memctx = CurrentMemoryContext;
+
+	pullvar_ctx.consts = (Const**)palloc0((strlen(queryString) + 1)*sizeof(Const*));
+	query_tree_walker(query, vops_pullvars_walker, &pullvar_ctx, 0);
+
+    SPI_connect();
+
+	rc = SPI_execute_with_args("select * from vops_projections where source_table=$1",
+							   1, &argtype, &reloid, NULL, true, 0);
+	if (rc != SPI_OK_SELECT)
+	{
+		elog(WARNING, "Table vops_projections doesn't exists");
+		return;
+	}
+	for (i = 0; i < SPI_processed; i++)
+	{
+		HeapTuple tuple = SPI_tuptable->vals[i];
+		TupleDesc tupDesc = SPI_tuptable->tupdesc;
+		bool isnull;
+		char* projectionName = SPI_getvalue(tuple, tupDesc, 1);
+		ArrayType* vectorColumns = (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(SPI_getbinval(tuple, tupDesc, 3, &isnull)));
+		ArrayType* scalarColumns = (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(SPI_getbinval(tuple, tupDesc, 4, &isnull)));
+		char* keyName = SPI_getvalue(tuple, tupDesc, 5);
+		Datum* vectorAttnos;
+		Datum* scalarAttnos;
+		int    nScalarColumns;
+		int    nVectorColumns;
+		Bitmapset* vectorAttrs = NULL;
+		Bitmapset* scalarAttrs = NULL;
+		Bitmapset* allAttrs;
+
+		/* Construct set of used vector columns */
+		deconstruct_array(vectorColumns, INT4OID, 4, true, 'i', &vectorAttnos, NULL, &nVectorColumns);
+		for (j = 0; j < nVectorColumns; j++)
+		{
+			vectorAttrs = bms_add_member(vectorAttrs, DatumGetInt32(vectorAttnos[j]));
+		}
+
+		/* Construct set of used scalar columns */
+		deconstruct_array(scalarColumns, INT4OID, 4, true, 'i', &scalarAttnos, NULL, &nScalarColumns);
+		for (j = 0; j < nScalarColumns; j++)
+		{
+			scalarAttrs = bms_add_member(scalarAttrs, DatumGetInt32(scalarAttnos[j]));
+		}
+		allAttrs = bms_union(vectorAttrs, vectorAttrs);
+
+		if (pullvar_ctx.aggVars                                   /* we are doing some aggregation */
+			&& bms_is_subset(pullvar_ctx.whereVars, allAttrs)     /* attributes in WHERE clause can be either scalar either vector */
+			&& bms_is_subset(pullvar_ctx.aggVars, vectorAttrs)    /* aggregates are calculated only for vector columns */
+			&& bms_is_subset(pullvar_ctx.otherVars, scalarAttrs)) /* variables used in other clauses can be only scalar */
+		{
+			List *parsetree_list;
+			RawStmt *parsetree;
+			SelectStmt* select;
+			RangeVar* rv;
+			MemoryContext spi_memctx = MemoryContextSwitchTo(memctx);
+
+			parsetree_list = pg_parse_query(queryString);
+			if (list_length(parsetree_list) != 1)
+			{
+				MemoryContextSwitchTo(spi_memctx);
+				break;
+			}
+			parsetree = linitial_node(RawStmt, parsetree_list);
+
+			/* Replace table with partition */
+			elog(NOTICE, "Use projection %s instead of table %d", projectionName, rte->relid);
+			select = (SelectStmt*)parsetree->stmt;
+			rv = linitial_node(RangeVar, select->fromClause);
+			rv->relname = projectionName;
+
+			if (keyName != NULL && select->whereClause)
+			{
+				if (IsA(select->whereClause, BoolExpr)
+					&& ((BoolExpr*)select->whereClause)->boolop == AND_EXPR)
+				{
+					ListCell* cell;
+					BoolExpr* andExpr = (BoolExpr*)select->whereClause;
+					List* conjuncts = NULL;
+					foreach (cell, andExpr->args)
+					{
+						Node* conjunct = (Node*)lfirst(cell);
+						conjuncts = vops_add_index_cond(conjunct, conjuncts, keyName);
+					}
+					andExpr->args = conjuncts;
+				}
+				else
+				{
+					List* conjuncts = vops_add_index_cond(select->whereClause, NULL, keyName);
+					if (list_length(conjuncts) > 1)
+					{
+						BoolExpr* andExpr = makeNode(BoolExpr);
+						andExpr->args = conjuncts;
+						andExpr->boolop = AND_EXPR;
+						andExpr->location = -1;
+						select->whereClause = (Node*)andExpr;
+					}
+				}
+			}
+			vops_add_literal_type_casts(select->whereClause, pullvar_ctx.consts);
+			PG_TRY();
+			{
+				Query* subst = parse_analyze(parsetree, queryString, NULL, 0, NULL);
+				*query = *subst;
+			}
+			PG_CATCH();
+			{
+				elog(LOG, "Failed to substitute query %s", queryString);
+			}
+			PG_END_TRY();
+			MemoryContextSwitchTo(spi_memctx);
+			break;
+		}
+		SPI_freetuple(tuple);
+	}
+ 	SPI_finish();
+}
+
+static void
+vops_resolve_functions(void)
+{
+
+	if (is_not_null_oid == InvalidOid)
+	{
 		int i;
 		Oid profile[2];
 		Oid any = ANYELEMENTOID;
-		is_not_null_oid = LookupFuncName(list_make1(makeString("is_not_null")), 1, &any, true); /* lookup last functions defined in extension */		
-		if (is_not_null_oid != InvalidOid) { /* if extension is already intialized */
+		is_not_null_oid = LookupFuncName(list_make1(makeString("is_not_null")), 1, &any, true); /* lookup last functions defined in extension */
+		if (is_not_null_oid != InvalidOid) /* if extension is already intialized */
+		{
 			vops_get_type(InvalidOid); /* initialize type map */
 			vops_bool_oid = vops_type_map[VOPS_BOOL].oid;
 			profile[0] = vops_bool_oid;
@@ -2766,17 +3636,85 @@ static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
 			}
 		}
 	}
+}
+
+static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
+{
+	vops_mutator_context ctx = {NULL,false};
+	/* Invoke original hook if needed */
+	if (post_parse_analyze_hook_next)
+	{
+		post_parse_analyze_hook_next(pstate, query);
+	}
+	vops_resolve_functions();
 	filter_mask = ~0;
+	if (query->commandType == CMD_SELECT &&
+		vops_auto_substitute_projections &&
+		list_length(query->rtable) == 1  && /* do not support substitution for joins because it is not clear how to handle case when only of of joined table is substituted with parition */
+		pstate->p_paramref_hook == NULL)    /* do not support prepared statements yet */
+	{
+		vops_substitute_tables_with_projections(pstate->p_sourcetext, query);
+	}
 	(void)query_tree_mutator(query, vops_expression_tree_mutator, &ctx, QTW_DONT_COPY_QUERY);
+}
+
+static void vops_explain_hook(Query *query,
+							  int cursorOptions,
+							  IntoClause *into,
+							  ExplainState *es,
+							  const char *queryString,
+							  ParamListInfo params,
+							  QueryEnvironment *queryEnv)
+{
+	PlannedStmt *plan;
+	vops_mutator_context ctx = {NULL,false};
+	instr_time	planstart, planduration;
+
+	vops_resolve_functions();
+
+	INSTR_TIME_SET_CURRENT(planstart);
+
+	if (query->commandType == CMD_SELECT &&
+		vops_auto_substitute_projections &&
+		list_length(query->rtable) == 1  && /* do not support substitution for joins because it is not clear how to handle case when only of of joined table is substituted with parition */
+		params == NULL)    /* do not support prepared statements yet */
+	{
+		char* select = pstrdup(queryString);
+		memset(select, ' ', 7);  /* clear "explain" prefix */
+		vops_substitute_tables_with_projections(select, query);
+	}
+	(void)query_tree_mutator(query, vops_expression_tree_mutator, &ctx, QTW_DONT_COPY_QUERY);
+
+	plan = pg_plan_query(query, cursorOptions, params);
+
+	INSTR_TIME_SET_CURRENT(planduration);
+	INSTR_TIME_SUBTRACT(planduration, planstart);
+
+	/* run it (if needed) and produce output */
+	ExplainOnePlan(plan, into, es, queryString, params, queryEnv,
+				   &planduration);
 }
 
 void _PG_init(void)
 {
 	post_parse_analyze_hook_next	= post_parse_analyze_hook;
 	post_parse_analyze_hook			= vops_post_parse_analysis_hook;
+	save_explain_hook = ExplainOneQuery_hook;
+	ExplainOneQuery_hook = vops_explain_hook;
+    DefineCustomBoolVariable("vops.auto_substitute_projections",
+							 "Automatically substitute tables with thier projections",
+							 NULL,
+							 &vops_auto_substitute_projections,
+							 false,
+							 PGC_USERSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
 }
 
 void _PG_fini(void)
 {
 	post_parse_analyze_hook = post_parse_analyze_hook_next;
+	ExplainOneQuery_hook = save_explain_hook;
 }

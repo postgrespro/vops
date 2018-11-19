@@ -301,3 +301,35 @@ select sum(x) over (order by id rows between 9 preceding and current row) from s
  955
 (100 rows)
 
+create table it(i interval, t varchar(4));
+insert into it values ('1 second','sec'), ('1 minute','min'), ('1 hour','hour');
+select create_projection('vit','it',array['i','t']);
+ create_projection 
+-------------------
+ 
+(1 row)
+
+select vit_refresh();
+ vit_refresh 
+-------------
+           3
+(1 row)
+
+select * from vit;
+                                             i                                              |                                      t                                      
+--------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------
+ {1000000,60000000,3600000000,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,} | {sec,min,hour,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,}
+(1 row)
+
+select count(*) from vit where t='min'::text;
+ count 
+-------
+     1
+(1 row)
+
+select count(*) from vit where i>='1 minute'::interval;
+ count 
+-------
+     2
+(1 row)
+

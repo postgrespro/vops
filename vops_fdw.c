@@ -718,7 +718,7 @@ postgresIterateForeignScan(ForeignScanState *node)
 			{
 				for (i = 0; i < n_attrs; i++) {
 					if (fsstate->vops_types[i] != VOPS_LAST) {
-						vops_tile_hdr* tile = (vops_tile_hdr*)PointerGetDatum(fsstate->src_values[i]);
+						vops_tile_hdr* tile = VOPS_GET_TILE(fsstate->src_values[i], fsstate->vops_types[i]);
 						if (tile != NULL && (tile->empty_mask & ((uint64)1 << j))) {
 							goto NextTuple;
 						}
@@ -741,6 +741,7 @@ postgresIterateForeignScan(ForeignScanState *node)
 								value = Int32GetDatum(((vops_int4*)tile)->payload[j]);
 								break;
 							  case VOPS_INT8:
+							  case VOPS_INTERVAL:
 							  case VOPS_TIMESTAMP:
 								value = Int64GetDatum(((vops_int8*)tile)->payload[j]);
 								break;
@@ -750,6 +751,17 @@ postgresIterateForeignScan(ForeignScanState *node)
 							  case VOPS_FLOAT8:
 								value = Float8GetDatum(((vops_float8*)tile)->payload[j]);
 								break;
+							  case VOPS_TEXT:
+							  {
+								  size_t elem_size = VOPS_ELEM_SIZE((char*)tile - VARHDRSZ);
+								  char* src = (char*)(tile + 1) + elem_size * j;
+								  size_t len = strnlen(src, elem_size);
+								  text* t = (text*)palloc(VARHDRSZ + len);
+								  SET_VARSIZE(t, VARHDRSZ + len);
+								  memcpy(VARDATA(t), src, len);
+								  value = PointerGetDatum(t);
+								  break;
+							  }
 							  default:
 								Assert(false);
 							}

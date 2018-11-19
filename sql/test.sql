@@ -23,3 +23,11 @@ select populate(destination:='v2'::regclass, source:='s2'::regclass,sort:='id');
 select unnest(t.*) from (select msum(x,10) over (order by first(id)) from v2) t;
 select sum(x) over (order by id rows between 9 preceding and current row) from s2;
 
+create table it(i interval, t varchar(4));
+insert into it values ('1 second','sec'), ('1 minute','min'), ('1 hour','hour');
+select create_projection('vit','it',array['i','t']);
+select vit_refresh();
+
+select * from vit;
+select count(*) from vit where t='min'::text;
+select count(*) from vit where i>='1 minute'::interval;

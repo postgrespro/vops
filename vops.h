@@ -1,6 +1,10 @@
 #ifndef __VOPS_H__
 #define __VOPS_H__
 
+#define VOPS_SIZEOF_TEXT(width) (VARHDRSZ + sizeof(vops_tile_hdr) + (width)*TILE_SIZE)
+#define VOPS_ELEM_SIZE(var)     ((VARSIZE(var) - VARHDRSZ - sizeof(vops_tile_hdr)) / TILE_SIZE)
+#define VOPS_GET_TILE(val,tid)  ((vops_tile_hdr*)(((tid) == VOPS_TEXT) ? VARDATA(DatumGetTextP(val)) : DatumGetPointer(val)))
+
 typedef enum
 {
 	VOPS_BOOL,
@@ -12,6 +16,8 @@ typedef enum
 	VOPS_TIMESTAMP,
 	VOPS_FLOAT4,
 	VOPS_FLOAT8,
+	VOPS_INTERVAL,
+	VOPS_TEXT,
 	VOPS_LAST,
 } vops_type;
 

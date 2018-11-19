@@ -19,6 +19,7 @@
  <li><a href="#fdw">Back to normal tables</a></li>
 </ul>
 <li><a href="#transform">Standard SQL query transformation</a></li>
+<li><a href="#projections">Table projections</a></li>
 <li><a href="#example">Example</a></li>
 <li><a href="#performance">Performance evaluation</a></li>
 <li><a href="#conclusion">Conclusion</a></li>
@@ -687,6 +688,11 @@ order by
 -- filter on orders range is pushed to FDW
 </pre>
 
+<p>
+  Unfortunately Postgres FDW mechanism is not parallel safe: it is using cursors which right now doesn't support parallel execution.
+  It means that queries on foreign tables can ont use parallel plans, so them are so several times (proportional to number of parallel workers)
+  slower than queries on normal tables. This is why it is ont recommended to use VOPS in this way.
+</p>
 
 <h2><a name="transform">Standard SQL query transformation</a></h2>
 <p>
@@ -747,10 +753,76 @@ generate dummy tile with all components equal to the specified constant and perf
 There is one pitfall with post parse analyze hook: it is initialized in the extension <code>_PG_init</code> function.
 But if extension was not registered in <code>shared_preload_libraries</code> list, then it will be loaded on demand when any function of this extension is requested.
 Unfortunately it happens <b>after</b> parse analyze is done. So first time you execute VOPS query, it will not be transformed. You can get wrong result in this case.
-Either take it in account, either add <code>vops</code> to <code>shared_preload_libraries</code> configuration string.
+Either take it in account, either add <code>vops</code> to <code>session_preload_libraries</code> configuration string.
 VOPS extension provides special function <code>vops_initialize()</code> which can be invoked to force initialization of VOPS extension.
 After invocation of this function, extension will be loaded and all subsequent queries will be normally transformed and produce expected results.
+But more convenient way is to add 'vops' to <code>session_preload_libraries</code> parameter.
 </p>
+
+<h2><a name="projections">Table projections</a></h2>
+<p>
+  In previous section we described how it is possible to write queries for VOPS tables using normal SQL.
+  This VOPS tables can be treated as projections of the main tables.
+</p>
+<p>
+  VOPS provides some functions simplifying creation and usage of projections.
+  In future it may be added to SQL grammar, so that it is possible to write
+  "CREATE PROJECTION xxx OF TABLE yyy(column1, column2,...) GROUP BY (column1, column2, ...)".
+  But right now it can be done using <code>create_projection(projection_name text, source_table regclass, vector_columns text[], scalar_columns text[] default null, order_by text default null)</code> function.
+  First argument of this function specifies name of the projection, second refers to existed Postgres table, <code>vector_columns</code> is array of
+  column names which should be stores as VOPS tiles, <code>scalar_columns</code>  is array of grouping columns which type is preserved and
+  optional <code>order_by</code> parameter specifies name of ordering attribute (explained below).
+  The <code>create_projection(PNAME,...)</code> functions does the following:
+</p>
+<ol>
+  <li>Creates projection table with specified name and attributes.</li>
+  <li>Creates PNAME_refresh() functions which can be used to update projection.</li>
+  <li>Creates functional BRIN indexes for <code>first()</code> and <code>last()</code> functions of ordering attribute (if any)</li>
+  <li>Creates BRIN index on grouping attributes (if any)</li>
+  <li>Insert information about created projection in <code>vops_projections</code> table. This table is used by optimizer to
+    automatically substitute table with partition.</li>
+</ol>
+<p>
+  The <code>order_by</code> attribute is on of the VOPS projection vector columns by which data is sorted. Usually it is some kind of timestamp
+  used in <i>time series</i> (for example trade date). Presence of such column in projection allows to incrementally update projection.
+  Generated <code>PNAME_refresh()</code> method calls <code>populate</code> method with correspondent values of <code>predicate</code> and
+  <code>sort</code> parameters, selecting from original table only rows with <code>order_by</code> column value greater than maximal
+  value of this column in projection. It assumes that <code>order_by</code> is unique or at least refresh is done at the moment when there is some gap
+  in collected events. In addition to <code>order_by</code>, sort list for <code>populate</code> includes all scalar (grouping) columns.
+  It allows to efficiently group imported data by scalar columns and fill VOPS tiles (vector columns) with data.
+</p>
+<p>
+  When <code>order_by</code> attribute is specified, VOPS creates two functional  BRIN indexes on <code>first()</code> and <code>last()</code>
+  functions of this attribute. Presence of such indexes allows to efficiently select time slices. If original query contains
+  predicates like <code>(trade_date between '01-01-2017' and '01-01-2018')</code> then VOPS projection substitution mechanism adds
+  <code>(first(trade_date) >= '01-01-2017' and last(trade_date) >= '01-01-2018')</code> conjuncts which allows Postgres optimizer to use BRIN
+  indexes to locate affected pages.
+</p>
+<p>
+  In in addition to BRIN indexes by <code>order_by</code> attribute, VOPS also creates BRIN index for grouping (scalar) columns.
+  Such index allows to efficiently select groups and perform index join.
+</p>
+<p>
+  Like materialized views, VOPS projections are not updated automatically. It is responsibility of programmer to periodically refresh them.
+  Certainly it is possible to define trigger or rule which will automatically insert data in projection table when original table is updated.
+  But such approach will be extremely inefficient and slow. To take advantage of vector processing, VOPS has to group data in tiles.
+  It can be done only if there is some batch of data which can be grouped by scalar attributes. If you insert records in projection table on-by-one,
+  then most of VOPS tiles will contain just one element.
+  The most convenient way is to use generated <code>PNAME_refresh()</code> function.
+  If <code>order_by</code> attribute is specified, this function imports from original table only the new data (not present in projection).
+</p>
+<p>
+  The main advantage of VOPS projection mechanism is that it allows to automatically substitute queries on original tables with projections.
+  There is <code>vops.auto_substitute_projections</code> configuration parameter which allows to switch on such substitution.
+  By default it is switched off, because VOPS projects may be not synchronized with original table and query on projection may return different result.
+  Right now projections can be automatically substituted only if:
+</p>
+<ul>
+  <li>Query doesn't contain joins.</li>
+  <li>Query performs aggregation of vector (tile) columns.</li>
+  <li>All other expressions in target list, <code>ORDER BY</code> / <code>GROUP BY</code> clauses refers only to scalar attributes of projection.</li>
+</ul>
+
 
 <h2><a name="example">Example</a></h2>
 
@@ -775,8 +847,8 @@ create table lineitem(
    l_extendedprice real,
    l_discount real,
    l_tax real,
-   l_returnflag char,
-   l_linestatus char,
+   l_returnflag "char",
+   l_linestatus "char",
    l_shipdate date,
    l_commitdate date,
    l_receiptdate date,
@@ -881,7 +953,7 @@ select reduce(map(l_returnflag||l_linestatus, 'sum,sum,sum,sum,avg,avg,avg',
     l_quantity,
     l_extendedprice,
     l_discount)) from vops_lineitem where filter(l_shipdate &lt;= '1998-12-01'::date);
-	   
+
 -- Mixed mode: let's Postgres does group by and calculates VOPS aggregates for each group
 select
     l_returnflag,
