@@ -819,6 +819,11 @@ But more convenient way is to add 'vops' to <code>session_preload_libraries</cod
   <li>Query performs aggregation of vector (tile) columns.</li>
   <li>All other expressions in target list, <code>ORDER BY</code> / <code>GROUP BY</code> clauses refers only to scalar attributes of projection.</li>
 </ul>
+<p>
+  Projection can be removed using <code>drop_projection(projection_name text)</code> function.
+  It not only drops the correspondent table, but also remove information about it from <code>vops_partitions</code> table
+  and drops generated refresh function.
+</p>
 
 
 <h2><a name="example">Example</a></h2>

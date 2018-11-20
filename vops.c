@@ -1932,7 +1932,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
         Oid type_id = DatumGetObjectId(SPI_getbinval(spi_tuple, spi_tupdesc, 2, &is_null));
 		types[i].tid = vops_get_type(type_id);
 		get_typlenbyvalalign(type_id, &types[i].len, &types[i].byval, &types[i].align);
-		if (types[i].len < 0) { /* varying length type: extract size from atttypmod */
+		if (types[i].tid != VOPS_LAST && types[i].len < 0) { /* varying length type: extract size from atttypmod */
 			types[i].len = DatumGetInt32(SPI_getbinval(spi_tuple, spi_tupdesc, 3, &is_null)) - VARHDRSZ;
 			if (types[i].len < 0) {
 				elog(ERROR, "Size of column %s is unknown", name);

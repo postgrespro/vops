@@ -3197,7 +3197,7 @@ declare
 		sep := ',';
 		if att_name=order_by
 		then
-			key_type = typname;
+			key_type := att_typname;
 		end if;
 	end loop;
 
@@ -3222,7 +3222,7 @@ declare
  	    execute create_index;
 		if key_type='timestamp' or key_type='date'
 		then
-		    min_value := '''-infinity''';
+		    min_value := '''''-infinity''''::'||key_type;
 		else
 			min_value := '-1'; -- assume that key have only non-negative values
 		end if;
