@@ -1375,6 +1375,40 @@ REGISTER_BIN_OP(int2,rem,%,int32,INT32)
 REGISTER_BIN_OP(int4,rem,%,int32,INT32)
 REGISTER_BIN_OP(int8,rem,%,int64,INT64)
 
+
+PG_FUNCTION_INFO_V1(vops_deltatime_output);
+Datum vops_deltatime_output(PG_FUNCTION_ARGS)
+{
+	Interval interval;
+	interval.time = PG_GETARG_INT64(0);
+	interval.day  = 0;
+	interval.month = 0;
+	PG_RETURN_DATUM(DirectFunctionCall1(interval_out, PointerGetDatum(&interval)));
+}
+
+PG_FUNCTION_INFO_V1(vops_deltatime_input);
+Datum vops_deltatime_input(PG_FUNCTION_ARGS)
+{
+	Interval* interval =
+		DatumGetIntervalP(DirectFunctionCall3(interval_in,
+											  PG_GETARG_DATUM(0),
+											  ObjectIdGetDatum(InvalidOid),
+											  Int32GetDatum(-1)));
+	if (interval->day || interval->month)
+		elog(ERROR, "Day, month and year intervals are not supported");
+	PG_RETURN_INT64(interval->time);
+}
+
+PG_FUNCTION_INFO_V1(vops_time_interval);
+Datum vops_time_interval(PG_FUNCTION_ARGS)
+{
+	Interval* interval = PG_GETARG_INTERVAL_P(0);
+	if (interval->day || interval->month)
+		elog(ERROR, "Day, month and year intervals are not supported");
+	PG_RETURN_INT64(interval->time);
+}
+
+
 static struct varlena*
 vops_alloc_text(int width)
 {

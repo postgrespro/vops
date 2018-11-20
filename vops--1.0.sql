@@ -14,7 +14,7 @@ create type vops_float8;
 create type vops_timestamp;
 create type vops_interval;
 create type vops_text;
-
+create type deltatime;
 
 create function vops_bool_input(cstring) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_bool_output(vops_bool) returns cstring as 'MODULE_PATHNAME' language C parallel safe immutable strict;
@@ -39,6 +39,9 @@ create function vops_interval_output(vops_interval) returns cstring as 'MODULE_P
 create function vops_text_input(cstring,oid,integer) returns vops_text as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_text_output(vops_text) returns cstring as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_text_typmod_in(cstring[]) returns integer as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_deltatime_input(cstring) returns deltatime as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_deltatime_output(deltatime) returns cstring as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_time_interval(interval) returns deltatime as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 
 create type vops_bool (
 	input = vops_bool_input, 
@@ -120,6 +123,9 @@ create type vops_text (
 	typmod_in = vops_text_typmod_in,
 	alignment = double
 );
+
+create type deltatime (input=vops_deltatime_input, output=vops_deltatime_output, like=int8);
+create cast (interval as deltatime) with function vops_time_interval(interval) AS IMPLICIT;
 
 -- text tile
 
@@ -1488,23 +1494,23 @@ create function vops_timestamp_sub(left vops_timestamp, right vops_timestamp) re
 create function vops_timestamp_interval_sub(left vops_timestamp, right vops_interval) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_sub' language C parallel safe immutable strict;
 create function vops_timestamp_sub_rconst(left vops_timestamp, right timestamp) returns vops_interval as 'MODULE_PATHNAME','vops_int8_sub_rconst' language C parallel safe immutable strict;
 create function vops_timestamp_sub_lconst(left timestamp, right vops_timestamp) returns vops_interval as 'MODULE_PATHNAME','vops_int8_sub_lconst' language C parallel safe immutable strict;
-create function vops_timestamp_sub_interval_rconst(left vops_timestamp, right interval) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_sub_rconst' language C parallel safe immutable strict;
+create function vops_timestamp_sub_interval_rconst(left vops_timestamp, right deltatime) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_sub_rconst' language C parallel safe immutable strict;
 create function vops_timestamp_sub_interval_lconst(left timestamp, right vops_interval) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_sub_lconst' language C parallel safe immutable strict;
 create operator - (leftarg=vops_timestamp, rightarg=vops_timestamp, procedure=vops_timestamp_sub);
 create operator - (leftarg=vops_timestamp, rightarg=vops_interval, procedure=vops_timestamp_interval_sub);
 create operator - (leftarg=vops_timestamp, rightarg=timestamp, procedure=vops_timestamp_sub_rconst);
 create operator - (leftarg=timestamp, rightarg=vops_timestamp, procedure=vops_timestamp_sub_lconst);
-create operator - (leftarg=vops_timestamp, rightarg=interval, procedure=vops_timestamp_sub_interval_rconst);
+create operator - (leftarg=vops_timestamp, rightarg=deltatime, procedure=vops_timestamp_sub_interval_rconst);
 create operator - (leftarg=timestamp, rightarg=vops_interval, procedure=vops_timestamp_sub_interval_lconst);
 
 create function vops_timestamp_interval_add(left vops_timestamp, right vops_interval) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_add' language C parallel safe immutable strict;
 create function vops_interval_timestamp_add(left vops_interval, right vops_timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_add' language C parallel safe immutable strict;
-create function vops_timestamp_add_rconst(left vops_timestamp, right interval) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_add_rconst' language C parallel safe immutable strict;
-create function vops_timestamp_add_lconst(left interval, right vops_timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_add_lconst' language C parallel safe immutable strict;
+create function vops_timestamp_add_rconst(left vops_timestamp, right deltatime) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_add_rconst' language C parallel safe immutable strict;
+create function vops_timestamp_add_lconst(left deltatime, right vops_timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_add_lconst' language C parallel safe immutable strict;
 create operator + (leftarg=vops_timestamp, rightarg=vops_interval, procedure=vops_timestamp_interval_add, commutator= +);
 create operator + (leftarg=vops_interval, rightarg=vops_timestamp, procedure=vops_interval_timestamp_add, commutator= +);
-create operator + (leftarg=vops_timestamp, rightarg=interval, procedure=vops_timestamp_add_rconst, commutator= +);
-create operator + (leftarg=interval, rightarg=vops_timestamp, procedure=vops_timestamp_add_lconst, commutator= +);
+create operator + (leftarg=vops_timestamp, rightarg=deltatime, procedure=vops_timestamp_add_rconst, commutator= +);
+create operator + (leftarg=deltatime, rightarg=vops_timestamp, procedure=vops_timestamp_add_lconst, commutator= +);
 
 create function vops_timestamp_mul(left vops_timestamp, right vops_timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_mul' language C parallel safe immutable strict;
 create function vops_timestamp_mul_rconst(left vops_timestamp, right timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_mul_rconst' language C parallel safe immutable strict;
@@ -1791,10 +1797,10 @@ create function last(tile vops_timestamp) returns timestamp as 'MODULE_PATHNAME'
 create function low(tile vops_timestamp) returns timestamp as 'MODULE_PATHNAME','vops_int8_low' language C parallel safe immutable strict;
 create function high(tile vops_timestamp) returns timestamp as 'MODULE_PATHNAME','vops_int8_high' language C parallel safe immutable strict;
 
--- interval tile
+-- deltatime tile
 
-create function vops_interval_const(opd interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_const' language C parallel safe immutable strict;
-create cast (interval as vops_interval) with function vops_interval_const(interval) AS IMPLICIT;
+create function vops_interval_const(opd deltatime) returns vops_interval as 'MODULE_PATHNAME','vops_int8_const' language C parallel safe immutable strict;
+create cast (deltatime as vops_interval) with function vops_interval_const(deltatime) AS IMPLICIT;
 
 create function vops_interval_group_by(state internal, group_by vops_interval, aggregates cstring, variadic anyarray) returns internal as 'MODULE_PATHNAME','vops_int8_group_by' language C immutable;
 create aggregate map(group_by vops_interval, aggregates cstring, variadic anyarray) (
@@ -1807,18 +1813,18 @@ create aggregate map(group_by vops_interval, aggregates cstring, variadic anyarr
 	   parallel = safe);
 
 create function vops_interval_sub(left vops_interval, right vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_sub' language C parallel safe immutable strict;
-create function vops_interval_sub_rconst(left vops_interval, right interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_sub_rconst' language C parallel safe immutable strict;
-create function vops_interval_sub_lconst(left interval, right vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_sub_lconst' language C parallel safe immutable strict;
+create function vops_interval_sub_rconst(left vops_interval, right deltatime) returns vops_interval as 'MODULE_PATHNAME','vops_int8_sub_rconst' language C parallel safe immutable strict;
+create function vops_interval_sub_lconst(left deltatime, right vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_sub_lconst' language C parallel safe immutable strict;
 create operator - (leftarg=vops_interval, rightarg=vops_interval, procedure=vops_interval_sub);
-create operator - (leftarg=vops_interval, rightarg=interval, procedure=vops_interval_sub_rconst);
-create operator - (leftarg=interval, rightarg=vops_interval, procedure=vops_interval_sub_lconst);
+create operator - (leftarg=vops_interval, rightarg=deltatime, procedure=vops_interval_sub_rconst);
+create operator - (leftarg=deltatime, rightarg=vops_interval, procedure=vops_interval_sub_lconst);
 
 create function vops_interval_add(left vops_interval, right vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_add' language C parallel safe immutable strict;
-create function vops_interval_add_rconst(left vops_interval, right interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_add_rconst' language C parallel safe immutable strict;
-create function vops_interval_add_lconst(left interval, right vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_add_lconst' language C parallel safe immutable strict;
+create function vops_interval_add_rconst(left vops_interval, right deltatime) returns vops_interval as 'MODULE_PATHNAME','vops_int8_add_rconst' language C parallel safe immutable strict;
+create function vops_interval_add_lconst(left deltatime, right vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_add_lconst' language C parallel safe immutable strict;
 create operator + (leftarg=vops_interval, rightarg=vops_interval, procedure=vops_interval_add, commutator= +);
-create operator + (leftarg=vops_interval, rightarg=interval, procedure=vops_interval_add_rconst, commutator= +);
-create operator + (leftarg=interval, rightarg=vops_interval, procedure=vops_interval_add_lconst, commutator= +);
+create operator + (leftarg=vops_interval, rightarg=deltatime, procedure=vops_interval_add_rconst, commutator= +);
+create operator + (leftarg=deltatime, rightarg=vops_interval, procedure=vops_interval_add_lconst, commutator= +);
 
 create function vops_interval_int_mul(left vops_interval, right vops_int8) returns vops_interval as 'MODULE_PATHNAME','vops_int8_mul' language C parallel safe immutable strict;
 create function vops_int_interval_mul(left vops_int8, right vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_mul' language C parallel safe immutable strict;
@@ -1832,70 +1838,70 @@ create operator * (leftarg=int8, rightarg=vops_interval, procedure=vops_interval
 create function vops_interval_div(left vops_interval, right vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_div' language C parallel safe immutable strict;
 create function vops_interval_int_div(left vops_interval, right vops_int8) returns vops_interval as 'MODULE_PATHNAME','vops_int8_div' language C parallel safe immutable strict;
 create function vops_interval_div_int_rconst(left vops_interval, right int8) returns vops_interval as 'MODULE_PATHNAME','vops_int8_div_rconst' language C parallel safe immutable strict;
-create function vops_interval_div_rconst(left vops_interval, right interval) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_div_rconst' language C parallel safe immutable strict;
-create function vops_interval_div_lconst(left interval, right vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_div_lconst' language C parallel safe immutable strict;
+create function vops_interval_div_rconst(left vops_interval, right deltatime) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_div_rconst' language C parallel safe immutable strict;
+create function vops_interval_div_lconst(left deltatime, right vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_div_lconst' language C parallel safe immutable strict;
 create operator / (leftarg=vops_interval, rightarg=vops_interval, procedure=vops_interval_div);
 create operator / (leftarg=vops_interval, rightarg=vops_int8, procedure=vops_interval_int_div);
 create operator / (leftarg=vops_interval, rightarg=int8, procedure=vops_interval_div_int_rconst);
-create operator / (leftarg=vops_interval, rightarg=interval, procedure=vops_interval_div_rconst);
-create operator / (leftarg=interval, rightarg=vops_interval, procedure=vops_interval_div_lconst);
+create operator / (leftarg=vops_interval, rightarg=deltatime, procedure=vops_interval_div_rconst);
+create operator / (leftarg=deltatime, rightarg=vops_interval, procedure=vops_interval_div_lconst);
 
 create function vops_interval_rem(left vops_interval, right vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_rem' language C parallel safe immutable strict;
 create function vops_interval_int_rem(left vops_interval, right vops_int8) returns vops_interval as 'MODULE_PATHNAME','vops_int8_rem' language C parallel safe immutable strict;
 create function vops_interval_rem_int_rconst(left vops_interval, right int8) returns vops_interval as 'MODULE_PATHNAME','vops_int8_rem_rconst' language C parallel safe immutable strict;
-create function vops_interval_rem_rconst(left vops_interval, right interval) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_rem_rconst' language C parallel safe immutable strict;
-create function vops_interval_rem_lconst(left interval, right vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_rem_lconst' language C parallel safe immutable strict;
+create function vops_interval_rem_rconst(left vops_interval, right deltatime) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_rem_rconst' language C parallel safe immutable strict;
+create function vops_interval_rem_lconst(left deltatime, right vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_rem_lconst' language C parallel safe immutable strict;
 create operator % (leftarg=vops_interval, rightarg=vops_interval, procedure=vops_interval_rem);
 create operator % (leftarg=vops_interval, rightarg=vops_int8, procedure=vops_interval_int_rem);
 create operator % (leftarg=vops_interval, rightarg=int8, procedure=vops_interval_rem_int_rconst);
-create operator % (leftarg=vops_interval, rightarg=interval, procedure=vops_interval_rem_rconst);
-create operator % (leftarg=interval, rightarg=vops_interval, procedure=vops_interval_rem_lconst);
+create operator % (leftarg=vops_interval, rightarg=deltatime, procedure=vops_interval_rem_rconst);
+create operator % (leftarg=deltatime, rightarg=vops_interval, procedure=vops_interval_rem_lconst);
 
 create function vops_interval_eq(left vops_interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_eq' language C parallel safe immutable strict;
-create function vops_interval_eq_rconst(left vops_interval, right interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_eq_rconst' language C parallel safe immutable strict;
-create function vops_interval_eq_lconst(left interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_eq_lconst' language C parallel safe immutable strict;
+create function vops_interval_eq_rconst(left vops_interval, right deltatime) returns vops_bool as 'MODULE_PATHNAME','vops_int8_eq_rconst' language C parallel safe immutable strict;
+create function vops_interval_eq_lconst(left deltatime, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_eq_lconst' language C parallel safe immutable strict;
 create operator = (leftarg=vops_interval, rightarg=vops_interval, procedure=vops_interval_eq, commutator= =);
-create operator = (leftarg=vops_interval, rightarg=interval, procedure=vops_interval_eq_rconst, commutator= =);
-create operator = (leftarg=interval, rightarg=vops_interval, procedure=vops_interval_eq_lconst, commutator= =);
+create operator = (leftarg=vops_interval, rightarg=deltatime, procedure=vops_interval_eq_rconst, commutator= =);
+create operator = (leftarg=deltatime, rightarg=vops_interval, procedure=vops_interval_eq_lconst, commutator= =);
 
 create function vops_interval_ne(left vops_interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_ne' language C parallel safe immutable strict;
-create function vops_interval_ne_rconst(left vops_interval, right interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_ne_rconst' language C parallel safe immutable strict;
-create function vops_interval_ne_lconst(left interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_ne_lconst' language C parallel safe immutable strict;
+create function vops_interval_ne_rconst(left vops_interval, right deltatime) returns vops_bool as 'MODULE_PATHNAME','vops_int8_ne_rconst' language C parallel safe immutable strict;
+create function vops_interval_ne_lconst(left deltatime, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_ne_lconst' language C parallel safe immutable strict;
 create operator <> (leftarg=vops_interval, rightarg=vops_interval, procedure=vops_interval_ne, commutator= <>);
-create operator <> (leftarg=vops_interval, rightarg=interval, procedure=vops_interval_ne_rconst, commutator= <>);
-create operator <> (leftarg=interval, rightarg=vops_interval, procedure=vops_interval_ne_lconst, commutator= <>);
+create operator <> (leftarg=vops_interval, rightarg=deltatime, procedure=vops_interval_ne_rconst, commutator= <>);
+create operator <> (leftarg=deltatime, rightarg=vops_interval, procedure=vops_interval_ne_lconst, commutator= <>);
 
 create function vops_interval_gt(left vops_interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_gt' language C parallel safe immutable strict;
-create function vops_interval_gt_rconst(left vops_interval, right interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_gt_rconst' language C parallel safe immutable strict;
-create function vops_interval_gt_lconst(left interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_gt_lconst' language C parallel safe immutable strict;
+create function vops_interval_gt_rconst(left vops_interval, right deltatime) returns vops_bool as 'MODULE_PATHNAME','vops_int8_gt_rconst' language C parallel safe immutable strict;
+create function vops_interval_gt_lconst(left deltatime, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_gt_lconst' language C parallel safe immutable strict;
 create operator > (leftarg=vops_interval, rightarg=vops_interval, procedure=vops_interval_gt, commutator= <);
-create operator > (leftarg=vops_interval, rightarg=interval, procedure=vops_interval_gt_rconst, commutator= <);
-create operator > (leftarg=interval, rightarg=vops_interval, procedure=vops_interval_gt_lconst, commutator= <);
+create operator > (leftarg=vops_interval, rightarg=deltatime, procedure=vops_interval_gt_rconst, commutator= <);
+create operator > (leftarg=deltatime, rightarg=vops_interval, procedure=vops_interval_gt_lconst, commutator= <);
 
 create function vops_interval_lt(left vops_interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_lt' language C parallel safe immutable strict;
-create function vops_interval_lt_rconst(left vops_interval, right interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_lt_rconst' language C parallel safe immutable strict;
-create function vops_interval_lt_lconst(left interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_lt_lconst' language C parallel safe immutable strict;
+create function vops_interval_lt_rconst(left vops_interval, right deltatime) returns vops_bool as 'MODULE_PATHNAME','vops_int8_lt_rconst' language C parallel safe immutable strict;
+create function vops_interval_lt_lconst(left deltatime, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_lt_lconst' language C parallel safe immutable strict;
 create operator < (leftarg=vops_interval, rightarg=vops_interval, procedure=vops_interval_lt, commutator= >);
-create operator < (leftarg=vops_interval, rightarg=interval, procedure=vops_interval_lt_rconst, commutator= >);
-create operator < (leftarg=interval, rightarg=vops_interval, procedure=vops_interval_lt_lconst, commutator= >);
+create operator < (leftarg=vops_interval, rightarg=deltatime, procedure=vops_interval_lt_rconst, commutator= >);
+create operator < (leftarg=deltatime, rightarg=vops_interval, procedure=vops_interval_lt_lconst, commutator= >);
 
 create function vops_interval_ge(left vops_interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_ge' language C parallel safe immutable strict;
-create function vops_interval_ge_rconst(left vops_interval, right interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_ge_rconst' language C parallel safe immutable strict;
-create function vops_interval_ge_lconst(left interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_ge_lconst' language C parallel safe immutable strict;
+create function vops_interval_ge_rconst(left vops_interval, right deltatime) returns vops_bool as 'MODULE_PATHNAME','vops_int8_ge_rconst' language C parallel safe immutable strict;
+create function vops_interval_ge_lconst(left deltatime, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_ge_lconst' language C parallel safe immutable strict;
 create operator >= (leftarg=vops_interval, rightarg=vops_interval, procedure=vops_interval_ge, commutator= <=);
-create operator >= (leftarg=vops_interval, rightarg=interval, procedure=vops_interval_ge_rconst, commutator= <=);
-create operator >= (leftarg=interval, rightarg=vops_interval, procedure=vops_interval_ge_lconst, commutator= <=);
+create operator >= (leftarg=vops_interval, rightarg=deltatime, procedure=vops_interval_ge_rconst, commutator= <=);
+create operator >= (leftarg=deltatime, rightarg=vops_interval, procedure=vops_interval_ge_lconst, commutator= <=);
 
 create function vops_interval_le(left vops_interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_le' language C parallel safe immutable strict;
-create function vops_interval_le_rconst(left vops_interval, right interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_le_rconst' language C parallel safe immutable strict;
-create function vops_interval_le_lconst(left interval, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_le_lconst' language C parallel safe immutable strict;
+create function vops_interval_le_rconst(left vops_interval, right deltatime) returns vops_bool as 'MODULE_PATHNAME','vops_int8_le_rconst' language C parallel safe immutable strict;
+create function vops_interval_le_lconst(left deltatime, right vops_interval) returns vops_bool as 'MODULE_PATHNAME','vops_int8_le_lconst' language C parallel safe immutable strict;
 create operator <= (leftarg=vops_interval, rightarg=vops_interval, procedure=vops_interval_le, commutator= >=);
-create operator <= (leftarg=vops_interval, rightarg=interval, procedure=vops_interval_le_rconst, commutator= >=);
-create operator <= (leftarg=interval, rightarg=vops_interval, procedure=vops_interval_le_lconst, commutator= >=);
+create operator <= (leftarg=vops_interval, rightarg=deltatime, procedure=vops_interval_le_rconst, commutator= >=);
+create operator <= (leftarg=deltatime, rightarg=vops_interval, procedure=vops_interval_le_lconst, commutator= >=);
 
-create function betwixt(opd vops_interval, low interval, high interval) returns vops_bool as 'MODULE_PATHNAME','vops_betwixt_int8' language C parallel safe immutable strict;
+create function betwixt(opd vops_interval, low deltatime, high deltatime) returns vops_bool as 'MODULE_PATHNAME','vops_betwixt_int8' language C parallel safe immutable strict;
 
-create function ifnull(opd vops_interval, subst interval) returns vops_interval as 'MODULE_PATHNAME','vops_ifnull_int8' language C parallel safe immutable strict;
+create function ifnull(opd vops_interval, subst deltatime) returns vops_interval as 'MODULE_PATHNAME','vops_ifnull_int8' language C parallel safe immutable strict;
 create function ifnull(opd vops_interval, subst vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_coalesce_int8' language C parallel safe immutable strict;
 
 create function vops_interval_neg(right vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_neg' language C parallel safe immutable strict;
@@ -2039,11 +2045,11 @@ CREATE AGGREGATE mavg(vops_interval) (
 	PARALLEL = SAFE
 );
 
-create function vops_interval_max_accumulate(state interval, val vops_interval) returns interval as 'MODULE_PATHNAME','vops_int8_max_accumulate' language C parallel safe;
+create function vops_interval_max_accumulate(state int8, val vops_interval) returns int8 as 'MODULE_PATHNAME','vops_int8_max_accumulate' language C parallel safe;
 CREATE AGGREGATE max(vops_interval) (
 	SFUNC = vops_interval_max_accumulate,
-	STYPE = interval,
-    COMBINEFUNC = interval_larger,
+	STYPE = int8,
+    COMBINEFUNC = int8larger,
 	PARALLEL = SAFE
 );
 create function vops_interval_max_stub(state vops_interval, val vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
@@ -2058,11 +2064,11 @@ CREATE AGGREGATE mmax(vops_interval) (
 	PARALLEL = SAFE
 );
 
-create function vops_interval_min_accumulate(state interval, val vops_interval) returns interval as 'MODULE_PATHNAME','vops_int8_min_accumulate' language C parallel safe;
+create function vops_interval_min_accumulate(state int8, val vops_interval) returns int8 as 'MODULE_PATHNAME','vops_int8_min_accumulate' language C parallel safe;
 CREATE AGGREGATE min(vops_interval) (
 	SFUNC = vops_interval_min_accumulate,
-	STYPE = interval,
-    COMBINEFUNC = interval_smaller,
+	STYPE = int8,
+    COMBINEFUNC = int8smaller,
 	PARALLEL = SAFE
 );
 create function vops_interval_min_stub(state vops_interval, val vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
@@ -2114,10 +2120,10 @@ CREATE AGGREGATE mcount(vops_interval) (
 	PARALLEL = SAFE
 );
 
-create function first(tile vops_interval) returns interval as 'MODULE_PATHNAME','vops_int8_first' language C parallel safe immutable strict;
-create function last(tile vops_interval) returns interval as 'MODULE_PATHNAME','vops_int8_last' language C parallel safe immutable strict;
-create function low(tile vops_interval) returns interval as 'MODULE_PATHNAME','vops_int8_low' language C parallel safe immutable strict;
-create function high(tile vops_interval) returns interval as 'MODULE_PATHNAME','vops_int8_high' language C parallel safe immutable strict;
+create function first(tile vops_interval) returns deltatime as 'MODULE_PATHNAME','vops_int8_first' language C parallel safe immutable strict;
+create function last(tile vops_interval) returns deltatime as 'MODULE_PATHNAME','vops_int8_last' language C parallel safe immutable strict;
+create function low(tile vops_interval) returns deltatime as 'MODULE_PATHNAME','vops_int8_low' language C parallel safe immutable strict;
+create function high(tile vops_interval) returns deltatime as 'MODULE_PATHNAME','vops_int8_high' language C parallel safe immutable strict;
 
 -- int8 tile
 
