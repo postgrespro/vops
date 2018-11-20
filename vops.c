@@ -3446,6 +3446,9 @@ vops_add_index_cond(Node* clause, List* conjuncts, char const* keyName)
 static Node*
 vops_add_literal_type_casts(Node* node, Const** consts)
 {
+	if (node == NULL)
+		return NULL;
+
 	if (IsA(node, BoolExpr))
 	{
 		ListCell* cell;
@@ -3679,9 +3682,11 @@ static void vops_explain_hook(Query *query,
 		list_length(query->rtable) == 1  && /* do not support substitution for joins because it is not clear how to handle case when only of of joined table is substituted with parition */
 		params == NULL)    /* do not support prepared statements yet */
 	{
-		char* select = pstrdup(queryString);
-		memset(select, ' ', 7);  /* clear "explain" prefix */
-		vops_substitute_tables_with_projections(select, query);
+		char* explain = pstrdup(queryString);
+		char* select = strstr(explain, "select");
+		size_t prefix = (select != NULL) ? (select - explain) : 7;
+		memset(explain, ' ', prefix);  /* clear "explain" prefix */
+		vops_substitute_tables_with_projections(explain, query);
 	}
 	(void)query_tree_mutator(query, vops_expression_tree_mutator, &ctx, QTW_DONT_COPY_QUERY);
 

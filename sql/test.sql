@@ -42,10 +42,10 @@ insert into stock values
 select create_projection('vstock','stock',array['day','low','high','open','close'],array['symbol'],'day');
 
 select vstock_refresh();
-select avg((open+close)/2),max(high-low) from stock group by day;
+select avg((open+close)/2),max(high-low) from stock group by symbol;
 set vops.auto_substitute_projections=on;
-explain (costs off) select avg((open+close)/2),max(high-low) from stock group by day;
-select avg((open+close)/2),max(high-low) from stock group by day;
+explain (costs off) select avg((open+close)/2),max(high-low) from stock group by symbol;
+select avg((open+close)/2),max(high-low) from stock group by symbol;
 
 insert into stock values
 ('AAA', '06-11-2018', 10.1, 10.8, 10.3, 10.2),
@@ -55,6 +55,6 @@ insert into stock values
 ('AAA', '10-11-2018', 10.7, 11.3, 10.8, 11.1);
 select vstock_refresh();
 
-select avg((open+close)/2),max(high-low) from stock group by day;
+select avg((open+close)/2),max(high-low) from stock group by symbol;
 set vops.auto_substitute_projections=off;
-select avg((open+close)/2),max(high-low) from stock group by day;
+select avg((open+close)/2),max(high-low) from stock group by symbol;

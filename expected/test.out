@@ -333,3 +333,68 @@ select count(*) from vit where i>='1 minute'::interval;
      2
 (1 row)
 
+create table stock(symbol char(5), day date, low real, high real, open real, close real);
+insert into stock values
+('AAA', '01-11-2018', 10.0, 11.0, 10.1, 10.8),
+('AAA', '02-11-2018', 11.0, 12.0, 11.2, 11.5),
+('AAA', '03-11-2018', 10.4, 10.6, 10.5, 10.4),
+('AAA', '04-11-2018', 11.1, 11.5, 11.2, 11.4),
+('AAA', '05-11-2018', 11.0, 11.3, 11.4, 11.1);
+select create_projection('vstock','stock',array['day','low','high','open','close'],array['symbol'],'day');
+ create_projection 
+-------------------
+ 
+(1 row)
+
+select vstock_refresh();
+ vstock_refresh 
+----------------
+              5
+(1 row)
+
+select avg((open+close)/2),max(high-low) from stock group by symbol;
+       avg       | max 
+-----------------+-----
+ 10.960000038147 |   1
+(1 row)
+
+set vops.auto_substitute_projections=on;
+explain (costs off) select avg((open+close)/2),max(high-low) from stock group by symbol;
+        QUERY PLAN        
+--------------------------
+ HashAggregate
+   Group Key: symbol
+   ->  Seq Scan on vstock
+(3 rows)
+
+select avg((open+close)/2),max(high-low) from stock group by symbol;
+       avg       | max 
+-----------------+-----
+ 10.960000038147 |   1
+(1 row)
+
+insert into stock values
+('AAA', '06-11-2018', 10.1, 10.8, 10.3, 10.2),
+('AAA', '07-11-2018', 11.1, 11.8, 10.2, 11.4),
+('AAA', '08-11-2018', 11.2, 11.6, 11.4, 11.3),
+('AAA', '09-11-2018', 10.6, 11.1, 11.3, 10.8),
+('AAA', '10-11-2018', 10.7, 11.3, 10.8, 11.1);
+select vstock_refresh();
+ vstock_refresh 
+----------------
+              5
+(1 row)
+
+select avg((open+close)/2),max(high-low) from stock group by symbol;
+       avg        | max 
+------------------+-----
+ 10.9200000762939 |   1
+(1 row)
+
+set vops.auto_substitute_projections=off;
+select avg((open+close)/2),max(high-low) from stock group by symbol;
+       avg        | max 
+------------------+-----
+ 10.9200000762939 |   1
+(1 row)
+
