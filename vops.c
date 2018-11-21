@@ -3583,7 +3583,7 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 			&& bms_is_subset(pullvar_ctx.otherVars, scalarAttrs)) /* variables used in other clauses can be only scalar */
 		{
 			List *parsetree_list;
-#if PG_VERSION_NUM>=110000
+#if PG_VERSION_NUM>=100006
 			RawStmt *parsetree;
 #else
 			Node *parsetree;
@@ -3598,7 +3598,7 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 				MemoryContextSwitchTo(spi_memctx);
 				break;
 			}
-#if PG_VERSION_NUM>=110000
+#if PG_VERSION_NUM>=100006
 			parsetree = linitial_node(RawStmt, parsetree_list);
 			select = (SelectStmt*)parsetree->stmt;
 #else
@@ -3642,7 +3642,7 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 			PG_TRY();
 			{
 				Query* subst = parse_analyze(parsetree, queryString, NULL, 0
-#if PG_VERSION_NUM>=110000
+#if PG_VERSION_NUM>=100006
 														 , NULL
 #endif
 					);
@@ -3723,6 +3723,15 @@ static void vops_explain_hook(Query *query,
 							  ParamListInfo params,
 							  QueryEnvironment *queryEnv)
 {
+#elif PG_VERSION_NUM>=100006
+static void vops_explain_hook(Query *query,
+							  int cursorOptions,
+							  IntoClause *into,
+							  ExplainState *es,
+							  const char *queryString,
+							  ParamListInfo params)
+{
+	QueryEnvironment *queryEnv = NULL;
 #else
 static void vops_explain_hook(Query *query,
 							  IntoClause *into,
@@ -3760,7 +3769,7 @@ static void vops_explain_hook(Query *query,
 
 	/* run it (if needed) and produce output */
 	ExplainOnePlan(plan, into, es, queryString, params,
-#if PG_VERSION_NUM>=110000
+#if PG_VERSION_NUM>=100006
 				   queryEnv,
 #endif
 				   &planduration);
