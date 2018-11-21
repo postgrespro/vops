@@ -3507,8 +3507,14 @@ vops_add_literal_type_casts(Node* node, Const** consts)
 			Const* c = consts[ac->location];
 			if (c != NULL && c->consttype != TEXTOID) {
 				TypeCast* cast = makeNode(TypeCast);
+				char* type_name;
+#if PG_VERSION_NUM>=110000
+				type_name = format_type_extended(c->consttype, c->consttypmod, FORMAT_TYPE_TYPEMOD_GIVEN);
+#else
+				type_name = format_type_with_typemod(c->consttype, c->consttypmod);
+#endif
 				cast->arg = (Node*)ac;
-				cast->typeName = makeTypeName(format_type_extended(c->consttype, c->consttypmod, FORMAT_TYPE_TYPEMOD_GIVEN));
+				cast->typeName = makeTypeName(type_name);
 				cast->location = ac->location;
 				node = (Node*)cast;
 			}
@@ -3577,7 +3583,11 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 			&& bms_is_subset(pullvar_ctx.otherVars, scalarAttrs)) /* variables used in other clauses can be only scalar */
 		{
 			List *parsetree_list;
+#if PG_VERSION_NUM>=110000
 			RawStmt *parsetree;
+#else
+			Node *parsetree;
+#endif
 			SelectStmt* select;
 			RangeVar* rv;
 			MemoryContext spi_memctx = MemoryContextSwitchTo(memctx);
@@ -3588,11 +3598,15 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 				MemoryContextSwitchTo(spi_memctx);
 				break;
 			}
+#if PG_VERSION_NUM>=110000
 			parsetree = linitial_node(RawStmt, parsetree_list);
-
+			select = (SelectStmt*)parsetree->stmt;
+#else
+			parsetree = (Node*) linitial(parsetree_list);
+			select = (SelectStmt*) parsetree;
+#endif
 			/* Replace table with partition */
 			elog(DEBUG1, "Use projection %s instead of table %d", projectionName, rte->relid);
-			select = (SelectStmt*)parsetree->stmt;
 			rv = linitial_node(RangeVar, select->fromClause);
 			rv->relname = projectionName;
 
@@ -3627,7 +3641,11 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 			vops_add_literal_type_casts(select->whereClause, pullvar_ctx.consts);
 			PG_TRY();
 			{
-				Query* subst = parse_analyze(parsetree, queryString, NULL, 0, NULL);
+				Query* subst = parse_analyze(parsetree, queryString, NULL, 0
+#if PG_VERSION_NUM>=110000
+														 , NULL
+#endif
+					);
 				*query = *subst;
 			}
 			PG_CATCH();
@@ -3641,6 +3659,7 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 		SPI_freetuple(tuple);
 	}
  	SPI_finish();
+	MemoryContextSwitchTo(memctx);
 }
 
 static void
@@ -3695,6 +3714,7 @@ static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
 	(void)query_tree_mutator(query, vops_expression_tree_mutator, &ctx, QTW_DONT_COPY_QUERY);
 }
 
+#if PG_VERSION_NUM>=110000
 static void vops_explain_hook(Query *query,
 							  int cursorOptions,
 							  IntoClause *into,
@@ -3703,6 +3723,15 @@ static void vops_explain_hook(Query *query,
 							  ParamListInfo params,
 							  QueryEnvironment *queryEnv)
 {
+#else
+static void vops_explain_hook(Query *query,
+							  IntoClause *into,
+							  ExplainState *es,
+							  const char *queryString,
+							  ParamListInfo params)
+{
+	int cursorOptions = 0;
+#endif
 	PlannedStmt *plan;
 	vops_mutator_context ctx = {NULL,false};
 	instr_time	planstart, planduration;
@@ -3730,7 +3759,10 @@ static void vops_explain_hook(Query *query,
 	INSTR_TIME_SUBTRACT(planduration, planstart);
 
 	/* run it (if needed) and produce output */
-	ExplainOnePlan(plan, into, es, queryString, params, queryEnv,
+	ExplainOnePlan(plan, into, es, queryString, params,
+#if PG_VERSION_NUM>=110000
+				   queryEnv,
+#endif
 				   &planduration);
 }
 
