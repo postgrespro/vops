@@ -3355,45 +3355,141 @@ static ExplainOneQuery_hook_type save_explain_hook;
 
 typedef enum
 {
-	SCOPE_WHERE       = 1,
-	SCOPE_AGGREGATE   = 2,
-	SCOPE_TARGET_LIST = 4
+	SCOPE_DEFAULT     = 0,
+	SCOPE_WHERE       = 1, /* WHERE clause */
+	SCOPE_AGGREGATE   = 2, /* argument of aggregate */
+	SCOPE_TARGET_LIST = 4  /* target list */
 } vops_clause_scope;
+
+/* Usage of table's attributes */
+typedef struct
+{
+	Bitmapset* where;   /* set of vars used in WHERE clause */
+	Bitmapset* agg;     /* set of vars used in aggregate expressions */
+	Bitmapset* other;   /* set of vars used in any other location */
+} vops_table_refs;
+
+/* Cluster of variables: columns used in one expression */
+typedef struct vops_vars_cluster
+{
+	struct vops_vars_cluster* next;
+	Bitmapset* vars;
+} vops_vars_cluster;
 
 typedef struct
 {
-	Bitmapset* whereVars;
-	Bitmapset* aggVars;
-	Bitmapset* otherVars;
-	int        maxAttNo;
-	int        scope;
-    Const**    consts;
+	Query*     query;      /* executed query */
+	int        scope;      /* mask of vops_clause_scope bits */
+	int        n_rels;     /* number of relations in query (join pseudorelations) */
+    Const**    consts;     /* array references to Const nodes in query, indexed by literal location */
+	Bitmapset* operands;   /* columns used in one expression */
+	vops_table_refs* refs; /* usage of table' variables (index by relation number - 1) */
+	vops_vars_cluster* clusters; /* clusters of query variables */
 } vops_pullvar_context;
 
+/*
+ * Add new variable cluster to context.
+ * ctx->operands is bitmapset of columns used in one expression.
+ * If it is intersected with some of the existed clusters, then join them and repeat this procedure recusrively.
+ */
+static void
+vops_update_vars_clusters(vops_pullvar_context *ctx)
+{
+	Bitmapset* operands = ctx->operands;
+	if (operands)
+	{
+		vops_vars_cluster *clu, **clup;
+		do
+		{
+			for (clup = &ctx->clusters; (clu = *clup) != NULL; clup = &clu->next)
+			{
+				if (bms_overlap(clu->vars, operands))
+				{
+					*clup = clu->next;
+					operands = bms_join(clu->vars, operands);
+					break;
+				}
+			}
+		} while (clu != NULL);
+
+		clu = (vops_vars_cluster*)palloc(sizeof(vops_vars_cluster));
+		clu->vars = operands;
+		clu->next = ctx->clusters;
+		ctx->clusters = clu;
+	}
+}
+
+/*
+ * Check that all variables used together are both either scalar, eithe vector.
+ */
+static bool
+vops_check_clusters(vops_vars_cluster* clusters, Bitmapset* vectorCols, Bitmapset* scalarCols)
+{
+	vops_vars_cluster* cluster;
+
+	Assert(!bms_overlap(vectorCols, scalarCols));
+
+	for (cluster = clusters; cluster != NULL; cluster = cluster->next)
+	{
+		if (!bms_is_subset(cluster->vars, vectorCols) &&
+			!bms_is_subset(cluster->vars, scalarCols))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+/*
+ * Collect information about attribute usage in the query
+ */
 static bool
 vops_pullvars_walker(Node *node, vops_pullvar_context *ctx)
 {
 	int scope = ctx->scope;
-	bool done;
 
 	if (node == NULL)
 		return false;
 
 	if (IsA(node, Var))
 	{
-		Var		   *var = (Var *) node;
+		Var	*var = (Var *) node;
+		int  relid = var->varno;
+		int  attno = var->varattno;
 
-		if (!IS_SPECIAL_VARNO(var->varno) && var->varattno >= 0)
+		if (!IS_SPECIAL_VARNO(relid) && attno >= 0)
 		{
-			int attno = var->varattno;
-			if (var->varattno > ctx->maxAttNo)
-				ctx->maxAttNo = var->varattno;
-			if (scope & SCOPE_AGGREGATE)
-				ctx->aggVars = bms_add_member(ctx->aggVars, attno);
-			else if (scope & SCOPE_WHERE)
-				ctx->whereVars = bms_add_member(ctx->whereVars, attno);
-			else
-				ctx->otherVars = bms_add_member(ctx->otherVars, attno);
+			RangeTblEntry* tbl;
+			/* Locate table from which this variables come from */
+			while (true)
+			{
+				tbl = list_nth_node(RangeTblEntry, ctx->query->rtable, relid-1);
+				if (tbl->rtekind == RTE_JOIN)
+				{
+					Assert(attno != 0); /* attno==0 correspondns to "SELECT *" */
+					var = list_nth_node(Var, tbl->joinaliasvars, attno-1);
+					attno = var->varattno;
+					relid = var->varno;
+				}
+				else break;
+			}
+			if (tbl->rtekind == RTE_RELATION)
+			{
+				vops_table_refs* rel = &ctx->refs[relid-1];
+				if (scope & SCOPE_AGGREGATE)
+				{
+					rel->agg = bms_add_member(rel->agg, attno);
+				}
+				else if (scope & SCOPE_WHERE)
+				{
+					ctx->operands = bms_add_member(ctx->operands, attno*ctx->n_rels + relid - 1);
+					rel->where = bms_add_member(rel->where, attno);
+				}
+				else
+				{
+					rel->other = bms_add_member(rel->other, attno);
+				}
+			}
 		}
 		return false;
 	}
@@ -3402,6 +3498,22 @@ vops_pullvars_walker(Node *node, vops_pullvar_context *ctx)
 		Const* c = (Const*)node;
 		if (c->location >= 0)
 			ctx->consts[c->location] = c;
+	}
+	else if (IsA(node, BoolExpr))
+	{
+		ListCell* cell;
+		BoolExpr* bop = (BoolExpr*)node;
+		Bitmapset* save_operands = ctx->operands;
+		/* Each conjunct or disjunct forms its own cluster */
+		foreach (cell, bop->args)
+		{
+			Node* opd = (Node*)lfirst(cell);
+			ctx->operands = NULL;
+			(void) expression_tree_walker(opd, vops_pullvars_walker, ctx);
+			vops_update_vars_clusters(ctx);
+		}
+		ctx->operands = save_operands;
+		return false;
 	}
 	else if (IsA(node, Aggref))
 	{
@@ -3413,17 +3525,30 @@ vops_pullvars_walker(Node *node, vops_pullvar_context *ctx)
 	}
 	else if (IsA(node, FromExpr))
 	{
+		FromExpr* from = (FromExpr*)node;
+		Bitmapset* save_operands = ctx->operands;
+		ctx->operands = NULL;
 		ctx->scope |= SCOPE_WHERE;
+		(void) expression_tree_walker(from->quals, vops_pullvars_walker, ctx);
+		vops_update_vars_clusters(ctx);
+		ctx->operands = save_operands;
+		ctx->scope = scope;
+		node = (Node*)from->fromlist;
 	}
 	else if (IsA(node, Query))
 	{
 		return query_tree_walker((Query*)node, vops_pullvars_walker, ctx, 0);
 	}
-	done = expression_tree_walker(node, vops_pullvars_walker, ctx);
+	(void) expression_tree_walker(node, vops_pullvars_walker, ctx);
 	ctx->scope = scope;
-	return done;
+	return false;
 }
 
+/*
+ * If projection has order key and it is used in qurey predicate, then
+ * add correspodent conditions for BRIN index to allow optimizer to perfor index scan
+ * to locate relevant blocks.
+ */
 static List*
 vops_add_index_cond(Node* clause, List* conjuncts, char const* keyName)
 {
@@ -3476,7 +3601,11 @@ vops_add_index_cond(Node* clause, List* conjuncts, char const* keyName)
 	return conjuncts;
 }
 
-
+/*
+ * Postgres query analyzer is able to automatically resolve string literal types if them are compare with scalar attributes,
+ * i.e. (day = '01.11.2018'). But if "day" column has VOPS tile type (i.e. vops_date), then error is reported.
+ * So we have to add explicit type cast to string literal to eliminate such error.
+ */
 static Node*
 vops_add_literal_type_casts(Node* node, Const** consts)
 {
@@ -3523,143 +3652,210 @@ vops_add_literal_type_casts(Node* node, Const** consts)
 	return node;
 }
 
+/*
+ * Try to substitute tables with their VOPS projections.
+ * Criterias for such substitution:
+ *   1. All attributes used in query are available in projection
+ *   2. Vector attributes are used only in aggregates ot in WHERE clause
+ *   3. Query pperforms some aggregation on vector attributes
+ *   4. Attributes used in the same expression are either all scalar, either all vector.
+ */
 static void
 vops_substitute_tables_with_projections(char const* queryString, Query *query)
 {
-	vops_pullvar_context pullvar_ctx = {NULL};
-	Oid argtype = OIDOID;
-	RangeTblEntry* rte = linitial_node(RangeTblEntry, query->rtable);
-	Datum reloid = ObjectIdGetDatum(rte->relid);
-	int i, j, rc;
+	vops_pullvar_context pullvar_ctx;
+	int i, j, relno, fromno, rc;
+	int n_rels = list_length(query->rtable);
 	MemoryContext memctx = CurrentMemoryContext;
+	Oid argtype = OIDOID;
+	Datum reloid;
+	SelectStmt* select = NULL;
+	Bitmapset* vectorCols = NULL; /* bitmap set of vector columns from all tables: (attno*n_rels + relno - 1) */
+	Bitmapset* scalarCols = NULL; /* bitmap set of scalar columns from all tables: (attno*n_rels + relno - 1) */
+	bool hasAggregates = false;
+#if PG_VERSION_NUM>=100000
+	RawStmt *parsetree = NULL;
+#else
+	Node *parsetree = NULL;
+#endif
 
+	pullvar_ctx.query = query;
+	pullvar_ctx.n_rels = n_rels;
+	pullvar_ctx.clusters = NULL;
 	pullvar_ctx.consts = (Const**)palloc0((strlen(queryString) + 1)*sizeof(Const*));
+	pullvar_ctx.scope = SCOPE_DEFAULT;
+	pullvar_ctx.refs = palloc0(n_rels*sizeof(vops_table_refs));
 	query_tree_walker(query, vops_pullvars_walker, &pullvar_ctx, 0);
 
     SPI_connect();
 
-	rc = SPI_execute_with_args("select * from vops_projections where source_table=$1",
-							   1, &argtype, &reloid, NULL, true, 0);
-	if (rc != SPI_OK_SELECT)
+	for (relno = 0, fromno = 0; relno < n_rels; relno++)
 	{
-		elog(WARNING, "Table vops_projections doesn't exists");
-		return;
-	}
-	for (i = 0; i < SPI_processed; i++)
-	{
-		HeapTuple tuple = SPI_tuptable->vals[i];
-		TupleDesc tupDesc = SPI_tuptable->tupdesc;
-		bool isnull;
-		char* projectionName = SPI_getvalue(tuple, tupDesc, 1);
-		ArrayType* vectorColumns = (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(SPI_getbinval(tuple, tupDesc, 3, &isnull)));
-		ArrayType* scalarColumns = (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(SPI_getbinval(tuple, tupDesc, 4, &isnull)));
-		char* keyName = SPI_getvalue(tuple, tupDesc, 5);
-		Datum* vectorAttnos;
-		Datum* scalarAttnos;
-		int    nScalarColumns;
-		int    nVectorColumns;
-		Bitmapset* vectorAttrs = NULL;
-		Bitmapset* scalarAttrs = NULL;
-		Bitmapset* allAttrs;
+		RangeTblEntry* rte = list_nth_node(RangeTblEntry, query->rtable, relno);
+		vops_table_refs* refs = &pullvar_ctx.refs[relno];
 
-		/* Construct set of used vector columns */
-		deconstruct_array(vectorColumns, INT4OID, 4, true, 'i', &vectorAttnos, NULL, &nVectorColumns);
-		for (j = 0; j < nVectorColumns; j++)
+		if (rte->rtekind != RTE_RELATION)
+			continue;
+
+		fromno += 1;
+		reloid = ObjectIdGetDatum(rte->relid);
+		rc = SPI_execute_with_args("select * from vops_projections where source_table=$1",
+								   1, &argtype, &reloid, NULL, true, 0);
+		if (rc != SPI_OK_SELECT)
 		{
-			vectorAttrs = bms_add_member(vectorAttrs, DatumGetInt32(vectorAttnos[j]));
+			Assert(select == NULL);
+			elog(WARNING, "Table vops_projections doesn't exists");
+			break;
 		}
-
-		/* Construct set of used scalar columns */
-		deconstruct_array(scalarColumns, INT4OID, 4, true, 'i', &scalarAttnos, NULL, &nScalarColumns);
-		for (j = 0; j < nScalarColumns; j++)
+		for (i = 0; i < SPI_processed; i++)
 		{
-			scalarAttrs = bms_add_member(scalarAttrs, DatumGetInt32(scalarAttnos[j]));
-		}
-		allAttrs = bms_union(vectorAttrs, vectorAttrs);
+			HeapTuple tuple = SPI_tuptable->vals[i];
+			TupleDesc tupDesc = SPI_tuptable->tupdesc;
+			bool isnull;
+			char* projectionName = SPI_getvalue(tuple, tupDesc, 1);
+			ArrayType* vectorColumns = (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(SPI_getbinval(tuple, tupDesc, 3, &isnull)));
+			ArrayType* scalarColumns = (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(SPI_getbinval(tuple, tupDesc, 4, &isnull)));
+			char* keyName = SPI_getvalue(tuple, tupDesc, 5);
+			Datum* vectorAttnos;
+			Datum* scalarAttnos;
+			int    nScalarColumns;
+			int    nVectorColumns;
+			Bitmapset* vectorAttrs = NULL;
+			Bitmapset* scalarAttrs = NULL;
+			Bitmapset* allAttrs;
 
-		if (pullvar_ctx.aggVars                                   /* we are doing some aggregation */
-			&& bms_is_subset(pullvar_ctx.whereVars, allAttrs)     /* attributes in WHERE clause can be either scalar either vector */
-			&& bms_is_subset(pullvar_ctx.aggVars, vectorAttrs)    /* aggregates are calculated only for vector columns */
-			&& bms_is_subset(pullvar_ctx.otherVars, scalarAttrs)) /* variables used in other clauses can be only scalar */
-		{
-			List *parsetree_list;
-#if PG_VERSION_NUM>=100000
-			RawStmt *parsetree;
-#else
-			Node *parsetree;
-#endif
-			SelectStmt* select;
-			RangeVar* rv;
-			MemoryContext spi_memctx = MemoryContextSwitchTo(memctx);
-
-			parsetree_list = pg_parse_query(queryString);
-			if (list_length(parsetree_list) != 1)
+			/* Construct set of used vector columns */
+			deconstruct_array(vectorColumns, INT4OID, 4, true, 'i', &vectorAttnos, NULL, &nVectorColumns);
+			for (j = 0; j < nVectorColumns; j++)
 			{
+				vectorAttrs = bms_add_member(vectorAttrs, DatumGetInt32(vectorAttnos[j]));
+			}
+
+			/* Construct set of used scalar columns */
+			deconstruct_array(scalarColumns, INT4OID, 4, true, 'i', &scalarAttnos, NULL, &nScalarColumns);
+			for (j = 0; j < nScalarColumns; j++)
+			{
+				scalarAttrs = bms_add_member(scalarAttrs, DatumGetInt32(scalarAttnos[j]));
+			}
+			allAttrs = bms_union(vectorAttrs, vectorAttrs);
+
+			hasAggregates |= refs->agg != NULL;
+			if (bms_is_subset(refs->where, allAttrs)        /* attributes in WHERE clause can be either scalar either vector */
+				&& bms_is_subset(refs->agg, vectorAttrs)    /* aggregates are calculated only for vector columns */
+				&& bms_is_subset(refs->other, scalarAttrs)) /* variables used in other clauses can be only scalar */
+			{
+				MemoryContext spi_memctx = MemoryContextSwitchTo(memctx);
+				RangeVar* rv;
+
+				if (select == NULL)
+				{
+					List *parsetree_list;
+
+					parsetree_list = pg_parse_query(queryString);
+					if (list_length(parsetree_list) != 1)
+					{
+						SPI_finish();
+						MemoryContextSwitchTo(memctx);
+						return;
+					}
+#if PG_VERSION_NUM>=100000
+					parsetree = linitial_node(RawStmt, parsetree_list);
+					select = (SelectStmt*)parsetree->stmt;
+#else
+					parsetree = (Node*) linitial(parsetree_list);
+					select = (SelectStmt*) parsetree;
+#endif
+				}
+				/* Replace table with partition */
+				elog(DEBUG1, "Use projection %s instead of table %d", projectionName, rte->relid);
+				rv = list_nth_node(RangeVar, select->fromClause, fromno-1);
+				rv->relname = pstrdup(projectionName);
+
+				/* Update vector/scalar bitmap sets for this query for this projection */
+				for (j = 0; j < nVectorColumns; j++)
+				{
+					vectorCols = bms_add_member(vectorCols, DatumGetInt32(vectorAttnos[j])*n_rels + relno - 1);
+				}
+				for (j = 0; j < nScalarColumns; j++)
+				{
+					scalarCols = bms_add_member(scalarCols, DatumGetInt32(scalarAttnos[j])*n_rels + relno - 1);
+				}
+				if (keyName != NULL && select->whereClause)
+				{
+					if (IsA(select->whereClause, BoolExpr)
+						&& ((BoolExpr*)select->whereClause)->boolop == AND_EXPR)
+					{
+						ListCell* cell;
+						BoolExpr* andExpr = (BoolExpr*)select->whereClause;
+						List* conjuncts = NULL;
+						foreach (cell, andExpr->args)
+						{
+							Node* conjunct = (Node*)lfirst(cell);
+							conjuncts = vops_add_index_cond(conjunct, conjuncts, keyName);
+						}
+						andExpr->args = conjuncts;
+					}
+					else
+					{
+						List* conjuncts = vops_add_index_cond(select->whereClause, NULL, keyName);
+						if (list_length(conjuncts) > 1)
+						{
+							BoolExpr* andExpr = makeNode(BoolExpr);
+							andExpr->args = conjuncts;
+							andExpr->boolop = AND_EXPR;
+							andExpr->location = -1;
+							select->whereClause = (Node*)andExpr;
+						}
+					}
+				}
 				MemoryContextSwitchTo(spi_memctx);
 				break;
 			}
-#if PG_VERSION_NUM>=100000
-			parsetree = linitial_node(RawStmt, parsetree_list);
-			select = (SelectStmt*)parsetree->stmt;
-#else
-			parsetree = (Node*) linitial(parsetree_list);
-			select = (SelectStmt*) parsetree;
-#endif
-			/* Replace table with partition */
-			elog(DEBUG1, "Use projection %s instead of table %d", projectionName, rte->relid);
-			rv = linitial_node(RangeVar, select->fromClause);
-			rv->relname = projectionName;
-
-			if (keyName != NULL && select->whereClause)
-			{
-				if (IsA(select->whereClause, BoolExpr)
-					&& ((BoolExpr*)select->whereClause)->boolop == AND_EXPR)
-				{
-					ListCell* cell;
-					BoolExpr* andExpr = (BoolExpr*)select->whereClause;
-					List* conjuncts = NULL;
-					foreach (cell, andExpr->args)
-					{
-						Node* conjunct = (Node*)lfirst(cell);
-						conjuncts = vops_add_index_cond(conjunct, conjuncts, keyName);
-					}
-					andExpr->args = conjuncts;
-				}
-				else
-				{
-					List* conjuncts = vops_add_index_cond(select->whereClause, NULL, keyName);
-					if (list_length(conjuncts) > 1)
-					{
-						BoolExpr* andExpr = makeNode(BoolExpr);
-						andExpr->args = conjuncts;
-						andExpr->boolop = AND_EXPR;
-						andExpr->location = -1;
-						select->whereClause = (Node*)andExpr;
-					}
-				}
-			}
-			vops_add_literal_type_casts(select->whereClause, pullvar_ctx.consts);
-			PG_TRY();
-			{
-				Query* subst = parse_analyze(parsetree, queryString, NULL, 0
-#if PG_VERSION_NUM>=100000
-														 , NULL
-#endif
-					);
-				*query = *subst;
-			}
-			PG_CATCH();
-			{
-				elog(LOG, "Failed to substitute query %s", queryString);
-			}
-			PG_END_TRY();
-			MemoryContextSwitchTo(spi_memctx);
-			break;
+			SPI_freetuple(tuple);
 		}
-		SPI_freetuple(tuple);
+
+		if (i == SPI_processed) /* No suitable projection was found... */
+		{
+			int	bit = -1;
+			Bitmapset* all = bms_join(bms_join(refs->agg, refs->where), refs->other);
+			MemoryContext spi_memctx = MemoryContextSwitchTo(memctx);
+			/* Add all used attributes to set of scalar columns */
+			while ((bit = bms_next_member(all, bit)) >= 0)
+			{
+				scalarCols = bms_add_member(scalarCols, bit*n_rels + relno - 1);
+			}
+			MemoryContextSwitchTo(spi_memctx);
+		}
+		SPI_freetuptable(SPI_tuptable);
 	}
  	SPI_finish();
 	MemoryContextSwitchTo(memctx);
+
+	if (select != NULL    /* We did some substitution... */
+		&& hasAggregates  /* use projection only if we do some aggregation */
+		&& vops_check_clusters(pullvar_ctx.clusters, vectorCols, scalarCols)) /* vector and scalar columns are not mixed in one expression */ 
+	{
+		vops_add_literal_type_casts(select->whereClause, pullvar_ctx.consts);
+
+		PG_TRY();
+		{
+			Query* subst = parse_analyze(parsetree, queryString, NULL, 0
+#if PG_VERSION_NUM>=100000
+										 , NULL
+#endif
+				);
+			*query = *subst; /* Urgh! Copying structs is not the best way to substitute the query */
+		}
+		PG_CATCH();
+		{
+			elog(LOG, "Failed to substitute query %s", queryString);
+			/*
+			 * We are leaking some relcache entries in case of error, but it is better
+			 * then aborting the query
+			 */
+		}
+		PG_END_TRY();
+	}
 }
 
 static void
@@ -3706,7 +3902,6 @@ static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
 	filter_mask = ~0;
 	if (query->commandType == CMD_SELECT &&
 		vops_auto_substitute_projections &&
-		list_length(query->rtable) == 1  && /* do not support substitution for joins because it is not clear how to handle case when only of of joined table is substituted with parition */
 		pstate->p_paramref_hook == NULL)    /* do not support prepared statements yet */
 	{
 		vops_substitute_tables_with_projections(pstate->p_sourcetext, query);
@@ -3751,13 +3946,12 @@ static void vops_explain_hook(Query *query,
 
 	if (query->commandType == CMD_SELECT &&
 		vops_auto_substitute_projections &&
-		list_length(query->rtable) == 1  && /* do not support substitution for joins because it is not clear how to handle case when only of of joined table is substituted with parition */
 		params == NULL)    /* do not support prepared statements yet */
 	{
 		char* explain = pstrdup(queryString);
 		char* select = strstr(explain, "select");
 		size_t prefix = (select != NULL) ? (select - explain) : 7;
-		memset(explain, ' ', prefix);  /* clear "explain" prefix */
+		memset(explain, ' ', prefix);  /* clear "explain" prefix: we need to preseve node locations */
 		vops_substitute_tables_with_projections(explain, query);
 	}
 	(void)query_tree_mutator(query, vops_expression_tree_mutator, &ctx, QTW_DONT_COPY_QUERY);
