@@ -784,7 +784,11 @@ postgresIterateForeignScan(ForeignScanState *node)
 				 */
 				MemoryContextSwitchTo(oldcontext);
 				tup = heap_form_tuple(fsstate->tupdesc, fsstate->dst_values, fsstate->dst_nulls);				
-				ExecStoreTuple(tup, slot, InvalidBuffer, false);				
+#if PG_VERSION_NUM>=120000
+				ExecStoreHeapTuple(tup, slot, false);
+#else
+				ExecStoreTuple(tup, slot, InvalidBuffer, false);
+#endif
 				return slot;
 			}
 		  NextTuple:;
