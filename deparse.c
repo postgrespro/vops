@@ -684,6 +684,7 @@ deparseTargetList(StringInfo buf,
 		*retrieved_attrs = lappend_int(*retrieved_attrs,
 									   SelfItemPointerAttributeNumber);
 	}
+#if PG_VERSION_NUM<120000
 	if (bms_is_member(ObjectIdAttributeNumber - FirstLowInvalidHeapAttributeNumber,
 					  attrs_used))
 	{
@@ -700,7 +701,7 @@ deparseTargetList(StringInfo buf,
 		*retrieved_attrs = lappend_int(*retrieved_attrs,
 									   ObjectIdAttributeNumber);
 	}
-
+#endif
 	/* Don't generate bad syntax if no undropped columns */
 	if (first && !is_returning)
 		appendStringInfoString(buf, "NULL");
@@ -1256,12 +1257,14 @@ deparseColumnRef(StringInfo buf, int varno, int varattno, PlannerInfo *root,
 			ADD_REL_QUALIFIER(buf, varno);
 		appendStringInfoString(buf, "ctid");
 	}
+#if PG_VERSION_NUM<120000
 	else if (varattno == ObjectIdAttributeNumber)
 	{
 		if (qualify_col)
 			ADD_REL_QUALIFIER(buf, varno);
 		appendStringInfoString(buf, "oid");
 	}
+#endif
 	else if (varattno < 0)
 	{
 		/*

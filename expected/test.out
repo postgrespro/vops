@@ -360,11 +360,11 @@ select avg((open+close)/2),max(high-low) from stock group by symbol;
 
 set vops.auto_substitute_projections=on;
 explain (costs off) select avg((open+close)/2),max(high-low) from stock group by symbol;
-        QUERY PLAN        
---------------------------
+           QUERY PLAN           
+--------------------------------
  HashAggregate
    Group Key: symbol
-   ->  Seq Scan on vstock
+   ->  Seq Scan on vstock stock
 (3 rows)
 
 select avg((open+close)/2),max(high-low) from stock group by symbol;
@@ -397,6 +397,105 @@ select avg((open+close)/2),max(high-low) from stock group by symbol;
 ------------------+-----
  10.9200000762939 |   1
 (1 row)
+
+create table wiki_data(
+   cat_id bigint,
+   page_id bigint,
+   requests int,
+   size bigint,
+   dyear int,
+   dmonth int,
+   dday int,
+   dhour int
+);
+create table wiki_cat
+(   cat_id bigint primary key,
+    category varchar(20))
+;
+insert into wiki_data values
+(101,1001,123,456),
+(101,1002,789,123),
+(101,1003,456,789),
+(102,2001,123,456),
+(102,2002,789,123),
+(103,3001,456,789);
+insert into wiki_cat values
+(101, 'cat 101'),
+(102, 'cat 102'),
+(103, 'cat 103');
+select create_projection('wiki_data_prj', 'wiki_data', array['page_id','requests','size'],array['cat_id']);
+ create_projection 
+-------------------
+ 
+(1 row)
+
+select wiki_data_prj_refresh();
+ wiki_data_prj_refresh 
+-----------------------
+                     6
+(1 row)
+
+SELECT
+	category,
+	sum( requests ),
+	sum( size )
+FROM
+	wiki_data
+	INNER JOIN wiki_cat
+	 ON wiki_data.cat_id = wiki_cat.cat_id
+GROUP BY
+	category
+ORDER BY 3 DESC limit 5;
+ category | sum  | sum  
+----------+------+------
+ cat 101  | 1368 | 1368
+ cat 103  |  456 |  789
+ cat 102  |  912 |  579
+(3 rows)
+
+set vops.auto_substitute_projections=on;
+SELECT
+	category,
+	sum( requests ),
+	sum( size )
+FROM
+	wiki_data
+	INNER JOIN wiki_cat
+	 ON wiki_data.cat_id = wiki_cat.cat_id
+GROUP BY
+	category
+ORDER BY 3 DESC limit 5;
+ category | sum  | sum  
+----------+------+------
+ cat 101  | 1368 | 1368
+ cat 103  |  456 |  789
+ cat 102  |  912 |  579
+(3 rows)
+
+explain (costs off) SELECT
+	category,
+	sum( requests ),
+	sum( size )
+FROM
+	wiki_data
+	INNER JOIN wiki_cat
+	 ON wiki_data.cat_id = wiki_cat.cat_id
+GROUP BY
+	category
+ORDER BY 3 DESC limit 5;
+                             QUERY PLAN                              
+---------------------------------------------------------------------
+ Limit
+   ->  Sort
+         Sort Key: (sum(wiki_data.size)) DESC
+         ->  HashAggregate
+               Group Key: wiki_cat.category
+               ->  Hash Join
+                     Hash Cond: (wiki_cat.cat_id = wiki_data.cat_id)
+                     ->  Seq Scan on wiki_cat
+                     ->  Hash
+                           ->  Seq Scan on wiki_data_prj wiki_data
+(10 rows)
 
 create table quote(symbol char(5), ts timestamp, ask_price real, ask_size integer, bid_price real, bid_size integer);
 insert into quote values

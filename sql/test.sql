@@ -59,6 +59,77 @@ select avg((open+close)/2),max(high-low) from stock group by symbol;
 set vops.auto_substitute_projections=off;
 select avg((open+close)/2),max(high-low) from stock group by symbol;
 
+create table wiki_data(
+   cat_id bigint,
+   page_id bigint,
+   requests int,
+   size bigint,
+   dyear int,
+   dmonth int,
+   dday int,
+   dhour int
+);
+
+create table wiki_cat
+(   cat_id bigint primary key,
+    category varchar(20))
+;
+
+insert into wiki_data values
+(101,1001,123,456),
+(101,1002,789,123),
+(101,1003,456,789),
+(102,2001,123,456),
+(102,2002,789,123),
+(103,3001,456,789);
+
+insert into wiki_cat values
+(101, 'cat 101'),
+(102, 'cat 102'),
+(103, 'cat 103');
+
+select create_projection('wiki_data_prj', 'wiki_data', array['page_id','requests','size'],array['cat_id']);
+
+select wiki_data_prj_refresh();
+
+SELECT
+	category,
+	sum( requests ),
+	sum( size )
+FROM
+	wiki_data
+	INNER JOIN wiki_cat
+	 ON wiki_data.cat_id = wiki_cat.cat_id
+GROUP BY
+	category
+ORDER BY 3 DESC limit 5;
+
+set vops.auto_substitute_projections=on;
+
+SELECT
+	category,
+	sum( requests ),
+	sum( size )
+FROM
+	wiki_data
+	INNER JOIN wiki_cat
+	 ON wiki_data.cat_id = wiki_cat.cat_id
+GROUP BY
+	category
+ORDER BY 3 DESC limit 5;
+
+explain (costs off) SELECT
+	category,
+	sum( requests ),
+	sum( size )
+FROM
+	wiki_data
+	INNER JOIN wiki_cat
+	 ON wiki_data.cat_id = wiki_cat.cat_id
+GROUP BY
+	category
+ORDER BY 3 DESC limit 5;
+
 create table quote(symbol char(5), ts timestamp, ask_price real, ask_size integer, bid_price real, bid_size integer);
 insert into quote values
 ('AAA', '03-12-2018 10:00', 10.0, 100, 10.1, 202),
@@ -71,3 +142,4 @@ select create_projection('vquote','quote',array['ts','ask_price','ask_size','bid
 select vquote_refresh();
 
 select first(bid_price,ts),last(ask_size,ts) from vquote group by symbol;
+

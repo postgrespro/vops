@@ -1037,15 +1037,20 @@ static void
 UserTableUpdateOpenIndexes()
 {
 	List	   *recheckIndexes = NIL;
+#if PG_VERSION_NUM>=120000
+	HeapTuple tuple = ExecFetchSlotHeapTuple(slot, true, NULL);
+#else
+	HeapTuple tuple = slot->tts_tuple;
+#endif
 
 	/* HOT update does not require index inserts */
-	if (HeapTupleIsHeapOnly(slot->tts_tuple))
+	if (HeapTupleIsHeapOnly(tuple))
 		return;
 
 	if (estate->es_result_relation_info->ri_NumIndices > 0)
 	{
 		recheckIndexes = ExecInsertIndexTuples(slot,
-											   &slot->tts_tuple->t_self,
+											   &tuple->t_self,
 											   estate, false, NULL, NIL);
 
 		if (recheckIndexes != NIL)
@@ -1060,7 +1065,7 @@ static void begin_batch_insert(Oid oid)
 {
 	ResultRelInfo *resultRelInfo;
 
-	rel = heap_open(oid, NoLock);
+	rel = heap_open(oid, RowExclusiveLock);
 
 	PushActiveSnapshot(GetTransactionSnapshot());
 
@@ -1075,7 +1080,9 @@ static void begin_batch_insert(Oid oid)
 	estate->es_num_result_relations = 1;
 	estate->es_result_relation_info = resultRelInfo;
 	ExecOpenIndices(estate->es_result_relation_info, false);
-#if PG_VERSION_NUM>=110000
+#if PG_VERSION_NUM>=120000
+	slot = ExecInitExtraTupleSlot(estate, RelationGetDescr(rel), &TTSOpsHeapTuple);
+#elif PG_VERSION_NUM>=110000
 	slot = ExecInitExtraTupleSlot(estate, RelationGetDescr(rel));
 #else
 	slot = ExecInitExtraTupleSlot(estate);
@@ -1086,8 +1093,13 @@ static void begin_batch_insert(Oid oid)
 static void insert_tuple(Datum* values, bool* nulls)
 {
 	HeapTuple tup = heap_form_tuple(RelationGetDescr(rel), values, nulls);
+#if PG_VERSION_NUM>=120000
+	ExecStoreHeapTuple(tup, slot, true);
+	simple_heap_insert(rel, ExecFetchSlotHeapTuple(slot, true, NULL));
+#else
 	ExecStoreTuple(tup, slot, InvalidBuffer, true);
 	simple_heap_insert(rel, slot->tts_tuple);
+#endif
     UserTableUpdateOpenIndexes();
 }
 
@@ -3162,7 +3174,11 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
         user_ctx->nulls = (bool*)palloc(sizeof(bool)*n_attrs);
         user_ctx->types = (vops_type*)palloc(sizeof(vops_type)*n_attrs);
 		user_ctx->tiles = (vops_tile_hdr**)palloc(sizeof(vops_tile_hdr*)*n_attrs);
+#if PG_VERSION_NUM>=120000
+        user_ctx->desc = CreateTemplateTupleDesc(n_attrs);
+#else
         user_ctx->desc = CreateTemplateTupleDesc(n_attrs, false);
+#endif
         func_ctx->user_fctx = user_ctx;
         user_ctx->n_attrs = n_attrs;
 		user_ctx->tile_pos = 0;
@@ -3721,10 +3737,6 @@ vops_pullvars_walker(Node *node, vops_pullvar_context *ctx)
 		ctx->scope = scope;
 		node = (Node*)from->fromlist;
 	}
-	else if (IsA(node, Query))
-	{
-		return query_tree_walker((Query*)node, vops_pullvars_walker, ctx, 0);
-	}
 	(void) expression_tree_walker(node, vops_pullvars_walker, ctx);
 	ctx->scope = scope;
 	return false;
@@ -3838,6 +3850,42 @@ vops_add_literal_type_casts(Node* node, Const** consts)
 	return node;
 }
 
+static RangeVar*
+vops_get_join_rangevar(Node* node, int* relno)
+{
+	if (IsA(node, JoinExpr))
+	{
+		RangeVar* rv;
+		JoinExpr* join = (JoinExpr*)node;
+		rv = vops_get_join_rangevar(join->larg, relno);
+		if (rv != NULL)
+			return rv;
+		rv = vops_get_join_rangevar(join->rarg, relno);
+		if (rv != NULL)
+			return rv;
+	}
+	else
+	{
+		Assert(IsA(node, RangeVar));
+		if (--*relno == 0)
+			return (RangeVar*)node;
+	}
+	return NULL;
+}
+
+static RangeVar*
+vops_get_rangevar(List* from, int relno)
+{
+	ListCell* cell;
+	foreach (cell, from)
+	{
+		Node* node = (Node*)lfirst(cell);
+		RangeVar* rv = vops_get_join_rangevar(node, &relno);
+		if (rv != NULL)
+			return rv;
+	}
+	Assert(false);
+}
 /*
  * Try to substitute tables with their VOPS projections.
  * Criterias for such substitution:
@@ -3871,7 +3919,7 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 	pullvar_ctx.consts = (Const**)palloc0((strlen(queryString) + 1)*sizeof(Const*));
 	pullvar_ctx.scope = SCOPE_DEFAULT;
 	pullvar_ctx.refs = palloc0(n_rels*sizeof(vops_table_refs));
-	query_tree_walker(query, vops_pullvars_walker, &pullvar_ctx, 0);
+	query_tree_walker(query, vops_pullvars_walker, &pullvar_ctx, QTW_IGNORE_CTE_SUBQUERIES|QTW_IGNORE_RANGE_TABLE);
 
     SPI_connect();
 
@@ -3954,7 +4002,10 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 				}
 				/* Replace table with partition */
 				elog(DEBUG1, "Use projection %s instead of table %d", projectionName, rte->relid);
-				rv = list_nth_node(RangeVar, select->fromClause, fromno-1);
+				rv = vops_get_rangevar(select->fromClause, fromno);
+				Assert(rv != NULL);
+				if (rv->alias == NULL)
+					rv->alias = makeAlias(rv->relname, NULL);
 				rv->relname = pstrdup(projectionName);
 
 				/* Update vector/scalar bitmap sets for this query for this projection */
@@ -4135,8 +4186,13 @@ static void vops_explain_hook(Query *query,
 		params == NULL)    /* do not support prepared statements yet */
 	{
 		char* explain = pstrdup(queryString);
-		char* select = strstr(explain, "select");
-		size_t prefix = (select != NULL) ? (select - explain) : 7;
+		char* select;
+		size_t prefix;
+		select = strstr(explain, "select");
+		if (select == NULL) {
+			select = strstr(explain, "SELECT");
+		}
+		prefix = (select != NULL) ? (select - explain) : 7;
 		memset(explain, ' ', prefix);  /* clear "explain" prefix: we need to preseve node locations */
 		vops_substitute_tables_with_projections(explain, query);
 	}
