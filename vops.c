@@ -129,12 +129,16 @@ static bool is_vops_type(Oid typeid)
 	return vops_get_type(typeid) != VOPS_LAST;
 }
 
+#define SCALAR_PAYLOAD(tile, i) ((tile)->payload[i])
+#define BOOL_PAYLOAD(tile, i)   (((tile)->payload >> (i)) & 1)
+
 /* Parameters used in macros:
  * TYPE:   Postgres SQL type:                          char,   int2,   int4,   int8, float4, float8
  * SSTYPE: Postgres SQL sum type:                      int8,   int8,   int8,   int8, float8, float8
  * CTYPE:  Postgres C type:                            char,  int16,  int32,  int64, float8, float8
  * XTYPE:  Postgres extended C type:                  int32,  int32,  int32,  int64, float8, float8
  * STYPE:  Postgres sum type:                        long64, long64, long64, long64, float8, float8
+ * DTYPE:  Postgres type to convert to Datum:          Char,  Int16,  Int32,  Int64, Float4, Float8
  * GCTYPE: capitalized prefix used in GETARG macro:    CHAR,  INT16,  INT32,  INT64, FLOAT4, FLOAT8
  * GXTYPE: capitalized prefix of extended type:       INT32,  INT32,  INT32,  INT64, FLOAT8, FLOAT8
  * GSTYPE: capitalized prefix of sum type:            INT64,  INT64,  INT64,  INT64, FLOAT8, FLOAT8
@@ -353,13 +357,10 @@ static bool is_vops_type(Oid typeid)
 		int i;															\
 		if (PG_ARGISNULL(0)) {											\
 			MemoryContext agg_context;									\
-			MemoryContext old_context;									\
 			if (!AggCheckCallContext(fcinfo, &agg_context))				\
 				elog(ERROR, "aggregate function called in non-aggregate context"); \
-			old_context = MemoryContextSwitchTo(agg_context);			\
-			state = (vops_##SSTYPE*)palloc0(sizeof(vops_##SSTYPE));		\
+			state = (vops_##SSTYPE*)MemoryContextAllocZero(agg_context, sizeof(vops_##SSTYPE)); \
 			state->hdr.null_mask = ~0;									\
-			MemoryContextSwitchTo(old_context);							\
 		} else { 														\
 			state->hdr.null_mask = (int64)state->hdr.null_mask >> 63;	\
 		}																\
@@ -397,14 +398,11 @@ static bool is_vops_type(Oid typeid)
 		}																\
 		if (PG_ARGISNULL(0)) {											\
 			MemoryContext agg_context;									\
-			MemoryContext old_context;									\
 			if (!AggCheckCallContext(fcinfo, &agg_context))				\
 				elog(ERROR, "aggregate function called in non-aggregate context"); \
-			old_context = MemoryContextSwitchTo(agg_context);			\
-			state = (vops_##TYPE##_msum_state*)palloc0(sizeof(vops_##TYPE##_msum_state));	\
+			state = (vops_##TYPE##_msum_state*)MemoryContextAllocZero(agg_context, sizeof(vops_##TYPE##_msum_state));	\
 			state->hist.hdr.null_mask = ~0;								\
 			state->n_nulls = size;										\
-			MemoryContextSwitchTo(old_context);							\
 		}																\
 		state->tile.hdr.empty_mask = ~filter_mask;						\
 		sum = state->tile.payload[TILE_SIZE-1];							\
@@ -447,13 +445,10 @@ static bool is_vops_type(Oid typeid)
 		int i;															\
 		if (PG_ARGISNULL(0)) {											\
 			MemoryContext agg_context;									\
-			MemoryContext old_context;									\
 			if (!AggCheckCallContext(fcinfo, &agg_context))				\
 				elog(ERROR, "aggregate function called in non-aggregate context"); \
-			old_context = MemoryContextSwitchTo(agg_context);			\
-			state = (vops_window_state*)palloc0(sizeof(vops_window_state));	\
+			state = (vops_window_state*)MemoryContextAllocZero(agg_context, sizeof(vops_window_state));	\
 			state->tile.hdr.null_mask = ~0;								\
-			MemoryContextSwitchTo(old_context);							\
 		} else { 														\
 		    state->tile.hdr.null_mask = (int64)state->tile.hdr.null_mask >> 63;	\
 		}																\
@@ -489,13 +484,10 @@ static bool is_vops_type(Oid typeid)
 		int i;															\
 		if (is_null) {													\
 			MemoryContext agg_context;									\
-			MemoryContext old_context;									\
 			if (!AggCheckCallContext(fcinfo, &agg_context))				\
 				elog(ERROR, "aggregate function called in non-aggregate context"); \
-			old_context = MemoryContextSwitchTo(agg_context);			\
-			state = (vops_##TYPE*)palloc0(sizeof(vops_##TYPE));			\
+			state = (vops_##TYPE*)MemoryContextAllocZero(agg_context, sizeof(vops_##TYPE));			\
 			state->hdr.null_mask = ~0;									\
-			MemoryContextSwitchTo(old_context);							\
 		} else { 														\
 			state->hdr.null_mask = (int64)state->hdr.null_mask >> 63;	\
 			is_null = state->hdr.null_mask != 0;						\
@@ -562,15 +554,12 @@ static bool is_vops_type(Oid typeid)
 		bool is_null = PG_ARGISNULL(0);									\
 		if (is_null) {													\
 			MemoryContext agg_context;									\
-			MemoryContext old_context;									\
 			if (PG_ARGISNULL(1)) PG_RETURN_NULL();						\
 			if (!AggCheckCallContext(fcinfo, &agg_context))				\
 				elog(ERROR, "aggregate function called in non-aggregate context"); \
-			old_context = MemoryContextSwitchTo(agg_context);			\
-			state = (vops_lag_##TYPE*)palloc0(sizeof(vops_lag_##TYPE));	\
+			state = (vops_lag_##TYPE*)MemoryContextAllocZero(agg_context, sizeof(vops_lag_##TYPE));	\
 			state->is_null = true;										\
 			lag = 0;													\
-			MemoryContextSwitchTo(old_context);							\
 		} else { 														\
 			is_null = state->is_null;									\
 			lag = state->lag;											\
@@ -615,12 +604,9 @@ static bool is_vops_type(Oid typeid)
 		    if (mask & ((uint64)1 << i)) {								\
 			    if (state == NULL) {									\
 					MemoryContext agg_context;							\
-					MemoryContext old_context;							\
 					if (!AggCheckCallContext(fcinfo, &agg_context))		\
 						elog(ERROR, "aggregate function called in non-aggregate context"); \
-					old_context = MemoryContextSwitchTo(agg_context);	\
-					state = (vops_avg_state*)palloc0(sizeof(vops_avg_state)); \
-					MemoryContextSwitchTo(old_context);					\
+					state = (vops_avg_state*)MemoryContextAllocZero(agg_context, sizeof(vops_avg_state)); \
 				}														\
 				state->count += 1;										\
 				state->sum += opd->payload[i];							\
@@ -646,12 +632,9 @@ static bool is_vops_type(Oid typeid)
 			if (mask & ((uint64)1 << i)) {								\
 				if (state == NULL) {									\
 					MemoryContext agg_context;							\
-					MemoryContext old_context;							\
 					if (!AggCheckCallContext(fcinfo, &agg_context))		\
 						elog(ERROR, "aggregate function called in non-aggregate context"); \
-					old_context = MemoryContextSwitchTo(agg_context);	\
-					state = (vops_var_state*)palloc0(sizeof(vops_var_state)); \
-					MemoryContextSwitchTo(old_context);					\
+					state = (vops_var_state*)MemoryContextAllocZero(agg_context, sizeof(vops_var_state)); \
 				}														\
 				state->sum += (double)price->payload[i]*volume->payload[i]; \
 				state->sum2 += volume->payload[i];						\
@@ -676,12 +659,9 @@ static bool is_vops_type(Oid typeid)
 		    if (mask & ((uint64)1 << i)) {								\
 			    if (state == NULL) {									\
 					MemoryContext agg_context;							\
-					MemoryContext old_context;							\
 					if (!AggCheckCallContext(fcinfo, &agg_context))		\
 						elog(ERROR, "aggregate function called in non-aggregate context"); \
-					old_context = MemoryContextSwitchTo(agg_context);	\
-					state = (vops_var_state*)palloc0(sizeof(vops_var_state)); \
-					MemoryContextSwitchTo(old_context);					\
+					state = (vops_var_state*)MemoryContextAllocZero(agg_context, sizeof(vops_var_state)); \
 				}														\
 				state->count += 1;										\
 				state->sum += opd->payload[i];							\
@@ -695,7 +675,7 @@ static bool is_vops_type(Oid typeid)
 		}																\
 	}																    \
 
-#define FIRST_AGG(TYPE,GCTYPE)											\
+	#define FIRST_AGG(TYPE,GCTYPE,PAYLOAD)								\
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_first);							\
 	Datum vops_##TYPE##_first(PG_FUNCTION_ARGS)							\
 	{																	\
@@ -704,13 +684,13 @@ static bool is_vops_type(Oid typeid)
 		int i;															\
 		for (i = 0; i < TILE_SIZE; i++) {								\
 			if (mask & ((uint64)1 << i)) {								\
-				PG_RETURN_##GCTYPE(tile->payload[i]);					\
+				PG_RETURN_##GCTYPE(PAYLOAD(tile, i));					\
 			}															\
 		} 																\
 		PG_RETURN_NULL();											    \
 	}
 
-#define LAST_AGG(TYPE,GCTYPE)											\
+	#define LAST_AGG(TYPE,GCTYPE,PAYLOAD)								\
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_last);							\
 	Datum vops_##TYPE##_last(PG_FUNCTION_ARGS)							\
 	{																	\
@@ -719,7 +699,7 @@ static bool is_vops_type(Oid typeid)
 		int i;															\
 		for (i = TILE_SIZE; --i >= 0;) {								\
 			if (mask & ((uint64)1 << i)) {								\
-				PG_RETURN_##GCTYPE(tile->payload[i]);					\
+				PG_RETURN_##GCTYPE(PAYLOAD(tile, i));					\
 			}															\
 		} 																\
 		PG_RETURN_NULL();											    \
@@ -891,6 +871,48 @@ static bool is_vops_type(Oid typeid)
     }
 
 
+#define FIRST_FUNC(TYPE,DTYPE,NAME,CMP,PAYLOAD)							\
+PG_FUNCTION_INFO_V1(vops_##TYPE##_##NAME##_accumulate);				    \
+Datum vops_##TYPE##_##NAME##_accumulate(PG_FUNCTION_ARGS)				\
+{																		\
+	vops_first_state* state = (vops_first_state*)PG_GETARG_POINTER(0);	\
+	vops_##TYPE* vars = (vops_##TYPE*)PG_GETARG_POINTER(1);				\
+	vops_int8* tss = (vops_int8*)PG_GETARG_POINTER(2);					\
+	if (state == NULL) {												\
+		MemoryContext agg_context;										\
+		if (!AggCheckCallContext(fcinfo, &agg_context))					\
+			elog(ERROR, "aggregate function called in non-aggregate context"); \
+		state = (vops_first_state*)MemoryContextAlloc(agg_context, sizeof(vops_first_state));	\
+		state->val_is_null = true;										\
+		state->ts_is_null = true;										\
+	}																	\
+	if (tss != NULL)													\
+	{																	\
+		int i;															\
+		uint64 mask = ~(tss->hdr.empty_mask | tss->hdr.null_mask);		\
+		for (i = 0; i < TILE_SIZE; i++) {								\
+			if (mask & ((uint64)1 << i)) {								\
+				if (state->ts_is_null || tss->payload[i] CMP state->ts) { \
+					state->ts = tss->payload[i];						\
+					state->ts_is_null = false;							\
+					if (vars != NULL) {									\
+						if ((vars->hdr.empty_mask | vars->hdr.null_mask) & ((uint64)1 << i)) { \
+							state->val_is_null = true;					\
+						} else {										\
+							state->val = DTYPE##GetDatum(PAYLOAD(vars, i)); \
+							state->val_is_null = false;					\
+						}												\
+					} else {											\
+						state->val_is_null = true;						\
+					}													\
+				}														\
+			}															\
+		}																\
+	}																	\
+	PG_RETURN_POINTER(state);											\
+}
+
+
 PG_FUNCTION_INFO_V1(vops_bool_input);
 Datum vops_bool_input(PG_FUNCTION_ARGS)
 {
@@ -938,6 +960,10 @@ Datum vops_bool_not(PG_FUNCTION_ARGS)
 
 BOOL_BIN_OP(or,|)
 BOOL_BIN_OP(and,&)
+FIRST_AGG(bool,BOOL,BOOL_PAYLOAD)
+LAST_AGG(bool,BOOL,BOOL_PAYLOAD)
+FIRST_FUNC(bool,Bool,first,<,BOOL_PAYLOAD)
+FIRST_FUNC(bool,Bool,last,>,BOOL_PAYLOAD)
 
 PG_FUNCTION_INFO_V1(vops_count_any_accumulate);
 Datum vops_count_any_accumulate(PG_FUNCTION_ARGS)
@@ -1093,12 +1119,9 @@ Datum vops_avg_combine(PG_FUNCTION_ARGS)
 			PG_RETURN_NULL();
 		} else {
 			MemoryContext agg_context;
-			MemoryContext old_context;
 			if (!AggCheckCallContext(fcinfo, &agg_context))
 				elog(ERROR, "aggregate function called in non-aggregate context");
-			old_context = MemoryContextSwitchTo(agg_context);
-			state0 = (vops_avg_state*)palloc0(sizeof(vops_avg_state));
-			MemoryContextSwitchTo(old_context);
+			state0 = (vops_avg_state*)MemoryContextAllocZero(agg_context, sizeof(vops_avg_state));
 			*state0 = *state1;
 		}
 	} else if (state1 != NULL) {
@@ -1194,12 +1217,9 @@ Datum vops_var_combine(PG_FUNCTION_ARGS)
 			PG_RETURN_NULL();
 		} else {
 			MemoryContext agg_context;
-			MemoryContext old_context;
 			if (!AggCheckCallContext(fcinfo, &agg_context))
 				elog(ERROR, "aggregate function called in non-aggregate context");
-			old_context = MemoryContextSwitchTo(agg_context);
-			state0 = (vops_var_state*)palloc0(sizeof(vops_var_state));
-			MemoryContextSwitchTo(old_context);
+			state0 = (vops_var_state*)MemoryContextAllocZero(agg_context, sizeof(vops_var_state));
 			*state0 = *state1;
 		}
 	} else if (state1 != NULL) {
@@ -1327,7 +1347,7 @@ Datum vops_agg_deserial(PG_FUNCTION_ARGS)
 	CMP_LCONST_OP(TYPE,XTYPE,GXTYPE,OP,COP)					\
 	CMP_RCONST_OP(TYPE,XTYPE,GXTYPE,OP,COP)
 
-#define REGISTER_TYPE(TYPE,SSTYPE,CTYPE,XTYPE,STYPE,GCTYPE,GXTYPE,GSTYPE,FORMAT,PREC) \
+#define REGISTER_TYPE(TYPE,SSTYPE,CTYPE,XTYPE,STYPE,DTYPE,GCTYPE,GXTYPE,GSTYPE,FORMAT,PREC) \
 	UNARY_OP(TYPE,neg,-)									\
 	REGISTER_BIN_OP(TYPE,add,+,XTYPE,GXTYPE)				\
 	REGISTER_BIN_OP(TYPE,sub,-,XTYPE,GXTYPE)				\
@@ -1354,21 +1374,23 @@ Datum vops_agg_deserial(PG_FUNCTION_ARGS)
 	MINMAX_AGG(TYPE,CTYPE,GCTYPE,max,>)						\
 	MINMAX_WIN(TYPE,CTYPE,min,<)							\
 	MINMAX_WIN(TYPE,CTYPE,max,>)							\
-	FIRST_AGG(TYPE,GCTYPE)									\
-	LAST_AGG(TYPE,GCTYPE)									\
+	FIRST_AGG(TYPE,GCTYPE,SCALAR_PAYLOAD)					\
+	LAST_AGG(TYPE,GCTYPE,SCALAR_PAYLOAD)					\
 	LOW_AGG(TYPE,CTYPE,GCTYPE)								\
 	HIGH_AGG(TYPE,CTYPE,GCTYPE)								\
 	IN_FUNC(TYPE,CTYPE,STYPE,FORMAT)						\
 	OUT_FUNC(TYPE,STYPE,FORMAT,PREC)						\
-    GROUP_BY_FUNC(TYPE)
+	GROUP_BY_FUNC(TYPE)									    \
+	FIRST_FUNC(TYPE,DTYPE,first,<,SCALAR_PAYLOAD)			\
+	FIRST_FUNC(TYPE,DTYPE,last,>,SCALAR_PAYLOAD)
 
-/*             TYPE,   SSTYPE, CTYPE,  XTYPE,  STYPE, GCTYPE, GXTYPE, GSTYPE, FORMAT, PREC */
-REGISTER_TYPE( char,    int8,   char,   char, long64,   CHAR,   CHAR,  INT64, lld, -1)
-REGISTER_TYPE( int2,    int8,  int16,  int32, long64,  INT16,  INT32,  INT64, lld, -1)
-REGISTER_TYPE( int4,    int8,  int32,  int32, long64,  INT32,  INT32,  INT64, lld, -1)
-REGISTER_TYPE( int8,    int8,  int64,  int64, long64,  INT64,  INT64,  INT64, lld, -1)
-REGISTER_TYPE(float4, float8, float4, float8, float8, FLOAT4, FLOAT8, FLOAT8, lg, Max(1, FLT_DIG + extra_float_digits))
-REGISTER_TYPE(float8, float8, float8, float8, float8, FLOAT8, FLOAT8, FLOAT8, lg, Max(1, DBL_DIG + extra_float_digits))
+/*             TYPE,   SSTYPE, CTYPE,  XTYPE,  STYPE,  DTYPE, GCTYPE, GXTYPE, GSTYPE, FORMAT, PREC */
+REGISTER_TYPE( char,    int8,   char,   char, long64,   Char,   CHAR,   CHAR,  INT64, lld, -1)
+REGISTER_TYPE( int2,    int8,  int16,  int32, long64,  Int16,  INT16,  INT32,  INT64, lld, -1)
+REGISTER_TYPE( int4,    int8,  int32,  int32, long64,  Int32,  INT32,  INT32,  INT64, lld, -1)
+REGISTER_TYPE( int8,    int8,  int64,  int64, long64,  Int64,  INT64,  INT64,  INT64, lld, -1)
+REGISTER_TYPE(float4, float8, float4, float8, float8, Float4, FLOAT4, FLOAT8, FLOAT8, lg, Max(1, FLT_DIG + extra_float_digits))
+REGISTER_TYPE(float8, float8, float8, float8, float8, Float8, FLOAT8, FLOAT8, FLOAT8, lg, Max(1, DBL_DIG + extra_float_digits))
 
 REGISTER_BIN_OP(char,rem,%,char,CHAR)
 REGISTER_BIN_OP(int2,rem,%,int32,INT32)
@@ -1902,6 +1924,170 @@ Datum vops_text_high(PG_FUNCTION_ARGS)
 		memcpy(VARDATA(t), src + max*elem_size, len);
 		PG_RETURN_POINTER(t);
 	}
+}
+
+PG_FUNCTION_INFO_V1(vops_text_first_accumulate);
+Datum vops_text_first_accumulate(PG_FUNCTION_ARGS)
+{
+	vops_first_state* state = (vops_first_state*)PG_GETARG_POINTER(0);
+	struct varlena* vars = PG_GETARG_VARLENA_PP(1);
+	vops_int8* tss = (vops_int8*) PG_GETARG_POINTER(2);
+	if (state == NULL) {
+		MemoryContext agg_context;
+		if (!AggCheckCallContext(fcinfo, &agg_context))
+			elog(ERROR, "aggregate function called in non-aggregate context");
+		state = (vops_first_state*)MemoryContextAlloc(agg_context, sizeof(vops_first_state));
+		state->val_is_null = true;
+		state->ts_is_null = true;
+	}
+	if (tss != NULL)
+	{
+		int i;
+		uint64 mask = ~(tss->hdr.empty_mask | tss->hdr.null_mask);
+		for (i = 0; i < TILE_SIZE; i++) {
+			if (mask & ((uint64)1 << i)) {
+				if (state->ts_is_null || tss->payload[i] < state->ts) {
+					state->ts = tss->payload[i];
+					state->ts_is_null = false;
+					if (vars != NULL) {
+						vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(vars);
+						if ((tile->empty_mask | tile->null_mask) & ((uint64)1 << i)) {
+							state->val_is_null = true;
+						} else {
+							text* dst = (text*)DatumGetPointer(state->val);
+							size_t elem_size = VOPS_ELEM_SIZE(vars);
+							char* src;
+							size_t len;
+							if (dst == NULL) {
+								MemoryContext agg_context = GetMemoryChunkContext(state);
+								dst = (text*)MemoryContextAlloc(agg_context, VARHDRSZ + elem_size);
+								state->val = PointerGetDatum(dst);
+							}
+							src = (char*)(tile + 1) + elem_size*i;
+							len = strnlen(src, elem_size);
+							memcpy(VARDATA(dst), src, len);
+							SET_VARSIZE(dst, VARHDRSZ + len);
+							state->val_is_null = false;
+						}
+					} else {
+						state->val_is_null = true;
+					}
+				}
+			}
+		}
+	}
+	PG_RETURN_POINTER(state);
+}
+
+PG_FUNCTION_INFO_V1(vops_text_last_accumulate);
+Datum vops_text_last_accumulate(PG_FUNCTION_ARGS)
+{
+	vops_first_state* state = (vops_first_state*)PG_GETARG_POINTER(0);
+	struct varlena* vars = PG_GETARG_VARLENA_PP(1);
+	vops_int8* tss = (vops_int8*)PG_GETARG_POINTER(2);
+	if (state == NULL) {
+		MemoryContext agg_context;
+		if (!AggCheckCallContext(fcinfo, &agg_context))
+			elog(ERROR, "aggregate function called in non-aggregate context");
+		state = (vops_first_state*)MemoryContextAlloc(agg_context, sizeof(vops_first_state));
+		state->val_is_null = true;
+		state->ts_is_null = true;
+	}
+	if (tss != NULL)
+	{
+		int i;
+		uint64 mask = ~(tss->hdr.empty_mask | tss->hdr.null_mask);
+		for (i = TILE_SIZE; --i >= 0;) {
+			if (mask & ((uint64)1 << i)) {
+				if (state->ts_is_null || tss->payload[i] > state->ts) {
+					state->ts = tss->payload[i];
+					state->ts_is_null = false;
+					if (vars != NULL) {
+						vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(vars);
+						if ((tile->empty_mask | tile->null_mask) & ((uint64)1 << i)) {
+							state->val_is_null = true;
+						} else {
+							text* dst = (text*)DatumGetPointer(state->val);
+							size_t elem_size = VOPS_ELEM_SIZE(vars);
+							char* src;
+							size_t len;
+							if (dst == NULL) {
+								MemoryContext agg_context = GetMemoryChunkContext(state);
+								dst = (text*)MemoryContextAlloc(agg_context, VARHDRSZ + elem_size);
+								state->val = PointerGetDatum(dst);
+							}
+							src = (char*)(tile + 1) + elem_size*i;
+							len = strnlen(src, elem_size);
+							memcpy(VARDATA(dst), src, len);
+							SET_VARSIZE(dst, VARHDRSZ + len);
+							state->val_is_null = false;
+						}
+					} else {
+						state->val_is_null = true;
+					}
+				}
+			}
+		}
+	}
+	PG_RETURN_POINTER(state);
+}
+
+PG_FUNCTION_INFO_V1(vops_first_final);
+Datum vops_first_final(PG_FUNCTION_ARGS)
+{
+	vops_first_state* state = (vops_first_state*)PG_GETARG_POINTER(0);
+	if (state->val_is_null)
+		PG_RETURN_NULL();
+	else
+		PG_RETURN_DATUM(state->val);
+}
+
+PG_FUNCTION_INFO_V1(vops_first_combine);
+Datum vops_first_combine(PG_FUNCTION_ARGS)
+{
+	vops_first_state* state0 = (vops_first_state*)PG_GETARG_POINTER(0);
+	vops_first_state* state1 = (vops_first_state*)PG_GETARG_POINTER(1);
+	if (state0 == NULL) {
+		if (state1 == NULL) {
+			PG_RETURN_NULL();
+		} else {
+			MemoryContext agg_context;
+			if (!AggCheckCallContext(fcinfo, &agg_context))
+				elog(ERROR, "aggregate function called in non-aggregate context");
+			state0 = (vops_first_state*)MemoryContextAlloc(agg_context, sizeof(vops_first_state));
+			*state0 = *state1;
+		}
+	} else if (state1 != NULL && !state1->ts_is_null && (state0->ts_is_null || state0->ts > state1->ts)) {
+		state0->ts_is_null = false;
+		state0->val_is_null = state1->val_is_null;
+		state0->ts = state1->ts;
+		state0->val = state1->val;
+	}
+	PG_RETURN_POINTER(state0);
+}
+
+PG_FUNCTION_INFO_V1(vops_last_combine);
+Datum vops_last_combine(PG_FUNCTION_ARGS)
+{
+	vops_first_state* state0 = (vops_first_state*)PG_GETARG_POINTER(0);
+	vops_first_state* state1 = (vops_first_state*)PG_GETARG_POINTER(1);
+	if (state0 == NULL) {
+		if (state1 == NULL) {
+			PG_RETURN_NULL();
+		} else {
+			MemoryContext agg_context;
+			if (!AggCheckCallContext(fcinfo, &agg_context))
+				elog(ERROR, "aggregate function called in non-aggregate context");
+			state0 = (vops_first_state*)MemoryContextAlloc(agg_context, sizeof(vops_first_state));
+			*state0 = *state1;
+		}
+	} else if (state1 != NULL && !state1->ts_is_null && (state0->ts_is_null || state0->ts < state1->ts)) {
+		state0->ts_is_null = false;
+		state0->val_is_null = state1->val_is_null;
+		state0->ts = state1->ts;
+		state0->val = state1->val;
+	}
+	PG_RETURN_POINTER(state0);
 }
 
 

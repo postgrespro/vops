@@ -58,3 +58,16 @@ select vstock_refresh();
 select avg((open+close)/2),max(high-low) from stock group by symbol;
 set vops.auto_substitute_projections=off;
 select avg((open+close)/2),max(high-low) from stock group by symbol;
+
+create table quote(symbol char(5), ts timestamp, ask_price real, ask_size integer, bid_price real, bid_size integer);
+insert into quote values
+('AAA', '03-12-2018 10:00', 10.0, 100, 10.1, 202),
+('AAA', '03-12-2018 10:01', 11.0, 120, 11.2, 200),
+('AAA', '03-12-2018 10:02', 10.4, 110, 10.5, 204),
+('AAA', '03-12-2018 10:03', 11.1, 125, 11.2, 201),
+('AAA', '03-12-2018 10:04', 11.0, 105, 11.4, 205);
+
+select create_projection('vquote','quote',array['ts','ask_price','ask_size','bid_price','bid_size'],array['symbol'],'ts');
+select vquote_refresh();
+
+select first(bid_price,ts),last(ask_size,ts) from vquote group by symbol;

@@ -181,7 +181,7 @@ Also it supports <code>date</code> and <code>timestamp</code> types but them are
 <table border>
 <tr><th>SQL type</th><th>C type</th><th>VOPS tile type</th></tr>
 <tr><td>bool</td><td>bool</td><td>vops_bool</td></tr>
-<tr><td>"char", char or char(1)</td><td>char</td><td>vops_char</td></tr>
+<tr><td>"char"</td><td>char</td><td>vops_char</td></tr>
 <tr><td>int2</td><td>int16</td><td>vops_int2</td></tr>
 <tr><td>int4</td><td>int32</td><td>vops_int4</td></tr>
 <tr><td>int8</td><td>int64</td><td>vops_int8</td></tr>
@@ -282,6 +282,15 @@ Also VOPS provides weighted average aggregate VWAP which can be used to calculat
 
 <pre>
 select wavg(l_extendedprice,l_quantity) from vops_lineitem;
+</pre>
+
+<p>
+  It is possible to get first/last value of each group using first/last aggregates.
+  This aggregates require two vector arguments: first one is value itself and second one - is timestamp by which sorting in each group is done:
+</p>
+
+<pre>
+select first(bid_price,ts),last(ask_price,ts) from vquote group by symbol;
 </pre>
 
 <p>

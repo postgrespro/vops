@@ -145,6 +145,13 @@ typedef struct {
 	Oid       inproc_param_oid;
 } vops_type_info;
 
+typedef struct {
+	Datum     val;
+	Datum     ts;
+	bool      val_is_null;
+	bool      ts_is_null;
+} vops_first_state;
+
 extern vops_type vops_get_type(Oid typid);
 
 #endif

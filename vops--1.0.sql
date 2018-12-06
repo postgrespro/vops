@@ -181,6 +181,29 @@ create function betwixt(opd vops_text, low text, high text) returns vops_bool as
 create function ifnull(opd vops_text, subst text) returns vops_text as 'MODULE_PATHNAME','vops_ifnull_text' language C parallel safe immutable strict;
 create function ifnull(opd vops_text, subst vops_text) returns vops_text as 'MODULE_PATHNAME','vops_coalesce_text' language C parallel safe immutable strict;
 
+create function vops_text_first_accumulate(state internal, val vops_text, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_text_first_final(state internal) returns text as 'MODULE_PATHNAME','vops_first_final' language C parallel safe strict;
+create function vops_first_combine(internal,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE first(vops_text,vops_timestamp) (
+	SFUNC = vops_text_first_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_text_first_final,
+ 	COMBINEFUNC = vops_first_combine,
+	PARALLEL = SAFE
+);
+
+create function vops_text_last_accumulate(state internal, val vops_text, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_last_combine(internal,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE last(vops_text,vops_timestamp) (
+	SFUNC = vops_text_last_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_text_first_final,
+ 	COMBINEFUNC = vops_last_combine,
+	PARALLEL = SAFE
+);
+
 create function first(tile vops_text) returns text as 'MODULE_PATHNAME','vops_text_first' language C parallel safe immutable strict;
 create function last(tile vops_text) returns text as 'MODULE_PATHNAME','vops_text_last' language C parallel safe immutable strict;
 create function low(tile vops_text) returns text as 'MODULE_PATHNAME','vops_text_low' language C parallel safe immutable strict;
@@ -518,6 +541,27 @@ CREATE AGGREGATE mcount(vops_char) (
 	PARALLEL = SAFE
 );
 
+create function vops_char_first_accumulate(state internal, val vops_char, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_char_first_final(state internal) returns "char" as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
+CREATE AGGREGATE first(vops_char,vops_timestamp) (
+	SFUNC = vops_char_first_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_char_first_final,
+ 	COMBINEFUNC = vops_first_combine,
+	PARALLEL = SAFE
+);
+
+create function vops_char_last_accumulate(state internal, val vops_char, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE last(vops_char,vops_timestamp) (
+	SFUNC = vops_char_last_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_char_first_final,
+ 	COMBINEFUNC = vops_last_combine,
+	PARALLEL = SAFE
+);
+
 create function first(tile vops_char) returns "char" as 'MODULE_PATHNAME','vops_char_first' language C parallel safe immutable strict;
 create function last(tile vops_char) returns "char" as 'MODULE_PATHNAME','vops_char_last' language C parallel safe immutable strict;
 create function low(tile vops_char) returns "char" as 'MODULE_PATHNAME','vops_char_low' language C parallel safe immutable strict;
@@ -834,6 +878,27 @@ CREATE AGGREGATE mcount(vops_int2) (
 	msfunc = vops_int2_count_extend,
 	minvfunc = vops_int2_count_reduce,
 	minitcond = '0', 
+	PARALLEL = SAFE
+);
+
+create function vops_int2_first_accumulate(state internal, val vops_int2, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_int2_first_final(state internal) returns int2 as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
+CREATE AGGREGATE first(vops_int2,vops_timestamp) (
+	SFUNC = vops_int2_first_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_int2_first_final,
+ 	COMBINEFUNC = vops_first_combine,
+	PARALLEL = SAFE
+);
+
+create function vops_int2_last_accumulate(state internal, val vops_int2, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE last(vops_int2,vops_timestamp) (
+	SFUNC = vops_int2_last_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_int2_first_final,
+ 	COMBINEFUNC = vops_last_combine,
 	PARALLEL = SAFE
 );
 
@@ -1156,6 +1221,27 @@ CREATE AGGREGATE mcount(vops_int4) (
 	PARALLEL = SAFE
 );
 
+create function vops_int4_first_accumulate(state internal, val vops_int4, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_int4_first_final(state internal) returns int4 as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
+CREATE AGGREGATE first(vops_int4,vops_timestamp) (
+	SFUNC = vops_int4_first_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_int4_first_final,
+ 	COMBINEFUNC = vops_first_combine,
+	PARALLEL = SAFE
+);
+
+create function vops_int4_last_accumulate(state internal, val vops_int4, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE last(vops_int4,vops_timestamp) (
+	SFUNC = vops_int4_last_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_int4_first_final,
+ 	COMBINEFUNC = vops_last_combine,
+	PARALLEL = SAFE
+);
+
 create function first(tile vops_int4) returns int4 as 'MODULE_PATHNAME','vops_int4_first' language C parallel safe immutable strict;
 create function last(tile vops_int4) returns int4 as 'MODULE_PATHNAME','vops_int4_last' language C parallel safe immutable strict;
 create function low(tile vops_int4) returns int4 as 'MODULE_PATHNAME','vops_int4_low' language C parallel safe immutable strict;
@@ -1467,6 +1553,27 @@ CREATE AGGREGATE mcount(vops_date) (
 	msfunc = vops_date_count_extend,
 	minvfunc = vops_date_count_reduce,
 	minitcond = '0', 
+	PARALLEL = SAFE
+);
+
+create function vops_date_first_accumulate(state internal, val vops_date, ts vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int4_first_accumulate' language C parallel safe;
+create function vops_date_first_final(state internal) returns date as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
+CREATE AGGREGATE first(vops_date,vops_timestamp) (
+	SFUNC = vops_date_first_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_date_first_final,
+ 	COMBINEFUNC = vops_first_combine,
+	PARALLEL = SAFE
+);
+
+create function vops_date_last_accumulate(state internal, val vops_date, ts vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int4_last_accumulate' language C parallel safe;
+CREATE AGGREGATE last(vops_date,vops_timestamp) (
+	SFUNC = vops_date_last_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_date_first_final,
+ 	COMBINEFUNC = vops_last_combine,
 	PARALLEL = SAFE
 );
 
@@ -2120,6 +2227,27 @@ CREATE AGGREGATE mcount(vops_interval) (
 	PARALLEL = SAFE
 );
 
+create function vops_interval_first_accumulate(state internal, val vops_interval, ts vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int8_first_accumulate' language C parallel safe;
+create function vops_interval_first_final(state internal) returns int8 as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
+CREATE AGGREGATE first(vops_interval,vops_timestamp) (
+	SFUNC = vops_interval_first_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_interval_first_final,
+ 	COMBINEFUNC = vops_first_combine,
+	PARALLEL = SAFE
+);
+
+create function vops_interval_last_accumulate(state internal, val vops_interval, ts vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int8_last_accumulate' language C parallel safe;
+CREATE AGGREGATE last(vops_interval,vops_timestamp) (
+	SFUNC = vops_interval_last_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_interval_first_final,
+ 	COMBINEFUNC = vops_last_combine,
+	PARALLEL = SAFE
+);
+
 create function first(tile vops_interval) returns deltatime as 'MODULE_PATHNAME','vops_int8_first' language C parallel safe immutable strict;
 create function last(tile vops_interval) returns deltatime as 'MODULE_PATHNAME','vops_int8_last' language C parallel safe immutable strict;
 create function low(tile vops_interval) returns deltatime as 'MODULE_PATHNAME','vops_int8_low' language C parallel safe immutable strict;
@@ -2440,6 +2568,27 @@ CREATE AGGREGATE mcount(vops_int8) (
 	PARALLEL = SAFE
 );
 
+create function vops_int8_first_accumulate(state internal, val vops_int8, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_int8_first_final(state internal) returns int8 as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
+CREATE AGGREGATE first(vops_int8,vops_timestamp) (
+	SFUNC = vops_int8_first_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_int8_first_final,
+ 	COMBINEFUNC = vops_first_combine,
+	PARALLEL = SAFE
+);
+
+create function vops_int8_last_accumulate(state internal, val vops_int8, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE last(vops_int8,vops_timestamp) (
+	SFUNC = vops_int8_last_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_int8_first_final,
+ 	COMBINEFUNC = vops_last_combine,
+	PARALLEL = SAFE
+);
+
 create function first(tile vops_int8) returns int8 as 'MODULE_PATHNAME','vops_int8_first' language C parallel safe immutable strict;
 create function last(tile vops_int8) returns int8 as 'MODULE_PATHNAME','vops_int8_last' language C parallel safe immutable strict;
 create function low(tile vops_int8) returns int8 as 'MODULE_PATHNAME','vops_int8_low' language C parallel safe immutable strict;
@@ -2741,6 +2890,28 @@ CREATE AGGREGATE mcount(vops_float4) (
 	minitcond = '0', 
 	PARALLEL = SAFE
 );
+
+create function vops_float4_first_accumulate(state internal, val vops_float4, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_float4_first_final(state internal) returns float4 as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
+CREATE AGGREGATE first(vops_float4,vops_timestamp) (
+	SFUNC = vops_float4_first_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_float4_first_final,
+ 	COMBINEFUNC = vops_first_combine,
+	PARALLEL = SAFE
+);
+
+create function vops_float4_last_accumulate(state internal, val vops_float4, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE last(vops_float4,vops_timestamp) (
+	SFUNC = vops_float4_last_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_float4_first_final,
+ 	COMBINEFUNC = vops_last_combine,
+	PARALLEL = SAFE
+);
+
 
 create function first(tile vops_float4) returns float4 as 'MODULE_PATHNAME','vops_float4_first' language C parallel safe immutable strict;
 create function last(tile vops_float4) returns float4 as 'MODULE_PATHNAME','vops_float4_last' language C parallel safe immutable strict;
@@ -3045,6 +3216,27 @@ CREATE AGGREGATE mcount(vops_float8) (
 	PARALLEL = SAFE
 );
 
+create function vops_float8_first_accumulate(state internal, val vops_float8, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_float8_first_final(state internal) returns float8 as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
+CREATE AGGREGATE first(vops_float8,vops_timestamp) (
+	SFUNC = vops_float8_first_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_float8_first_final,
+ 	COMBINEFUNC = vops_first_combine,
+	PARALLEL = SAFE
+);
+
+create function vops_float8_last_accumulate(state internal, val vops_float8, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE last(vops_float8,vops_timestamp) (
+	SFUNC = vops_float8_last_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_float8_first_final,
+ 	COMBINEFUNC = vops_last_combine,
+	PARALLEL = SAFE
+);
+
 create function first(tile vops_float8) returns float8 as 'MODULE_PATHNAME','vops_float8_first' language C parallel safe immutable strict;
 create function last(tile vops_float8) returns float8 as 'MODULE_PATHNAME','vops_float8_last' language C parallel safe immutable strict;
 create function low(tile vops_float8) returns float8 as 'MODULE_PATHNAME','vops_float8_low' language C parallel safe immutable strict;
@@ -3084,6 +3276,29 @@ CREATE AGGREGATE mcount(*) (
 	PARALLEL = SAFE
 );
 
+create function vops_bool_first_accumulate(state internal, val vops_bool, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_bool_first_final(state internal) returns bool as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
+CREATE AGGREGATE first(vops_bool,vops_timestamp) (
+	SFUNC = vops_bool_first_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_bool_first_final,
+ 	COMBINEFUNC = vops_first_combine,
+	PARALLEL = SAFE
+);
+
+create function vops_bool_last_accumulate(state internal, val vops_bool, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE last(vops_bool,vops_timestamp) (
+	SFUNC = vops_bool_last_accumulate,
+	STYPE = internal,
+	SSPACE = 24,
+	FINALFUNC = vops_bool_first_final,
+ 	COMBINEFUNC = vops_last_combine,
+	PARALLEL = SAFE
+);
+
+create function first(tile vops_bool) returns bool as 'MODULE_PATHNAME','vops_bool_first' language C parallel safe immutable strict;
+create function last(tile vops_bool) returns bool as 'MODULE_PATHNAME','vops_bool_last' language C parallel safe immutable strict;
 
 -- Generic functions
 
