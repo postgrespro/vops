@@ -142,4 +142,4 @@ select create_projection('vquote','quote',array['ts','ask_price','ask_size','bid
 select vquote_refresh();
 
 select first(bid_price,ts),last(ask_size,ts) from vquote group by symbol;
-
+select symbol,time_bucket('2 minutes',ts) from vquote;

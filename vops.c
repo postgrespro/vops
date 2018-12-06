@@ -1029,6 +1029,92 @@ Datum vops_count_accumulate(PG_FUNCTION_ARGS)
 	PG_RETURN_INT64(count);
 }
 
+PG_FUNCTION_INFO_V1(vops_time_bucket);
+Datum vops_time_bucket(PG_FUNCTION_ARGS)
+{
+	Interval* interval = PG_GETARG_INTERVAL_P(0);
+	vops_int8* timestamp = (vops_int8*)PG_GETARG_POINTER(1);
+	vops_int8* result = (vops_int8*)palloc(sizeof(vops_int8));
+	int i;
+	result->hdr = timestamp->hdr;
+	if (interval->day == 0 && interval->month == 0) {
+		for (i = 0; i < TILE_SIZE; i++) {
+			result->payload[i] = timestamp->payload[i] / interval->time * interval->time;
+		}
+	} else if (interval->month == 0) {
+		time_t days = interval->day * USECS_PER_DAY + interval->time;
+
+		for (i = 0; i < TILE_SIZE; i++) {
+			result->payload[i] = timestamp->payload[i] / days * days;
+		}
+	} else {
+		int tz;
+		struct pg_tm tm;
+		fsec_t fsec;
+		Timestamp dt;
+		int months;
+
+		if (interval->day != 0 || interval->time != 0)
+			elog(ERROR, "Month interval may not include days and time");
+
+		for (i = 0; i < TILE_SIZE; i++) {
+			timestamp2tm(timestamp->payload[i], &tz, &tm, &fsec, NULL, NULL);
+			tm.tm_sec = 0;
+			tm.tm_min = 0;
+			tm.tm_hour = 0;
+			tm.tm_sec = 0;
+			tm.tm_mday = 1;
+			months = (tm.tm_year*12 + tm.tm_mon - 1) / interval->month;
+			tm.tm_year = months/12;
+			tm.tm_mon = months%12 + 1;
+			fsec = 0;
+			tm2timestamp(&tm, fsec, &tz, &dt);
+			result->payload[i] = dt;
+		}
+	}
+	PG_RETURN_POINTER(result);
+}
+
+PG_FUNCTION_INFO_V1(vops_date_bucket);
+Datum vops_date_bucket(PG_FUNCTION_ARGS)
+{
+	Interval* interval = PG_GETARG_INTERVAL_P(0);
+	vops_int4* date = (vops_int4*)PG_GETARG_POINTER(1);
+	vops_int4* result = (vops_int4*)palloc(sizeof(vops_int4));
+	int i;
+
+	if (interval->time)
+		elog(ERROR, "Date interval may not include time");
+
+	result->hdr = date->hdr;
+
+	if (interval->month == 0) {
+		time_t days = interval->day;
+
+		for (i = 0; i < TILE_SIZE; i++) {
+			result->payload[i] = date->payload[i] / days * days;
+		}
+	} else {
+		int year, month, day, months;
+
+		if (interval->day != 0)
+			elog(ERROR, "Month interval may not include days");
+
+		for (i = 0; i < TILE_SIZE; i++) {
+			j2date(date->payload[i], &year, &month, &day);
+			months = (year*12 + month - 1) / interval->month;
+			year = months / 12;
+			month = months % 12 + 1;
+			day = 1;
+			result->payload[i] = date2j(year, month, day);
+		}
+	}
+	PG_RETURN_POINTER(result);
+}
+
+
+
+
 static EState *estate;
 static TupleTableSlot* slot;
 static Relation rel;

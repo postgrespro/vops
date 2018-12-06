@@ -1249,6 +1249,8 @@ create function high(tile vops_int4) returns int4 as 'MODULE_PATHNAME','vops_int
 
 -- date tile
 
+create function date_bucket(interval, vops_date) returns vops_date  as 'MODULE_PATHNAME','vops_date_bucket' language C parallel safe immutable strict;
+
 create function vops_date_const(opd date) returns vops_date as 'MODULE_PATHNAME','vops_int4_const' language C parallel safe immutable strict;
 create cast (date as vops_date) with function vops_date_const(date) AS IMPLICIT;
 
@@ -1583,6 +1585,8 @@ create function low(tile vops_date) returns date as 'MODULE_PATHNAME','vops_int4
 create function high(tile vops_date) returns date as 'MODULE_PATHNAME','vops_int4_high' language C parallel safe immutable strict;
 
 -- timestamp tile
+
+create function time_bucket(interval, vops_timestamp) returns vops_timestamp  as 'MODULE_PATHNAME','vops_time_bucket' language C parallel safe immutable strict;
 
 create function vops_timestamp_const(opd timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_const' language C parallel safe immutable strict;
 create cast (timestamp as vops_timestamp) with function vops_timestamp_const(timestamp) AS IMPLICIT;
