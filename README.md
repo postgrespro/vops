@@ -109,7 +109,7 @@ main advantages:
   - Use CPU vector instruction (SIMD) to process data
 
 There are several DBMS-es implementing columnar store model. Most
-popular are [Vertical](https://vertica.com/),
+popular are [Vertica](https://vertica.com/),
 [MonetDB](https://www.monetdb.org/Home). But actually performing
 operation on the whole column is not so good idea. Table can be very
 large (OLAP queries are used to work with large data sets), so vector
