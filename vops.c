@@ -111,6 +111,7 @@ static bool vops_auto_substitute_projections;
 static vops_agg_state* vops_init_agg_state(char const* aggregates, Oid elem_type, int n_aggregates);
 static vops_agg_state* vops_create_agg_state(int n_aggregates);
 static void vops_agg_state_accumulate(vops_agg_state* state, int64 group_by, int i, Datum* tiles, bool* nulls);
+static void reset_static_cache(void);
 
 vops_type vops_get_type(Oid typid)
 {
@@ -2223,7 +2224,16 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 	int rc;
 	bool is_null;
 	int64 loaded;
+	static Oid self_oid = InvalidOid;
     char stmt[MAX_SQL_STMT_LEN];
+
+	/* Detect case when extension is drop and created several times */
+	if (fcinfo->flinfo->fn_oid != self_oid)
+	{
+		if (self_oid != InvalidOid)
+			reset_static_cache();
+		self_oid = fcinfo->flinfo->fn_oid;
+	}
 
     SPI_connect();
 	sql = psprintf("select attname,atttypid,atttypmod from pg_attribute where attrelid=%d and attnum>0 order by attnum", destination);
@@ -4297,8 +4307,15 @@ static void vops_explain_hook(Query *query,
 				   &planduration);
 }
 
+static void reset_static_cache(void)
+{
+	vops_type_map[0].oid = InvalidOid;
+	is_not_null_oid = InvalidOid;
+}
+
 void _PG_init(void)
 {
+	elog(LOG, "Initialize VOPS extension");
 	post_parse_analyze_hook_next	= post_parse_analyze_hook;
 	post_parse_analyze_hook			= vops_post_parse_analysis_hook;
 	save_explain_hook = ExplainOneQuery_hook;
@@ -4317,6 +4334,11 @@ void _PG_init(void)
 
 void _PG_fini(void)
 {
+	elog(LOG, "Finalize VOPS extension");
+	/* Restore hooks */
 	post_parse_analyze_hook = post_parse_analyze_hook_next;
 	ExplainOneQuery_hook = save_explain_hook;
+
+	/* undo static initializations */
+	reset_static_cache();
 }
