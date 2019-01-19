@@ -2230,8 +2230,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 	/* Detect case when extension is drop and created several times */
 	if (fcinfo->flinfo->fn_oid != self_oid)
 	{
-		if (self_oid != InvalidOid)
-			reset_static_cache();
+		reset_static_cache();
 		self_oid = fcinfo->flinfo->fn_oid;
 	}
 
