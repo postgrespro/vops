@@ -4042,18 +4042,26 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 			TupleDesc tupDesc = SPI_tuptable->tupdesc;
 			bool isnull;
 			char* projectionName = SPI_getvalue(tuple, tupDesc, 1);
-			ArrayType* vectorColumns = (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(SPI_getbinval(tuple, tupDesc, 3, &isnull)));
-			ArrayType* scalarColumns = (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(SPI_getbinval(tuple, tupDesc, 4, &isnull)));
+			ArrayType* vectorColumns;
+			ArrayType* scalarColumns;
 			char* keyName = SPI_getvalue(tuple, tupDesc, 5);
 			Datum* vectorAttnos;
 			Datum* scalarAttnos;
+			Datum  datum;
 			int    nScalarColumns;
 			int    nVectorColumns;
 			Bitmapset* vectorAttrs = NULL;
 			Bitmapset* scalarAttrs = NULL;
 			Bitmapset* allAttrs;
 
-			/* Construct set of used vector columns */
+
+			datum = SPI_getbinval(tuple, tupDesc, 3, &isnull);
+			vectorColumns = isnull ? NULL : (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(datum));
+
+			datum = SPI_getbinval(tuple, tupDesc, 4, &isnull);
+			scalarColumns = isnull ? NULL : (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(datum));
+
+            /* Construct set of used vector columns */
 			deconstruct_array(vectorColumns, INT4OID, 4, true, 'i', &vectorAttnos, NULL, &nVectorColumns);
 			for (j = 0; j < nVectorColumns; j++)
 			{
