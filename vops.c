@@ -4042,8 +4042,8 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 			TupleDesc tupDesc = SPI_tuptable->tupdesc;
 			bool isnull;
 			char* projectionName = SPI_getvalue(tuple, tupDesc, 1);
-			ArrayType* vectorColumns;
-			ArrayType* scalarColumns;
+			ArrayType* vectorColumns = NULL;
+			ArrayType* scalarColumns = NULL;
 			char* keyName = SPI_getvalue(tuple, tupDesc, 5);
 			Datum* vectorAttnos;
 			Datum* scalarAttnos;
@@ -4056,24 +4056,30 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 
 
 			datum = SPI_getbinval(tuple, tupDesc, 3, &isnull);
-			vectorColumns = isnull ? NULL : (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(datum));
+			if (!isnull)
+			{
+				vectorColumns = (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(datum));
+
+				/* Construct set of used vector columns */
+				deconstruct_array(vectorColumns, INT4OID, 4, true, 'i', &vectorAttnos, NULL, &nVectorColumns);
+				for (j = 0; j < nVectorColumns; j++)
+				{
+					vectorAttrs = bms_add_member(vectorAttrs, DatumGetInt32(vectorAttnos[j]));
+				}
+			}
 
 			datum = SPI_getbinval(tuple, tupDesc, 4, &isnull);
-			scalarColumns = isnull ? NULL : (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(datum));
-
-            /* Construct set of used vector columns */
-			deconstruct_array(vectorColumns, INT4OID, 4, true, 'i', &vectorAttnos, NULL, &nVectorColumns);
-			for (j = 0; j < nVectorColumns; j++)
+			if (!isnull)
 			{
-				vectorAttrs = bms_add_member(vectorAttrs, DatumGetInt32(vectorAttnos[j]));
-			}
+				scalarColumns = isnull ? NULL : (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(datum));
 
-			/* Construct set of used scalar columns */
-			deconstruct_array(scalarColumns, INT4OID, 4, true, 'i', &scalarAttnos, NULL, &nScalarColumns);
-			for (j = 0; j < nScalarColumns; j++)
-			{
-				scalarAttrs = bms_add_member(scalarAttrs, DatumGetInt32(scalarAttnos[j]));
-			}
+				/* Construct set of used scalar columns */
+				deconstruct_array(scalarColumns, INT4OID, 4, true, 'i', &scalarAttnos, NULL, &nScalarColumns);
+				for (j = 0; j < nScalarColumns; j++)
+				{
+					scalarAttrs = bms_add_member(scalarAttrs, DatumGetInt32(scalarAttnos[j]));
+				}
+			} 
 			allAttrs = bms_union(vectorAttrs, vectorAttrs);
 
 			hasAggregates |= refs->agg != NULL;

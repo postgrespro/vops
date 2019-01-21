@@ -301,6 +301,7 @@ select sum(x) over (order by id rows between 9 preceding and current row) from s
  955
 (100 rows)
 
+set vops.auto_substitute_projections=on;
 create table it(i interval, t varchar(4));
 insert into it values ('1 second','sec'), ('1 minute','min'), ('1 hour','hour');
 select create_projection('vit','it',array['i','t']);
