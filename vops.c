@@ -1555,7 +1555,7 @@ Datum vops_text_input(PG_FUNCTION_ARGS)
 		elog(ERROR, "Invalid vops_char width");
 
 	var = vops_alloc_text(width);
-	result = (vops_tile_hdr*)VARDATA(var);
+	result = VOPS_TEXT_TILE(var);
 	result->null_mask = 0;
 	result->empty_mask = 0;
 	dst = (char*)result + 1;
@@ -1617,7 +1617,7 @@ PG_FUNCTION_INFO_V1(vops_text_output);
 Datum vops_text_output(PG_FUNCTION_ARGS)
 {
 	struct varlena* var =  (struct varlena*)PG_GETARG_POINTER(0);
-	vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(var);
+	vops_tile_hdr* tile = VOPS_TEXT_TILE(var);
 	char* src = (char*)(tile + 1);
 	int width = VOPS_ELEM_SIZE(var);
 	int i;
@@ -1660,8 +1660,8 @@ Datum vops_text_##op(PG_FUNCTION_ARGS)									\
 {																		\
 	struct varlena* vl = PG_GETARG_VARLENA_PP(0);						\
 	struct varlena* vr = PG_GETARG_VARLENA_PP(1);						\
-    vops_tile_hdr* left = (vops_tile_hdr*)VARDATA(vl);					\
-    vops_tile_hdr* right = (vops_tile_hdr*)VARDATA(vl);					\
+    vops_tile_hdr* left = VOPS_TEXT_TILE(vl);							\
+    vops_tile_hdr* right = VOPS_TEXT_TILE(vl);							\
 	size_t left_elem_size = VOPS_ELEM_SIZE(vl);							\
 	size_t right_elem_size = VOPS_ELEM_SIZE(vr);						\
 	char* l = (char*)(left + 1);										\
@@ -1694,7 +1694,7 @@ Datum vops_text_##op##_rconst(PG_FUNCTION_ARGS)						    \
 {																		\
 	struct varlena* var = PG_GETARG_VARLENA_PP(0);						\
 	text* t = PG_GETARG_TEXT_P(1);										\
-	vops_tile_hdr* left = (vops_tile_hdr*)VARDATA(var);					\
+	vops_tile_hdr* left = VOPS_TEXT_TILE(var);							\
 	size_t elem_size = VOPS_ELEM_SIZE(var);								\
 	char* const_data = (char*)VARDATA(t);								\
 	size_t const_size = VARSIZE(t) - VARHDRSZ;							\
@@ -1729,7 +1729,7 @@ Datum vops_text_##op##_lconst(PG_FUNCTION_ARGS)							\
 {																		\
 	struct varlena* var = PG_GETARG_VARLENA_PP(1);						\
 	text* t = PG_GETARG_TEXT_P(0);										\
-    vops_tile_hdr* right = (vops_tile_hdr*)VARDATA(var);				\
+    vops_tile_hdr* right = VOPS_TEXT_TILE(var);							\
 	size_t elem_size = VOPS_ELEM_SIZE(var);								\
 	char* const_data = (char*)VARDATA(t);								\
 	size_t const_size = VARSIZE(t) - VARHDRSZ;							\
@@ -1775,7 +1775,7 @@ Datum vops_text_const(PG_FUNCTION_ARGS)
 	size_t const_size = VARSIZE(t) - VARHDRSZ;
 	int width = PG_GETARG_INT32(1);
 	struct varlena* var = vops_alloc_text(width);
-	vops_tile_hdr* result = (vops_tile_hdr*)VARDATA(var);
+	vops_tile_hdr* result = VOPS_TEXT_TILE(var);
 	char* dst = (char*)(result + 1);
 	int i;
 	for (i = 0; i < TILE_SIZE; i++)
@@ -1801,14 +1801,14 @@ Datum vops_text_concat(PG_FUNCTION_ARGS)
 {
 	struct varlena* vl = PG_GETARG_VARLENA_PP(0);
 	struct varlena* vr = PG_GETARG_VARLENA_PP(1);
-    vops_tile_hdr* left = (vops_tile_hdr*)VARDATA(vl);
-    vops_tile_hdr* right = (vops_tile_hdr*)VARDATA(vl);
+    vops_tile_hdr* left = VOPS_TEXT_TILE(vl);
+    vops_tile_hdr* right = VOPS_TEXT_TILE(vl);
 	size_t left_elem_size = VOPS_ELEM_SIZE(vl);
 	size_t right_elem_size = VOPS_ELEM_SIZE(vr);
 	char* l = (char*)(left + 1);
 	char* r = (char*)(right + 1);
 	struct varlena* var = vops_alloc_text(left_elem_size + right_elem_size);
-	vops_tile_hdr* result = (vops_tile_hdr*)VARDATA(var);
+	vops_tile_hdr* result = VOPS_TEXT_TILE(var);
 	char* dst = (char*)(result + 1);
 	int i;
 	for (i = 0; i < TILE_SIZE; i++) {
@@ -1831,7 +1831,7 @@ Datum vops_betwixt_text(PG_FUNCTION_ARGS)
 	size_t from_size = VARSIZE(from) - VARHDRSZ;
 	char* till_data = (char*)VARDATA(till);
 	size_t till_size = VARSIZE(till) - VARHDRSZ;
-    vops_tile_hdr* left = (vops_tile_hdr*)VARDATA(var);
+    vops_tile_hdr* left = VOPS_TEXT_TILE(var);
 	char* l = (char*)(left + 1);
 	vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));
 	int i;
@@ -1859,13 +1859,13 @@ PG_FUNCTION_INFO_V1(vops_ifnull_text);
 Datum vops_ifnull_text(PG_FUNCTION_ARGS)
 {
 	struct varlena* var = PG_GETARG_VARLENA_PP(0);
-	vops_tile_hdr* opd = (vops_tile_hdr*)VARDATA(var);
+	vops_tile_hdr* opd = VOPS_TEXT_TILE(var);
 	size_t elem_size = VOPS_ELEM_SIZE(var);
 	text* subst = PG_GETARG_TEXT_P(1);
 	char* subst_data = (char*)VARDATA(subst);
 	size_t subst_size = VARSIZE(subst) - VARHDRSZ;
 	struct varlena* result = vops_alloc_text(elem_size);
-	vops_tile_hdr* res = (vops_tile_hdr*)VARDATA(result);
+	vops_tile_hdr* res = VOPS_TEXT_TILE(result);
 	char* dst = (char*)(res + 1);
 	char* src = (char*)(opd + 1);
 	int i;
@@ -1890,15 +1890,15 @@ PG_FUNCTION_INFO_V1(vops_coalesce_text);
 Datum vops_coalesce_text(PG_FUNCTION_ARGS)
 {
 	struct varlena* left = PG_GETARG_VARLENA_PP(0);
-	vops_tile_hdr* opd = (vops_tile_hdr*)VARDATA(left);
+	vops_tile_hdr* opd = VOPS_TEXT_TILE(left);
 	size_t elem_size = VOPS_ELEM_SIZE(left);
 
 	struct varlena* right = PG_GETARG_VARLENA_PP(1);
-	vops_tile_hdr* subst = (vops_tile_hdr*)VARDATA(right);
+	vops_tile_hdr* subst = VOPS_TEXT_TILE(right);
 	size_t subst_elem_size = VOPS_ELEM_SIZE(right);
 
 	struct varlena* result = vops_alloc_text(elem_size);
-	vops_tile_hdr* res = (vops_tile_hdr*)VARDATA(result);
+	vops_tile_hdr* res = VOPS_TEXT_TILE(result);
 	char* dst = (char*)(res + 1);
 	char* src = (char*)(opd + 1);
 	int i;
@@ -1921,7 +1921,7 @@ PG_FUNCTION_INFO_V1(vops_text_first);
 Datum vops_text_first(PG_FUNCTION_ARGS)
 {
 	struct varlena* var = PG_GETARG_VARLENA_PP(0);
-	vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(var);
+	vops_tile_hdr* tile = VOPS_TEXT_TILE(var);
 	size_t elem_size = VOPS_ELEM_SIZE(var);
 
 	uint64 mask = ~(tile->empty_mask | tile->null_mask);
@@ -1943,7 +1943,7 @@ PG_FUNCTION_INFO_V1(vops_text_last);
 Datum vops_text_last(PG_FUNCTION_ARGS)
 {
 	struct varlena* var = PG_GETARG_VARLENA_PP(0);
-	vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(var);
+	vops_tile_hdr* tile = VOPS_TEXT_TILE(var);
 	size_t elem_size = VOPS_ELEM_SIZE(var);
 
 	uint64 mask = ~(tile->empty_mask | tile->null_mask);
@@ -1965,7 +1965,7 @@ PG_FUNCTION_INFO_V1(vops_text_low);
 Datum vops_text_low(PG_FUNCTION_ARGS)
 {
 	struct varlena* var = PG_GETARG_VARLENA_PP(0);
-	vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(var);
+	vops_tile_hdr* tile = VOPS_TEXT_TILE(var);
 	size_t elem_size = VOPS_ELEM_SIZE(var);
 
 	uint64 mask = ~(tile->empty_mask | tile->null_mask);
@@ -1997,7 +1997,7 @@ PG_FUNCTION_INFO_V1(vops_text_high);
 Datum vops_text_high(PG_FUNCTION_ARGS)
 {
 	struct varlena* var = PG_GETARG_VARLENA_PP(0);
-	vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(var);
+	vops_tile_hdr* tile = VOPS_TEXT_TILE(var);
 	size_t elem_size = VOPS_ELEM_SIZE(var);
 
 	uint64 mask = ~(tile->empty_mask | tile->null_mask);
@@ -2049,7 +2049,7 @@ Datum vops_text_first_accumulate(PG_FUNCTION_ARGS)
 					state->ts = tss->payload[i];
 					state->ts_is_null = false;
 					if (vars != NULL) {
-						vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(vars);
+						vops_tile_hdr* tile = VOPS_TEXT_TILE(vars);
 						if ((tile->empty_mask | tile->null_mask) & ((uint64)1 << i)) {
 							state->val_is_null = true;
 						} else {
@@ -2102,7 +2102,7 @@ Datum vops_text_last_accumulate(PG_FUNCTION_ARGS)
 					state->ts = tss->payload[i];
 					state->ts_is_null = false;
 					if (vars != NULL) {
-						vops_tile_hdr* tile = (vops_tile_hdr*)VARDATA(vars);
+						vops_tile_hdr* tile = VOPS_TEXT_TILE(vars);
 						if ((tile->empty_mask | tile->null_mask) & ((uint64)1 << i)) {
 							state->val_is_null = true;
 						} else {

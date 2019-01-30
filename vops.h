@@ -1,9 +1,10 @@
 #ifndef __VOPS_H__
 #define __VOPS_H__
 
-#define VOPS_SIZEOF_TEXT(width) (VARHDRSZ + sizeof(vops_tile_hdr) + (width)*TILE_SIZE)
-#define VOPS_ELEM_SIZE(var)     ((VARSIZE(var) - VARHDRSZ - sizeof(vops_tile_hdr)) / TILE_SIZE)
-#define VOPS_GET_TILE(val,tid)  ((vops_tile_hdr*)(((tid) == VOPS_TEXT) ? VARDATA(DatumGetTextP(val)) : DatumGetPointer(val)))
+#define VOPS_SIZEOF_TEXT(width) (LONGALIGN(VARHDRSZ) + sizeof(vops_tile_hdr) + (width)*TILE_SIZE)
+#define VOPS_ELEM_SIZE(var)     ((VARSIZE(var) - LONGALIGN(VARHDRSZ) - sizeof(vops_tile_hdr)) / TILE_SIZE)
+#define VOPS_TEXT_TILE(val)     ((vops_tile_hdr*)((char*)DatumGetTextP(val) + LONGALIGN(VARHDRSZ)))
+#define VOPS_GET_TILE(val,tid)  (((tid) == VOPS_TEXT) ? VOPS_TEXT_TILE(val) : (vops_tile_hdr*)DatumGetPointer(val))
 
 typedef enum
 {
