@@ -36,7 +36,13 @@
 #include "optimizer/planmain.h"
 #include "optimizer/plancat.h"
 #include "optimizer/restrictinfo.h"
+#if PG_VERSION_NUM>=120000
+#include "access/table.h"
+#include "nodes/primnodes.h"
+#include "optimizer/optimizer.h"
+#else
 #include "optimizer/var.h"
+#endif
 #include "optimizer/tlist.h"
 #include "parser/parsetree.h"
 #include "utils/builtins.h"
@@ -1031,7 +1037,7 @@ estimate_path_cost_size(PlannerInfo *root,
 		 *-----
 		 */
 		run_cost = ofpinfo->rel_total_cost - ofpinfo->rel_startup_cost;
-		run_cost += aggcosts.finalCost * numGroups;
+		run_cost += aggcosts.finalCost.per_tuple * numGroups;
 		run_cost += cpu_tuple_cost * numGroups;
 		run_cost += ptarget->cost.per_tuple * numGroups;
 	}

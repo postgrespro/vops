@@ -15,7 +15,11 @@
 
 #include "foreign/foreign.h"
 #include "lib/stringinfo.h"
+#if PG_VERSION_NUM>=120000
+#include "nodes/pathnodes.h"
+#else
 #include "nodes/relation.h"
+#endif
 #include "utils/relcache.h"
 
 #include "libpq-fe.h"

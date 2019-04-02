@@ -144,6 +144,8 @@ typedef struct {
 	char      align;
 	FmgrInfo  inproc;
 	Oid       inproc_param_oid;
+	Oid       src_type;
+	Oid       dst_type;
 } vops_type_info;
 
 typedef struct {

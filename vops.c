@@ -26,10 +26,12 @@
 #include "tcop/utility.h"
 
 #include "utils/array.h"
-#include "utils/tqual.h"
 #include "utils/datum.h"
 #if PG_VERSION_NUM>=120000
+#include "access/heapam.h"
 #include "utils/float.h"
+#else
+#include "utils/tqual.h"
 #endif
 #include "utils/builtins.h"
 #include "utils/datetime.h"
@@ -1137,9 +1139,10 @@ UserTableUpdateOpenIndexes()
 	if (estate->es_result_relation_info->ri_NumIndices > 0)
 	{
 		recheckIndexes = ExecInsertIndexTuples(slot,
+#if PG_VERSION_NUM<120000
 											   &tuple->t_self,
+#endif
 											   estate, false, NULL, NIL);
-
 		if (recheckIndexes != NIL)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -1182,7 +1185,7 @@ static void insert_tuple(Datum* values, bool* nulls)
 	HeapTuple tup = heap_form_tuple(RelationGetDescr(rel), values, nulls);
 #if PG_VERSION_NUM>=120000
 	ExecStoreHeapTuple(tup, slot, true);
-	simple_heap_insert(rel, ExecFetchSlotHeapTuple(slot, true, NULL));
+	simple_table_insert(rel, slot);
 #else
 	ExecStoreTuple(tup, slot, InvalidBuffer, true);
 	simple_heap_insert(rel, slot->tts_tuple);
@@ -2224,6 +2227,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 	int rc;
 	bool is_null;
 	int64 loaded;
+	bool type_checked = false;
 	static Oid self_oid = InvalidOid;
     char stmt[MAX_SQL_STMT_LEN];
 
@@ -2257,6 +2261,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
         HeapTuple spi_tuple = SPI_tuptable->vals[i];
         char const* name = SPI_getvalue(spi_tuple, spi_tupdesc, 1);
         Oid type_id = DatumGetObjectId(SPI_getbinval(spi_tuple, spi_tupdesc, 2, &is_null));
+		types[i].dst_type = type_id;
 		types[i].tid = vops_get_type(type_id);
 		get_typlenbyvalalign(type_id, &types[i].len, &types[i].byval, &types[i].align);
 		if (types[i].tid != VOPS_LAST && types[i].len < 0) { /* varying length type: extract size from atttypmod */
@@ -2294,6 +2299,26 @@ Datum vops_populate(PG_FUNCTION_ARGS)
         if (SPI_processed) {
             HeapTuple spi_tuple = SPI_tuptable->vals[0];
             spi_tupdesc = SPI_tuptable->tupdesc;
+			if (!type_checked)
+			{
+				for (i = 0; i < n_attrs; i++)
+				{
+					Oid dst_type = types[i].dst_type;
+					Oid src_type = SPI_gettypeid(spi_tupdesc, i+1);
+					types[i].src_type = src_type;
+					if (types[i].tid != VOPS_LAST)
+						dst_type = vops_map_tid[types[i].tid];
+					if (!(dst_type == src_type ||
+						  (dst_type == CHAROID && src_type == TEXTOID) ||
+						  (dst_type == TEXTOID && src_type == VARCHAROID) ||
+						  (dst_type == TEXTOID && src_type == BPCHAROID)))
+					{
+						elog(ERROR, "Incompatible type of attribute %d: %s vs. %s",
+							 i+1, format_type_be(dst_type), format_type_be(src_type));
+					}
+				}
+				type_checked = true;
+			}
 			if (j == TILE_SIZE) {
 				for (i = 0; i < n_attrs; i++) {
 					if (types[i].tid != VOPS_LAST) {
@@ -2343,7 +2368,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 						((vops_bool*)tile)->payload |= (uint64)DatumGetBool(val) << j;
 						break;
 					  case VOPS_CHAR:
-						((vops_char*)tile)->payload[j] = SPI_gettypeid(spi_tupdesc, i+1) == CHAROID
+						((vops_char*)tile)->payload[j] = types[i].src_type == CHAROID
 							? DatumGetChar(val)
 							: *VARDATA(DatumGetTextP(val));
 						break;

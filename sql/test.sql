@@ -1,4 +1,5 @@
 create extension vops;
+set extra_float_digits=0;
 create table s(x real);
 create table v(x vops_float4);
 insert into s values(1.0),(2.0),(null),(3.0),(null),(4.0);
