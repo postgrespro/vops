@@ -114,7 +114,11 @@ static void deparseExpr(Expr *expr, deparse_expr_cxt *context);
 static void deparseVar(Var *node, deparse_expr_cxt *context);
 static void deparseConst(Const *node, deparse_expr_cxt *context, int showtype);
 static void deparseParam(Param *node, deparse_expr_cxt *context);
+#if PG_VERSION_NUM>=120000
 static void deparseSubscriptingRef(SubscriptingRef *node, deparse_expr_cxt *context);
+#else
+static void deparseArrayRef(ArrayRef *node, deparse_expr_cxt *context);
+#endif
 static void deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context);
 static void deparseOpExpr(OpExpr *node, deparse_expr_cxt *context);
 static void deparseOperatorName(StringInfo buf, Form_pg_operator opform);
@@ -246,10 +250,15 @@ foreign_expr_walker(Node *node,
 		case T_Const:
 		case T_Param:
 			break;
+#if PG_VERSION_NUM>=120000
 		case T_SubscriptingRef:
 			{
 				SubscriptingRef   *ar = (SubscriptingRef *) node;
-
+#else
+		case T_ArrayRef:
+			{
+				ArrayRef   *ar = (ArrayRef *) node;
+#endif
 				/* Assignment should not be in restrictions. */
 				if (ar->refassgnexpr != NULL)
 					return false;
@@ -1490,8 +1499,13 @@ deparseExpr(Expr *node, deparse_expr_cxt *context)
 		case T_Param:
 			deparseParam((Param *) node, context);
 			break;
+#if PG_VERSION_NUM>=120000
 		case T_SubscriptingRef:
 			deparseSubscriptingRef((SubscriptingRef *) node, context);
+#else
+		case T_ArrayRef:
+			deparseArrayRef((ArrayRef *) node, context);
+#endif
 			break;
 		case T_FuncExpr:
 			deparseFuncExpr((FuncExpr *) node, context);
@@ -1724,8 +1738,13 @@ deparseParam(Param *node, deparse_expr_cxt *context)
 /*
  * Deparse an array subscript expression.
  */
+#if PG_VERSION_NUM>=120000
 static void
 deparseSubscriptingRef(SubscriptingRef *node, deparse_expr_cxt *context)
+#else
+static void
+deparseArrayRef(ArrayRef *node, deparse_expr_cxt *context)
+#endif
 {
 	StringInfo	buf = context->buf;
 	ListCell   *lowlist_item;

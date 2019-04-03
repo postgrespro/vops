@@ -1028,7 +1028,7 @@ estimate_path_cost_size(PlannerInfo *root,
 		startup_cost += aggcosts.transCost.per_tuple * input_rows;
 		startup_cost += (cpu_operator_cost * numGroupCols) * input_rows;
 		startup_cost += ptarget->cost.startup;
-		
+
 		/*-----
 		 * Run time cost includes:
 		 *	  1. Run time cost of underneath input relation
@@ -1037,7 +1037,11 @@ estimate_path_cost_size(PlannerInfo *root,
 		 *-----
 		 */
 		run_cost = ofpinfo->rel_total_cost - ofpinfo->rel_startup_cost;
+#if PG_VERSION_NUM>=120000
 		run_cost += aggcosts.finalCost.per_tuple * numGroups;
+#else
+		run_cost += aggcosts.finalCost * numGroups;
+#endif
 		run_cost += cpu_tuple_cost * numGroups;
 		run_cost += ptarget->cost.per_tuple * numGroups;
 	}
@@ -1045,7 +1049,7 @@ estimate_path_cost_size(PlannerInfo *root,
 	{
 		/* Clamp retrieved rows estimates to at most foreignrel->tuples. */
 		retrieved_rows = Min(retrieved_rows, foreignrel->tuples);
-		
+
 		/*
 		 * Cost as though this were a seqscan, which is pessimistic.  We
 		 * effectively imagine the local_conds are being evaluated
