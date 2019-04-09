@@ -4004,8 +4004,9 @@ vops_get_rangevar(List* from, int relno)
 		if (rv != NULL)
 			return rv;
 	}
-	Assert(false);
+	return NULL;
 }
+
 /*
  * Try to substitute tables with their VOPS projections.
  * Criterias for such substitution:
