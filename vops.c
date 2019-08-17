@@ -1185,7 +1185,7 @@ static void insert_tuple(Datum* values, bool* nulls)
 	HeapTuple tup = heap_form_tuple(RelationGetDescr(rel), values, nulls);
 #if PG_VERSION_NUM>=120000
 	ExecStoreHeapTuple(tup, slot, true);
-	simple_table_insert(rel, slot);
+	simple_table_tuple_insert(rel, slot);
 #else
 	ExecStoreTuple(tup, slot, InvalidBuffer, true);
 	simple_heap_insert(rel, slot->tts_tuple);
