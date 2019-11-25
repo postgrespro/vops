@@ -770,6 +770,141 @@ initialization of VOPS extension. After invocation of this function,
 extension will be loaded and all subsequent queries will be normally
 transformed and produce expected results.
 
+## <span id="projections">VOPS projections and automatic table sustitution</span>
+
+VOPS provides some functions simplifying creation and usage of projections.
+In future it may be added to SQL grammar, so that it is possible to write
+`CREATE PROJECTION xxx OF TABLE yyy(column1, column2,...) GROUP BY (column1, column2, ...)`.
+But right now it can be done using `create_projection(projection_name text, source_table regclass, vector_columns text[], scalar_columns text[] default null, order_by text default null)` function.
+First argument of this function specifies name of the projection, second refers to existed Postgres table, `vector_columns` is array of
+column names which should be stores as VOPS tiles, `scalar_columns`  is array of grouping columns which type is preserved and
+optional `order_by` parameter specifies name of ordering attribute (explained below).
+The `create_projection(PNAME,...)` functions does the following:
+
+1. Creates projection table with specified name and attributes.
+2. Creates PNAME_refresh() functions which can be used to update projection.
+3. Creates functional BRIN indexes for `first()` and `last()` functions of ordering attribute (if any)
+4. Creates BRIN index on grouping attributes (if any)
+5. Insert information about created projection in `vops_projections` table. This table is used by optimizer to
+    automatically substitute table with partition.
+
+The `order_by` attribute is on of the VOPS projection vector columns by which data is sorted. Usually it is some kind of timestamp
+used in *time series* (for example trade date). Presence of such column in projection allows to incrementally update projection.
+Generated `PNAME_refresh()` method calls `populate` method with correspondent values of `predicate` and
+`sort` parameters, selecting from original table only rows with `order_by` column value greater than maximal
+value of this column in projection. It assumes that `order_by` is unique or at least refresh is done at the moment when there is some gap
+in collected events. In addition to `order_by`, sort list for `populate` includes all scalar (grouping) columns.
+It allows to efficiently group imported data by scalar columns and fill VOPS tiles (vector columns) with data.
+
+When `order_by` attribute is specified, VOPS creates two functional  BRIN indexes on `first()` and `last()`
+functions of this attribute. Presence of such indexes allows to efficiently select time slices. If original query contains
+predicates like `(trade_date between '01-01-2017' and '01-01-2018')` then VOPS projection substitution mechanism adds
+`(first(trade_date) >= '01-01-2017' and last(trade_date) >= '01-01-2018')` conjuncts which allows Postgres optimizer to use BRIN
+indexes to locate affected pages.
+
+In in addition to BRIN indexes for `order_by` attribute, VOPS also creates BRIN index for grouping (scalar) columns.
+Such index allows to efficiently select groups and perform index join.
+
+Like materialized views, VOPS projections are not updated automatically. It is responsibility of programmer to periodically refresh them.
+Certainly it is possible to define trigger or rule which will automatically insert data in projection table when original table is updated.
+But such approach will be extremely inefficient and slow. To take advantage of vector processing, VOPS has to group data in tiles.
+It can be done only if there is some batch of data which can be grouped by scalar attributes. If you insert records in projection table on-by-one,
+then most of VOPS tiles will contain just one element.
+The most convenient way is to use generated `PNAME_refresh()` function.
+If `order_by` attribute is specified, this function imports from original table only the new data (not present in projection).
+
+The main advantage of VOPS projection mechanism is that it allows to automatically substitute queries on original tables with projections.
+There is `vops.auto_substitute_projections` configuration parameter which allows to switch on such substitution.
+By default it is switched off, because VOPS projects may be not synchronized with original table and query on projection may return different result.
+Right now projections can be automatically substituted only if:
+
+1. Query doesn't contain joins.
+2. Query performs aggregation of vector (tile) columns.
+3. All other expressions in target list, `ORDER BY` / `GROUP BY` clauses refers only to scalar attributes of projection.
+
+Projection can be removed using `drop_projection(projection_name text)` function.
+It not only drops the correspondent table, but also removes information about it from `vops_partitions` table
+and drops generated refresh function.
+
+Example of using projections:
+```
+create extension vops;
+
+create table lineitem(
+   l_orderkey integer,
+   l_partkey integer,
+   l_suppkey integer,
+   l_linenumber integer,
+   l_quantity real,
+   l_extendedprice real,
+   l_discount real,
+   l_tax real,
+   l_returnflag "char",
+   l_linestatus "char",
+   l_shipdate date,
+   l_commitdate date,
+   l_receiptdate date,
+   l_shipinstruct char(25),
+   l_shipmode char(10),
+   l_comment char(44),
+   l_dummy char(1));
+
+select create_projection('vops_lineitem','lineitem',array['l_shipdate','l_quantity','l_extendedprice','l_discount','l_tax'],array['l_returnflag','l_linestatus']);
+
+\timing
+
+copy lineitem from '/mnt/data/lineitem.tbl' delimiter '|' csv;
+
+select vops_lineitem_refresh();
+
+select
+    l_returnflag,
+    l_linestatus,
+    sum(l_quantity) as sum_qty,
+    sum(l_extendedprice) as sum_base_price,
+    sum(l_extendedprice*(1-l_discount)) as sum_disc_price,
+    sum(l_extendedprice*(1-l_discount)*(1+l_tax)) as sum_charge,
+    avg(l_quantity) as avg_qty,
+    avg(l_extendedprice) as avg_price,
+    avg(l_discount) as avg_disc,
+    count(*) as count_order
+from
+    lineitem
+where
+    l_shipdate <= '1998-12-01'
+group by
+    l_returnflag,
+    l_linestatus
+order by
+    l_returnflag,
+    l_linestatus;
+
+set vops.auto_substitute_projections TO  on;
+
+select
+    l_returnflag,
+    l_linestatus,
+    sum(l_quantity) as sum_qty,
+    sum(l_extendedprice) as sum_base_price,
+    sum(l_extendedprice*(1-l_discount)) as sum_disc_price,
+    sum(l_extendedprice*(1-l_discount)*(1+l_tax)) as sum_charge,
+    avg(l_quantity) as avg_qty,
+    avg(l_extendedprice) as avg_price,
+    avg(l_discount) as avg_disc,
+    count(*) as count_order
+from
+    lineitem
+where
+    l_shipdate <= '1998-12-01'
+group by
+    l_returnflag,
+    l_linestatus
+order by
+    l_returnflag,
+    l_linestatus;
+```
+
+
 ## <span id="example">Example</span>
 
 The most popular benchmark for OLAP is [TPC-H](http://www.tpc.org/tpch).

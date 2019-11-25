@@ -805,7 +805,7 @@ But more convenient way is to add 'vops' to <code>session_preload_libraries</cod
   indexes to locate affected pages.
 </p>
 <p>
-  In in addition to BRIN indexes by <code>order_by</code> attribute, VOPS also creates BRIN index for grouping (scalar) columns.
+  In in addition to BRIN indexes for <code>order_by</code> attribute, VOPS also creates BRIN index for grouping (scalar) columns.
   Such index allows to efficiently select groups and perform index join.
 </p>
 <p>
@@ -830,7 +830,7 @@ But more convenient way is to add 'vops' to <code>session_preload_libraries</cod
 </ul>
 <p>
   Projection can be removed using <code>drop_projection(projection_name text)</code> function.
-  It not only drops the correspondent table, but also remove information about it from <code>vops_partitions</code> table
+  It not only drops the correspondent table, but also removes information about it from <code>vops_partitions</code> table
   and drops generated refresh function.
 </p>
 
