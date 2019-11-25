@@ -595,6 +595,53 @@ static bool is_vops_type(Oid typeid)
 		PG_RETURN_POINTER(state);										\
 	}
 
+
+static void
+vops_avg_state_accumulate(vops_avg_state* state, float8 newval)
+{
+	float8		N,
+				Sx,
+				Sxx,
+				tmp;
+
+	N = state->N;
+	Sx = state->Sx;
+	Sxx = state->Sxx;
+
+	/*
+	 * Use the Youngs-Cramer algorithm to incorporate the new value into the
+	 * transition values.
+	 */
+	N += 1.0;
+	Sx += newval;
+	if (state->N > 0.0)
+	{
+		tmp = newval * N - Sx;
+		Sxx += tmp * tmp / (N * state->N);
+
+		/*
+		 * Overflow check.  We only report an overflow error when finite
+		 * inputs lead to infinite results.  Note also that Sxx should be NaN
+		 * if any of the inputs are infinite, so we intentionally prevent Sxx
+		 * from becoming infinite.
+		 */
+		if (isinf(Sx) || isinf(Sxx))
+		{
+			if (!isinf(state->Sx) && !isinf(newval))
+				ereport(ERROR,
+						(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+						 errmsg("value out of range: overflow")));
+
+			Sxx = get_float8_nan();
+		}
+	}
+
+	state->N = N;
+	state->Sx = Sx;
+	state->Sxx = Sxx;
+}
+
+
 #define AVG_AGG(TYPE)													\
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_avg_accumulate);					\
 	Datum vops_##TYPE##_avg_accumulate(PG_FUNCTION_ARGS)				\
@@ -611,8 +658,7 @@ static bool is_vops_type(Oid typeid)
 						elog(ERROR, "aggregate function called in non-aggregate context"); \
 					state = (vops_avg_state*)MemoryContextAllocZero(agg_context, sizeof(vops_avg_state)); \
 				}														\
-				state->count += 1;										\
-				state->sum += opd->payload[i];							\
+				vops_avg_state_accumulate(state, opd->payload[i]);		\
 			}															\
 		}																\
 		if (state == NULL) {											\
@@ -1208,7 +1254,75 @@ PG_FUNCTION_INFO_V1(vops_avg_final);
 Datum vops_avg_final(PG_FUNCTION_ARGS)
 {
 	vops_avg_state* state = (vops_avg_state*)PG_GETARG_POINTER(0);
-	PG_RETURN_FLOAT8(state->sum / state->count);
+	if (state->N == 0.0)
+		PG_RETURN_NULL();
+	PG_RETURN_FLOAT8(state->Sx / state->N);
+}
+
+static void
+vops_agg_state_combine(vops_avg_state* state1, vops_avg_state* state2)
+{
+	float8		N1,
+				Sx1,
+				Sxx1,
+				N2,
+				Sx2,
+				Sxx2,
+				tmp,
+				N,
+				Sx,
+				Sxx;
+
+	N1 = state1->N;
+	Sx1 = state1->Sx;
+	Sxx1 = state1->Sxx;
+
+	N2 = state2->N;
+	Sx2 = state2->Sx;
+	Sxx2 = state2->Sxx;
+
+	/*--------------------
+	 * The transition values combine using a generalization of the
+	 * Youngs-Cramer algorithm as follows:
+	 *
+	 *	N = N1 + N2
+	 *	Sx = Sx1 + Sx2
+	 *	Sxx = Sxx1 + Sxx2 + N1 * N2 * (Sx1/N1 - Sx2/N2)^2 / N;
+	 *
+	 * It's worth handling the special cases N1 = 0 and N2 = 0 separately
+	 * since those cases are trivial, and we then don't need to worry about
+	 * division-by-zero errors in the general case.
+	 *--------------------
+	 */
+	if (N1 == 0.0)
+	{
+		N = N2;
+		Sx = Sx2;
+		Sxx = Sxx2;
+	}
+	else if (N2 == 0.0)
+	{
+		N = N1;
+		Sx = Sx1;
+		Sxx = Sxx1;
+	}
+	else
+	{
+		N = N1 + N2;
+		Sx = float8_pl(Sx1, Sx2);
+		tmp = Sx1 / N1 - Sx2 / N2;
+		Sxx = Sxx1 + Sxx2 + N1 * N2 * tmp * tmp / N;
+		check_float8_val(Sxx, isinf(Sxx1) || isinf(Sxx2), true);
+	}
+
+	/*
+	 * If we're invoked as an aggregate, we can cheat and modify our first
+	 * parameter in-place to reduce palloc overhead. Otherwise we construct a
+	 * new array with the updated transition data and return it.
+	 */
+	state1->N = N;
+	state1->Sx = Sx;
+	state1->Sxx = Sxx;
 }
 
 PG_FUNCTION_INFO_V1(vops_avg_combine);
@@ -1227,8 +1341,7 @@ Datum vops_avg_combine(PG_FUNCTION_ARGS)
 			*state0 = *state1;
 		}
 	} else if (state1 != NULL) {
-		state0->sum += state1->sum;
-		state0->count += state1->count;
+		vops_agg_state_combine(state0, state1);
 	}
 	PG_RETURN_POINTER(state0);
 }
@@ -1240,8 +1353,9 @@ Datum vops_avg_serial(PG_FUNCTION_ARGS)
 	StringInfoData buf;
 	bytea* result;
 	pq_begintypsend(&buf);
-	pq_sendint64(&buf, state->count);
-	pq_sendfloat8(&buf, state->sum);
+	pq_sendfloat8(&buf, state->N);
+	pq_sendfloat8(&buf, state->Sx);
+	pq_sendfloat8(&buf, state->Sxx);
 	result = pq_endtypsend(&buf);
 	PG_RETURN_BYTEA_P(result);
 }
@@ -1256,8 +1370,9 @@ Datum vops_avg_deserial(PG_FUNCTION_ARGS)
 	initStringInfo(&buf);
 	appendBinaryStringInfo(&buf, VARDATA(sstate), VARSIZE(sstate) - VARHDRSZ);
 
-	state->count = pq_getmsgint64(&buf);
-	state->sum = pq_getmsgfloat8(&buf);
+	state->N = pq_getmsgfloat8(&buf);
+	state->Sx = pq_getmsgfloat8(&buf);
+	state->Sxx = pq_getmsgfloat8(&buf);
 
 	pq_getmsgend(&buf);
 	pfree(buf.data);

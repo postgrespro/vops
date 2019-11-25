@@ -68,8 +68,9 @@ typedef struct {
 } vops_bool;
 
 typedef struct {
-	uint64 count;
-	double sum;
+	float8 N;
+	float8 Sx;
+	float8 Sxx;
 } vops_avg_state;
 
 typedef struct {

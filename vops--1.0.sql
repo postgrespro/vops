@@ -359,7 +359,7 @@ create function vops_char_avg_accumulate(state internal, val vops_char) returns 
 CREATE AGGREGATE avg(vops_char) (
 	SFUNC = vops_char_avg_accumulate,
 	STYPE = internal,
-	SSPACE = 16,
+	SSPACE = 24,
 	FINALFUNC = vops_avg_final,
 	COMBINEFUNC = vops_avg_combine,
 	SERIALFUNC = vops_avg_serial,
