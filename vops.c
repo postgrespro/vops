@@ -3742,7 +3742,7 @@ vops_update_vars_clusters(vops_pullvar_context *ctx)
 }
 
 /*
- * Check that all variables used together are both either scalar, eithe vector.
+ * Check that all variables used together are both either scalar, either vector.
  */
 static bool
 vops_check_clusters(vops_vars_cluster* clusters, Bitmapset* vectorCols, Bitmapset* scalarCols)
@@ -4146,11 +4146,11 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 				/* Update vector/scalar bitmap sets for this query for this projection */
 				for (j = 0; j < nVectorColumns; j++)
 				{
-					vectorCols = bms_add_member(vectorCols, DatumGetInt32(vectorAttnos[j])*n_rels + relno - 1);
+					vectorCols = bms_add_member(vectorCols, DatumGetInt32(vectorAttnos[j])*n_rels + relno);
 				}
 				for (j = 0; j < nScalarColumns; j++)
 				{
-					scalarCols = bms_add_member(scalarCols, DatumGetInt32(scalarAttnos[j])*n_rels + relno - 1);
+					scalarCols = bms_add_member(scalarCols, DatumGetInt32(scalarAttnos[j])*n_rels + relno);
 				}
 				if (keyName != NULL && select->whereClause)
 				{
@@ -4194,7 +4194,7 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 			/* Add all used attributes to set of scalar columns */
 			while ((bit = bms_next_member(all, bit)) >= 0)
 			{
-				scalarCols = bms_add_member(scalarCols, bit*n_rels + relno - 1);
+				scalarCols = bms_add_member(scalarCols, bit*n_rels + relno);
 			}
 			MemoryContextSwitchTo(spi_memctx);
 		}
