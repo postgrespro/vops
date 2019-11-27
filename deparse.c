@@ -52,6 +52,7 @@
 #include "utils/syscache.h"
 #include "utils/typcache.h"
 
+#include "vops.h"
 
 /*
  * Global context for foreign_expr_walker's search of an expression tree.
