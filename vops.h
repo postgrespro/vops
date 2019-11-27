@@ -158,4 +158,11 @@ typedef struct {
 
 extern vops_type vops_get_type(Oid typid);
 
+#if PG_VERSION_NUM>=130000
+#define heap_open(oid, lock) table_open(oid, lock)
+#define heap_close(oid, lock) table_close(oid, lock)
+#define heap_openrv_extended(rel, lockmode, missing_ok) table_openrv_extended(rel, lockmode, missing_ok)
+#endif
+
+
 #endif
