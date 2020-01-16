@@ -3546,7 +3546,12 @@ vops_expression_tree_mutator(Node *node, void *context)
 		return node;
 	}
 	/* depth first traversal */
-	node = expression_tree_mutator(node, vops_expression_tree_mutator, context);
+	node = expression_tree_mutator(node, vops_expression_tree_mutator, context
+#ifdef 	QTW_DONT_COPY_DEFAULT
+								   ,0
+#endif
+	);
+
 	if (IsA(node, BoolExpr))
 	{
 		BoolExpr* expr = (BoolExpr*)node;
