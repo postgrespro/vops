@@ -1439,6 +1439,239 @@ Datum vops_agg_deserial(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(state);
 }
 
+#define ROTL32(x, r) ((x) << (r)) | ((x) >> (32 - (r)))
+#define HASH_BITS 25
+#define N_HASHES (1 << (32 - HASH_BITS))
+#define MURMUR_SEED 0x5C1DB
+
+static uint32 murmur_hash3_32(const void* key, const int len, const uint32 seed)
+{
+    const uint8* data = (const uint8*)key;
+    const int nblocks = len / 4;
+
+    uint32 h1 = seed;
+
+    uint32 c1 = 0xcc9e2d51;
+    uint32 c2 = 0x1b873593;
+    int i;
+    uint32 k1;
+    const uint8* tail;
+    const uint32* blocks = (const uint32 *)(data + nblocks*4);
+
+    for(i = -nblocks; i; i++)
+    {
+        k1 = blocks[i];
+
+        k1 *= c1;
+        k1 = ROTL32(k1,15);
+        k1 *= c2;
+
+        h1 ^= k1;
+        h1 = ROTL32(h1,13);
+        h1 = h1*5+0xe6546b64;
+    }
+
+    tail = (const uint8*)(data + nblocks*4);
+
+    k1 = 0;
+
+    switch(len & 3)
+    {
+      case 3:
+        k1 ^= tail[2] << 16;
+        /* no break */
+      case 2:
+        k1 ^= tail[1] << 8;
+        /* no break */
+      case 1:
+        k1 ^= tail[0];
+        k1 *= c1;
+        k1 = ROTL32(k1,15);
+        k1 *= c2;
+        h1 ^= k1;
+    }
+
+    h1 ^= len;
+    h1 ^= h1 >> 16;
+    h1 *= 0x85ebca6b;
+    h1 ^= h1 >> 13;
+    h1 *= 0xc2b2ae35;
+    h1 ^= h1 >> 16;
+
+    return h1;
+}
+
+inline static void calculate_zero_bits(uint32 h, uint8* max_zero_bits)
+{
+    int j = h >> HASH_BITS;
+    int zero_bits = 1;
+    while ((h & 1) == 0 && zero_bits <= HASH_BITS)  {
+        h >>= 1;
+        zero_bits += 1;
+    }
+    if (max_zero_bits[j] < zero_bits) {
+        max_zero_bits[j] = zero_bits;
+    }
+}
+
+inline static void calculate_hash_functions(void const* val, int size, uint8* max_zero_bits)
+{
+    uint32 h = murmur_hash3_32(val, size, MURMUR_SEED);
+    calculate_zero_bits(h, max_zero_bits);
+}
+
+inline static void merge_zero_bits(uint8* dst_max_zero_bits, uint8* src_max_zero_bits)
+{
+    int i;
+    for (i = 0; i < N_HASHES; i++) {
+        if (dst_max_zero_bits[i] < src_max_zero_bits[i]) {
+            dst_max_zero_bits[i] = src_max_zero_bits[i];
+        }
+    }
+}
+
+static uint64 approximate_distinct_count(uint8* max_zero_bits)
+{
+    const int m = N_HASHES;
+    const double alpha_m = 0.7213 / (1 + 1.079 / (double)m);
+    const double pow_2_32 = 0xffffffff;
+    double E, c = 0;
+    int i;
+    for (i = 0; i < m; i++)
+    {
+        c += 1 / pow(2., (double)max_zero_bits[i]);
+    }
+    E = alpha_m * m * m / c;
+
+    if (E <= (5 / 2. * m))
+    {
+        double V = 0;
+        for (i = 0; i < m; i++)
+        {
+            if (max_zero_bits[i] == 0) V++;
+        }
+
+        if (V > 0)
+        {
+            E = m * log(m / V);
+        }
+    }
+    else if (E > (1 / 30. * pow_2_32))
+    {
+        E = -pow_2_32 * log(1 - E / pow_2_32);
+    }
+    return (uint64)E;
+}
+
+typedef struct {
+    uint8 max_zero_bits[N_HASHES];
+} vops_approxdc_state;
+
+
+PG_FUNCTION_INFO_V1(vops_approxdc_final);
+Datum vops_approxdc_final(PG_FUNCTION_ARGS)
+{
+	vops_approxdc_state* state = (vops_approxdc_state*)PG_GETARG_POINTER(0);
+	PG_RETURN_INT64(approximate_distinct_count(state->max_zero_bits));
+}
+
+PG_FUNCTION_INFO_V1(vops_approxdc_combine);
+Datum vops_approxdc_combine(PG_FUNCTION_ARGS)
+{
+	vops_approxdc_state* state0 = (vops_approxdc_state*)PG_GETARG_POINTER(0);
+	vops_approxdc_state* state1 = (vops_approxdc_state*)PG_GETARG_POINTER(1);
+	if (state0 == NULL) {
+		if (state1 == NULL) {
+			PG_RETURN_NULL();
+		} else {
+			MemoryContext agg_context;
+			if (!AggCheckCallContext(fcinfo, &agg_context))
+				elog(ERROR, "aggregate function called in non-aggregate context");
+			state0 = (vops_approxdc_state*)MemoryContextAllocZero(agg_context, sizeof(vops_approxdc_state));
+			*state0 = *state1;
+		}
+	} else if (state1 != NULL) {
+		merge_zero_bits(state0->max_zero_bits, state1->max_zero_bits);
+	}
+	PG_RETURN_POINTER(state0);
+}
+
+PG_FUNCTION_INFO_V1(vops_approxdc_serial);
+Datum vops_approxdc_serial(PG_FUNCTION_ARGS)
+{
+	vops_approxdc_state* state = (vops_approxdc_state*)PG_GETARG_POINTER(0);
+	bytea* p = (text*)palloc(VARHDRSZ + N_HASHES);
+	SET_VARSIZE(p, VARHDRSZ + N_HASHES);
+	memcpy(VARDATA(p), state->max_zero_bits, N_HASHES);
+	PG_RETURN_BYTEA_P(p);
+}
+
+PG_FUNCTION_INFO_V1(vops_approxdc_deserial);
+Datum vops_approxdc_deserial(PG_FUNCTION_ARGS)
+{
+	bytea* p = PG_GETARG_BYTEA_P(0);
+	vops_approxdc_state* state = (vops_approxdc_state*)palloc(sizeof(vops_approxdc_state));
+	memcpy(state->max_zero_bits, VARDATA(p), N_HASHES);
+	Assert(VARSIZE(p) - VARHDRSZ == N_HASHES);
+	PG_RETURN_POINTER(state);
+}
+
+#define APPROXDC_AGG(TYPE)												\
+	PG_FUNCTION_INFO_V1(vops_##TYPE##_approxdc_accumulate);				\
+	Datum vops_##TYPE##_approxdc_accumulate(PG_FUNCTION_ARGS)			\
+	{																	\
+	    vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
+		vops_approxdc_state* state = PG_ARGISNULL(0) ? NULL : (vops_approxdc_state*)PG_GETARG_POINTER(0); \
+		uint64 mask = filter_mask & ~opd->hdr.empty_mask & ~opd->hdr.null_mask; \
+		int i;															\
+		for (i = 0; i < TILE_SIZE; i++) {								\
+		    if (mask & ((uint64)1 << i)) {								\
+			    if (state == NULL) {									\
+					MemoryContext agg_context;							\
+					if (!AggCheckCallContext(fcinfo, &agg_context))		\
+						elog(ERROR, "aggregate function called in non-aggregate context"); \
+					state = (vops_approxdc_state*)MemoryContextAllocZero(agg_context, sizeof(vops_approxdc_state)); \
+				}														\
+				calculate_hash_functions(&opd->payload[i], sizeof(opd->payload[i]), state->max_zero_bits); \
+			}															\
+		}																\
+		if (state == NULL) {											\
+			PG_RETURN_NULL();											\
+		} else {														\
+			PG_RETURN_POINTER(state);									\
+		}																\
+	}																    \
+
+
+PG_FUNCTION_INFO_V1(vops_text_approxdc_accumulate);
+Datum vops_text_approxdc_accumulate(PG_FUNCTION_ARGS)
+{
+	struct varlena* var = PG_GETARG_VARLENA_PP(1);
+	vops_tile_hdr* opd = VOPS_TEXT_TILE(var);
+	vops_approxdc_state* state = PG_ARGISNULL(1) ? NULL : (vops_approxdc_state*)PG_GETARG_POINTER(1);
+	uint64 mask = filter_mask & ~opd->empty_mask & ~opd->null_mask;
+	size_t elem_size = VOPS_ELEM_SIZE(var);
+	char* elems = (char*)(opd+1);
+	int i;
+	for (i = 0; i < TILE_SIZE; i++) {
+		if (mask & ((uint64)1 << i)) {
+			if (state == NULL) {
+				MemoryContext agg_context;
+				if (!AggCheckCallContext(fcinfo, &agg_context))
+					elog(ERROR, "aggregate function called in non-aggregate context");
+				state = (vops_approxdc_state*)MemoryContextAllocZero(agg_context, sizeof(vops_approxdc_state));
+			}
+			calculate_hash_functions(elems + i*elem_size, elem_size, state->max_zero_bits);
+		}
+	}
+	if (state == NULL) {
+		PG_RETURN_NULL();
+	} else {
+		PG_RETURN_POINTER(state);
+	}
+}
+
+
 #define REGISTER_BIN_OP(TYPE,OP,COP,XTYPE,GXTYPE)			\
 	BIN_OP(TYPE,OP,COP)										\
 	BIN_LCONST_OP(TYPE,XTYPE,GXTYPE,OP,COP)					\
@@ -1470,6 +1703,7 @@ Datum vops_agg_deserial(PG_FUNCTION_ARGS)
 	AVG_WIN(TYPE)											\
 	LAG_WIN(TYPE,CTYPE)										\
 	AVG_AGG(TYPE)											\
+	APPROXDC_AGG(TYPE)										\
 	VAR_AGG(TYPE)											\
 	WAVG_AGG(TYPE)											\
 	MINMAX_AGG(TYPE,CTYPE,GCTYPE,min,<)						\

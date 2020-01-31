@@ -204,6 +204,23 @@ CREATE AGGREGATE last(vops_text,vops_timestamp) (
 	PARALLEL = SAFE
 );
 
+create function vops_approxdc_final(state internal) returns int8 as 'MODULE_PATHNAME' language C parallel safe strict;
+create function vops_approxdc_combine(internal,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_approxdc_serial(internal) returns bytea as 'MODULE_PATHNAME' language C parallel safe strict;
+create function vops_approxdc_deserial(bytea,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe strict;
+
+create function vops_text_approxdc_accumulate(state internal, val vops_text) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE approxdc(vops_text) (
+	SFUNC = vops_text_approxdc_accumulate,
+	STYPE = internal,
+	SSPACE = 128,
+	FINALFUNC = vops_approxdc_final,
+	COMBINEFUNC = vops_approxdc_combine,
+	SERIALFUNC = vops_approxdc_serial,
+	DESERIALFUNC = vops_approxdc_deserial,
+	PARALLEL = SAFE
+);
+
 create function first(tile vops_text) returns text as 'MODULE_PATHNAME','vops_text_first' language C parallel safe immutable strict;
 create function last(tile vops_text) returns text as 'MODULE_PATHNAME','vops_text_last' language C parallel safe immutable strict;
 create function low(tile vops_text) returns text as 'MODULE_PATHNAME','vops_text_low' language C parallel safe immutable strict;
@@ -562,6 +579,18 @@ CREATE AGGREGATE last(vops_char,vops_timestamp) (
 	PARALLEL = SAFE
 );
 
+create function vops_char_approxdc_accumulate(state internal, val vops_char) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE approxdc(vops_char) (
+	SFUNC = vops_char_approxdc_accumulate,
+	STYPE = internal,
+	SSPACE = 128,
+	FINALFUNC = vops_approxdc_final,
+	COMBINEFUNC = vops_approxdc_combine,
+	SERIALFUNC = vops_approxdc_serial,
+	DESERIALFUNC = vops_approxdc_deserial,
+	PARALLEL = SAFE
+);
+
 create function first(tile vops_char) returns "char" as 'MODULE_PATHNAME','vops_char_first' language C parallel safe immutable strict;
 create function last(tile vops_char) returns "char" as 'MODULE_PATHNAME','vops_char_last' language C parallel safe immutable strict;
 create function low(tile vops_char) returns "char" as 'MODULE_PATHNAME','vops_char_low' language C parallel safe immutable strict;
@@ -899,6 +928,18 @@ CREATE AGGREGATE last(vops_int2,vops_timestamp) (
 	SSPACE = 24,
 	FINALFUNC = vops_int2_first_final,
  	COMBINEFUNC = vops_last_combine,
+	PARALLEL = SAFE
+);
+
+create function vops_int2_approxdc_accumulate(state internal, val vops_int2) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE approxdc(vops_int2) (
+	SFUNC = vops_int2_approxdc_accumulate,
+	STYPE = internal,
+	SSPACE = 128,
+	FINALFUNC = vops_approxdc_final,
+	COMBINEFUNC = vops_approxdc_combine,
+	SERIALFUNC = vops_approxdc_serial,
+	DESERIALFUNC = vops_approxdc_deserial,
 	PARALLEL = SAFE
 );
 
@@ -1242,6 +1283,18 @@ CREATE AGGREGATE last(vops_int4,vops_timestamp) (
 	PARALLEL = SAFE
 );
 
+create function vops_int4_approxdc_accumulate(state internal, val vops_int4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE approxdc(vops_int4) (
+	SFUNC = vops_int4_approxdc_accumulate,
+	STYPE = internal,
+	SSPACE = 128,
+	FINALFUNC = vops_approxdc_final,
+	COMBINEFUNC = vops_approxdc_combine,
+	SERIALFUNC = vops_approxdc_serial,
+	DESERIALFUNC = vops_approxdc_deserial,
+	PARALLEL = SAFE
+);
+
 create function first(tile vops_int4) returns int4 as 'MODULE_PATHNAME','vops_int4_first' language C parallel safe immutable strict;
 create function last(tile vops_int4) returns int4 as 'MODULE_PATHNAME','vops_int4_last' language C parallel safe immutable strict;
 create function low(tile vops_int4) returns int4 as 'MODULE_PATHNAME','vops_int4_low' language C parallel safe immutable strict;
@@ -1579,6 +1632,19 @@ CREATE AGGREGATE last(vops_date,vops_timestamp) (
 	PARALLEL = SAFE
 );
 
+create function vops_date_approxdc_accumulate(state internal, val vops_date) returns internal as 'MODULE_PATHNAME','vops_int4_approxdc_accumulate' language C parallel safe;
+CREATE AGGREGATE approxdc(vops_date) (
+	SFUNC = vops_date_approxdc_accumulate,
+	STYPE = internal,
+	SSPACE = 128,
+	FINALFUNC = vops_approxdc_final,
+	COMBINEFUNC = vops_approxdc_combine,
+	SERIALFUNC = vops_approxdc_serial,
+	DESERIALFUNC = vops_approxdc_deserial,
+	PARALLEL = SAFE
+);
+
+
 create function first(tile vops_date) returns date as 'MODULE_PATHNAME','vops_int4_first' language C parallel safe immutable strict;
 create function last(tile vops_date) returns date as 'MODULE_PATHNAME','vops_int4_last' language C parallel safe immutable strict;
 create function low(tile vops_date) returns date as 'MODULE_PATHNAME','vops_int4_low' language C parallel safe immutable strict;
@@ -1900,6 +1966,18 @@ CREATE AGGREGATE mcount(vops_timestamp) (
 	msfunc = vops_timestamp_count_extend,
 	minvfunc = vops_timestamp_count_reduce,
 	minitcond = '0', 
+	PARALLEL = SAFE
+);
+
+create function vops_timestamp_approxdc_accumulate(state internal, val vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int8_approxdc_accumulate' language C parallel safe;
+CREATE AGGREGATE approxdc(vops_timestamp) (
+	SFUNC = vops_timestamp_approxdc_accumulate,
+	STYPE = internal,
+	SSPACE = 128,
+	FINALFUNC = vops_approxdc_final,
+	COMBINEFUNC = vops_approxdc_combine,
+	SERIALFUNC = vops_approxdc_serial,
+	DESERIALFUNC = vops_approxdc_deserial,
 	PARALLEL = SAFE
 );
 
@@ -2252,6 +2330,18 @@ CREATE AGGREGATE last(vops_interval,vops_timestamp) (
 	PARALLEL = SAFE
 );
 
+create function vops_interval_approxdc_accumulate(state internal, val vops_interval) returns internal as 'MODULE_PATHNAME','vops_int8_approxdc_accumulate' language C parallel safe;
+CREATE AGGREGATE approxdc(vops_interval) (
+	SFUNC = vops_interval_approxdc_accumulate,
+	STYPE = internal,
+	SSPACE = 128,
+	FINALFUNC = vops_approxdc_final,
+	COMBINEFUNC = vops_approxdc_combine,
+	SERIALFUNC = vops_approxdc_serial,
+	DESERIALFUNC = vops_approxdc_deserial,
+	PARALLEL = SAFE
+);
+
 create function first(tile vops_interval) returns deltatime as 'MODULE_PATHNAME','vops_int8_first' language C parallel safe immutable strict;
 create function last(tile vops_interval) returns deltatime as 'MODULE_PATHNAME','vops_int8_last' language C parallel safe immutable strict;
 create function low(tile vops_interval) returns deltatime as 'MODULE_PATHNAME','vops_int8_low' language C parallel safe immutable strict;
@@ -2593,6 +2683,18 @@ CREATE AGGREGATE last(vops_int8,vops_timestamp) (
 	PARALLEL = SAFE
 );
 
+create function vops_int8_approxdc_accumulate(state internal, val vops_int8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE approxdc(vops_int8) (
+	SFUNC = vops_int8_approxdc_accumulate,
+	STYPE = internal,
+	SSPACE = 128,
+	FINALFUNC = vops_approxdc_final,
+	COMBINEFUNC = vops_approxdc_combine,
+	SERIALFUNC = vops_approxdc_serial,
+	DESERIALFUNC = vops_approxdc_deserial,
+	PARALLEL = SAFE
+);
+
 create function first(tile vops_int8) returns int8 as 'MODULE_PATHNAME','vops_int8_first' language C parallel safe immutable strict;
 create function last(tile vops_int8) returns int8 as 'MODULE_PATHNAME','vops_int8_last' language C parallel safe immutable strict;
 create function low(tile vops_int8) returns int8 as 'MODULE_PATHNAME','vops_int8_low' language C parallel safe immutable strict;
@@ -2913,6 +3015,18 @@ CREATE AGGREGATE last(vops_float4,vops_timestamp) (
 	SSPACE = 24,
 	FINALFUNC = vops_float4_first_final,
  	COMBINEFUNC = vops_last_combine,
+	PARALLEL = SAFE
+);
+
+create function vops_float4_approxdc_accumulate(state internal, val vops_float4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE approxdc(vops_float4) (
+	SFUNC = vops_float4_approxdc_accumulate,
+	STYPE = internal,
+	SSPACE = 128,
+	FINALFUNC = vops_approxdc_final,
+	COMBINEFUNC = vops_approxdc_combine,
+	SERIALFUNC = vops_approxdc_serial,
+	DESERIALFUNC = vops_approxdc_deserial,
 	PARALLEL = SAFE
 );
 
@@ -3238,6 +3352,18 @@ CREATE AGGREGATE last(vops_float8,vops_timestamp) (
 	SSPACE = 24,
 	FINALFUNC = vops_float8_first_final,
  	COMBINEFUNC = vops_last_combine,
+	PARALLEL = SAFE
+);
+
+create function vops_float8_approxdc_accumulate(state internal, val vops_float8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+CREATE AGGREGATE approxdc(vops_float8) (
+	SFUNC = vops_float8_approxdc_accumulate,
+	STYPE = internal,
+	SSPACE = 128,
+	FINALFUNC = vops_approxdc_final,
+	COMBINEFUNC = vops_approxdc_combine,
+	SERIALFUNC = vops_approxdc_serial,
+	DESERIALFUNC = vops_approxdc_deserial,
 	PARALLEL = SAFE
 );
 

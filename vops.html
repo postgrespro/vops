@@ -266,7 +266,7 @@ Them can be used for grouping by several columns (see below).
 <p>
 OLAP queries usually perform some kind of aggregation of large volumes of data. These includes <code>grand</code> aggregates which are calculated for the whole
 table or aggregates with <code>group by</code> which are calculated for each group.
-VOPS implements all standard SQL aggregates: <code>count, min, max, sum, avg, var_pop, var_sampl, variance, stddev_pop, stddev_samp, stddev</code>. Them can be used exactly in the same way as in normal SQL queries:
+VOPS implements all standard SQL aggregates: <code>count, min, max, sum, avg, var_pop, var_sampl, variance, stddev_pop, stddev_samp, stddev</code>. Also it provides <code>approaxdc</code> for approximation of distinct count. Them can be used exactly in the same way as in normal SQL queries:
 </p>
 <pre>
 select sum(l_extendedprice*l_discount) as revenue
