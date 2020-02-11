@@ -125,7 +125,7 @@ create type vops_text (
 );
 
 create type deltatime (input=vops_deltatime_input, output=vops_deltatime_output, like=int8);
-create cast (interval as deltatime) with function vops_time_interval(interval) AS IMPLICIT;
+create cast (interval as deltatime) with function vops_time_interval(interval) as implicit;
 
 -- text tile
 
@@ -229,7 +229,7 @@ create function high(tile vops_text) returns text as 'MODULE_PATHNAME','vops_tex
 -- char tile
 
 create function vops_char_const(opd "char") returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create cast ("char" as vops_char) with function vops_char_const("char") AS IMPLICIT;
+create cast ("char" as vops_char) with function vops_char_const("char");
 
 create function vops_char_concat(left vops_char, right vops_char) returns vops_int2 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator || (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_concat);
@@ -599,7 +599,7 @@ create function high(tile vops_char) returns "char" as 'MODULE_PATHNAME','vops_c
 -- int2 tile
 
 create function vops_int2_const(opd int4) returns vops_int2 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create cast (int4 as vops_int2) with function vops_int2_const(int4) AS IMPLICIT;
+create cast (int4 as vops_int2) with function vops_int2_const(int4);
 
 create function vops_int2_concat(left vops_int2, right vops_int2) returns vops_int4 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator || (leftarg=vops_int2, rightarg=vops_int2, procedure=vops_int2_concat);
@@ -951,7 +951,7 @@ create function high(tile vops_int2) returns int2 as 'MODULE_PATHNAME','vops_int
 -- int4 tile
 
 create function vops_int4_const(opd int4) returns vops_int4 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create cast (int4 as vops_int4) with function vops_int4_const(int4) AS IMPLICIT;
+create cast (int4 as vops_int4) with function vops_int4_const(int4);
 
 create function vops_int4_concat(left vops_int4, right vops_int4) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator || (leftarg=vops_int4, rightarg=vops_int4, procedure=vops_int4_concat);
@@ -1305,7 +1305,7 @@ create function high(tile vops_int4) returns int4 as 'MODULE_PATHNAME','vops_int
 create function date_bucket(interval, vops_date) returns vops_date  as 'MODULE_PATHNAME','vops_date_bucket' language C parallel safe immutable strict;
 
 create function vops_date_const(opd date) returns vops_date as 'MODULE_PATHNAME','vops_int4_const' language C parallel safe immutable strict;
-create cast (date as vops_date) with function vops_date_const(date) AS IMPLICIT;
+create cast (date as vops_date) with function vops_date_const(date);
 
 create function vops_date_group_by(state internal, group_by vops_date, aggregates cstring, variadic anyarray) returns internal as 'MODULE_PATHNAME','vops_int4_group_by' language C parallel safe immutable;
 create aggregate map(group_by vops_date, aggregates cstring, variadic anyarray) (
@@ -1655,7 +1655,7 @@ create function high(tile vops_date) returns date as 'MODULE_PATHNAME','vops_int
 create function time_bucket(interval, vops_timestamp) returns vops_timestamp  as 'MODULE_PATHNAME','vops_time_bucket' language C parallel safe immutable strict;
 
 create function vops_timestamp_const(opd timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_const' language C parallel safe immutable strict;
-create cast (timestamp as vops_timestamp) with function vops_timestamp_const(timestamp) AS IMPLICIT;
+create cast (timestamp as vops_timestamp) with function vops_timestamp_const(timestamp);
 
 create function vops_timestamp_group_by(state internal, group_by vops_timestamp, aggregates cstring, variadic anyarray) returns internal as 'MODULE_PATHNAME','vops_int8_group_by' language C immutable;
 create aggregate map(group_by vops_timestamp, aggregates cstring, variadic anyarray) (
@@ -1989,7 +1989,7 @@ create function high(tile vops_timestamp) returns timestamp as 'MODULE_PATHNAME'
 -- deltatime tile
 
 create function vops_interval_const(opd deltatime) returns vops_interval as 'MODULE_PATHNAME','vops_int8_const' language C parallel safe immutable strict;
-create cast (deltatime as vops_interval) with function vops_interval_const(deltatime) AS IMPLICIT;
+create cast (deltatime as vops_interval) with function vops_interval_const(deltatime);
 
 create function vops_interval_group_by(state internal, group_by vops_interval, aggregates cstring, variadic anyarray) returns internal as 'MODULE_PATHNAME','vops_int8_group_by' language C immutable;
 create aggregate map(group_by vops_interval, aggregates cstring, variadic anyarray) (
@@ -2350,7 +2350,7 @@ create function high(tile vops_interval) returns deltatime as 'MODULE_PATHNAME',
 -- int8 tile
 
 create function vops_int8_const(opd int8) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create cast (int8 as vops_int8) with function vops_int8_const(int8) AS IMPLICIT;
+create cast (int8 as vops_int8) with function vops_int8_const(int8);
 
 create function vops_int8_group_by(state internal, group_by vops_int8, aggregates cstring, variadic anyarray) returns internal as 'MODULE_PATHNAME' language C parallel safe immutable;
 create aggregate map(group_by vops_int8, aggregates cstring, variadic anyarray) (
@@ -2703,7 +2703,7 @@ create function high(tile vops_int8) returns int8 as 'MODULE_PATHNAME','vops_int
 -- float4 tile
 
 create function vops_float4_const(opd float8) returns vops_float4 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create cast (float8 as vops_float4) with function vops_float4_const(float8) AS IMPLICIT;
+create cast (float8 as vops_float4) with function vops_float4_const(float8);
 
 create function vops_float4_sub(left vops_float4, right vops_float4) returns vops_float4 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_float4_sub_rconst(left vops_float4, right float8) returns vops_float4 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
@@ -3039,7 +3039,7 @@ create function high(tile vops_float4) returns float4 as 'MODULE_PATHNAME','vops
 -- float8 tile
 
 create function vops_float8_const(opd float8) returns vops_float8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
-create cast (float8 as vops_float8) with function vops_float8_const(float8) AS IMPLICIT;
+create cast (float8 as vops_float8) with function vops_float8_const(float8);
 
 create function vops_float8_sub(left vops_float8, right vops_float8) returns vops_float8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_float8_sub_rconst(left vops_float8, right float8) returns vops_float8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
@@ -3384,8 +3384,16 @@ create function vops_bool_and(left vops_bool, right vops_bool) returns vops_bool
 create operator & (leftarg=vops_bool, rightarg=vops_bool, procedure=vops_bool_and, commutator= &);
 
 
-create function vops_count_accumulate(state int8) returns int8 as 'MODULE_PATHNAME' language C parallel safe strict;
+create function vops_count_all_accumulate(state int8) returns int8 as 'MODULE_PATHNAME' language C parallel safe strict;
 CREATE AGGREGATE countall(*) (
+	SFUNC = vops_count_all_accumulate,
+	STYPE = int8,
+	COMBINEFUNC = int8pl,
+	INITCOND = '0', 
+	PARALLEL = SAFE
+);
+create function vops_count_accumulate(state int8, val anyelement) returns int8 as 'MODULE_PATHNAME' language C parallel safe strict;
+CREATE AGGREGATE vcount(anyelement) (
 	SFUNC = vops_count_accumulate,
 	STYPE = int8,
 	COMBINEFUNC = int8pl,

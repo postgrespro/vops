@@ -968,6 +968,21 @@ LAST_AGG(bool,BOOL,BOOL_PAYLOAD)
 FIRST_FUNC(bool,Bool,first,<,BOOL_PAYLOAD)
 FIRST_FUNC(bool,Bool,last,>,BOOL_PAYLOAD)
 
+PG_FUNCTION_INFO_V1(vops_count_accumulate);
+Datum vops_count_accumulate(PG_FUNCTION_ARGS)
+{
+	vops_tile_hdr* opd = (vops_tile_hdr*)PG_GETARG_POINTER(1);
+	int64 count = PG_GETARG_INT64(0);
+	uint64 mask = filter_mask & ~opd->empty_mask;
+	int i;
+	for (i = 0; i < TILE_SIZE; i++) {
+		if (mask & ((uint64)1 << i)) {
+			count += 1;
+		}
+	}
+	PG_RETURN_INT64(count);
+}
+
 PG_FUNCTION_INFO_V1(vops_count_any_accumulate);
 Datum vops_count_any_accumulate(PG_FUNCTION_ARGS)
 {
@@ -1019,8 +1034,8 @@ Datum vops_count_extend(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(state);
 }
 
-PG_FUNCTION_INFO_V1(vops_count_accumulate);
-Datum vops_count_accumulate(PG_FUNCTION_ARGS)
+PG_FUNCTION_INFO_V1(vops_count_all_accumulate);
+Datum vops_count_all_accumulate(PG_FUNCTION_ARGS)
 {
 	int64 count = PG_GETARG_INT64(0);
 	int i;
@@ -3747,7 +3762,7 @@ static Oid filter_oid;
 static Oid vops_and_oid;
 static Oid vops_or_oid;
 static Oid vops_not_oid;
-static Oid countall_oid;
+static Oid vcount_oid;
 static Oid count_oid;
 static Oid is_null_oid;
 static Oid is_not_null_oid;
@@ -3755,28 +3770,63 @@ static Oid coalesce_oids[VOPS_LAST];
 
 typedef struct
 {
-	Aggref* countall;
-	bool    has_vector_ops;
-} vops_mutator_context;
+	int varno;
+	int varattno;
+	int vartype;
+} vops_var;
+
+static bool
+is_select_from_vops_projection(Query* query, vops_var* var)
+{
+	int relno;
+	int n_rels = list_length(query->rtable);
+	for (relno = 1; relno <= n_rels; relno++)
+	{
+		RangeTblEntry* rte = list_nth_node(RangeTblEntry, query->rtable, relno-1);
+		if (rte->rtekind == RTE_RELATION)
+		{
+			Relation rel = table_open(rte->relid, NoLock); /* Assume we already have adequate lock */
+			int attno;
+			for (attno = 1; attno <= rel->rd_att->natts; attno++)
+			{
+				Oid typid = TupleDescAttr(rel->rd_att, attno-1)->atttypid;
+				if (is_vops_type(typid))
+				{
+					table_close(rel, NoLock);
+					var->varno = relno;
+					var->varattno = attno;
+					var->vartype = typid;
+					return true;
+				}
+			}
+			table_close(rel, NoLock);
+		}
+	}
+	return false;
+}
+
+
 
 static Node*
 vops_expression_tree_mutator(Node *node, void *context)
 {
-	vops_mutator_context* ctx = (vops_mutator_context*)context;
+	vops_var* var = (vops_var*)context;
 	if (node == NULL)
 	{
 		return NULL;
 	}
 	if (IsA(node, Query))
 	{
-		vops_mutator_context save_ctx = *ctx;
-		ctx->countall = NULL;
-		ctx->has_vector_ops = false;
-		node = (Node *) query_tree_mutator((Query *) node,
-										   vops_expression_tree_mutator,
-										   context,
-										   QTW_DONT_COPY_QUERY);
-		*(vops_mutator_context*)context = save_ctx; /* restore query context */
+		vops_var save_var = *var;
+		Query* query = (Query*)node;
+		if (is_select_from_vops_projection(query, var))
+		{
+			node = (Node *) query_tree_mutator(query,
+											   vops_expression_tree_mutator,
+											   context,
+											   QTW_DONT_COPY_QUERY);
+			*var = save_var; /* restore query context */
+		}
 		return node;
 	}
 	/* depth first traversal */
@@ -3851,11 +3901,6 @@ vops_expression_tree_mutator(Node *node, void *context)
 		NullTest* test = (NullTest*)node;
 		if (!test->argisrow && is_vops_type(exprType((Node*)test->arg)))
 		{
-			ctx->has_vector_ops = true;
-			if (ctx->countall) {
-				ctx->countall->aggfnoid = countall_oid;
-				ctx->countall = NULL;
-			}
 			return (Node*)makeFuncExpr(filter_oid, BOOLOID,
 									   list_make1(makeFuncExpr(test->nulltesttype == IS_NULL
 															   ? is_null_oid
@@ -3867,35 +3912,15 @@ vops_expression_tree_mutator(Node *node, void *context)
 									   InvalidOid, InvalidOid, COERCE_EXPLICIT_CALL);
 		}
 	}
-	else if (IsA(node, FuncExpr) && !ctx->has_vector_ops && ((FuncExpr*)node)->funcid == filter_oid)
-	{
-		ctx->has_vector_ops = true;
-		if (ctx->countall) {
-			ctx->countall->aggfnoid = countall_oid;
-			ctx->countall = NULL;
-		}
-	}
 	else if (IsA(node, Aggref))
 	{
 		Aggref* agg = (Aggref*)node;
 		if (agg->aggfnoid == count_oid) {
 			Assert(agg->aggstar);
-			if (ctx->has_vector_ops) {
-				agg->aggfnoid = countall_oid;
-				ctx->countall = NULL;
-			} else {
-				ctx->countall = agg;
-			}
-		} else if (!agg->aggstar && !ctx->has_vector_ops) {
-			Assert(list_length(agg->aggargtypes) >= 1);
-			if (is_vops_type(linitial_oid(agg->aggargtypes)))
-			{
-				ctx->has_vector_ops = true;
-				if (ctx->countall) {
-					ctx->countall->aggfnoid = countall_oid;
-					ctx->countall = NULL;
-				}
-			}
+			agg->aggfnoid = vcount_oid;
+			agg->aggstar = false;
+			agg->aggargtypes = list_make1_oid(var->vartype);
+			agg->args = list_make1(makeTargetEntry((Expr*)makeVar(var->varno, var->varattno, var->vartype, -1, 0, 0), 1, NULL, false));
 		}
 	}
 	else if (IsA(node, CoalesceExpr))
@@ -4490,7 +4515,7 @@ vops_resolve_functions(void)
 			vops_or_oid = LookupFuncName(list_make1(makeString("vops_bool_or")), 2, profile, false);
 			vops_not_oid = LookupFuncName(list_make1(makeString("vops_bool_not")), 1, profile, false);
 			count_oid = LookupFuncName(list_make1(makeString("count")), 0, profile, false);
-			countall_oid = LookupFuncName(list_make1(makeString("countall")), 0, profile, false);
+			vcount_oid = LookupFuncName(list_make1(makeString("vcount")), 1, &any, false);
 			is_null_oid = LookupFuncName(list_make1(makeString("is_null")), 1, &any, false);
 
 			for (i = VOPS_CHAR; i < VOPS_LAST; i++) {
@@ -4503,13 +4528,14 @@ vops_resolve_functions(void)
 
 static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
 {
-	vops_mutator_context ctx = {NULL,false};
+	vops_var var;
 	/* Invoke original hook if needed */
 	if (post_parse_analyze_hook_next)
 	{
 		post_parse_analyze_hook_next(pstate, query);
 	}
 	vops_resolve_functions();
+
 	filter_mask = ~0;
 	if (query->commandType == CMD_SELECT &&
 		vops_auto_substitute_projections &&
@@ -4517,7 +4543,10 @@ static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
 	{
 		vops_substitute_tables_with_projections(pstate->p_sourcetext, query);
 	}
-	(void)query_tree_mutator(query, vops_expression_tree_mutator, &ctx, QTW_DONT_COPY_QUERY);
+	if (is_select_from_vops_projection(query, &var))
+	{
+		(void)query_tree_mutator(query, vops_expression_tree_mutator, &var, QTW_DONT_COPY_QUERY);
+	}
 }
 
 #if PG_VERSION_NUM>=110000
@@ -4547,13 +4576,13 @@ static void vops_explain_hook(Query *query,
 {
 	int cursorOptions = 0;
 #endif
+	vops_var var;
 	PlannedStmt *plan;
-	vops_mutator_context ctx = {NULL,false};
 	instr_time	planstart, planduration;
 
-	vops_resolve_functions();
-
 	INSTR_TIME_SET_CURRENT(planstart);
+
+	vops_resolve_functions();
 
 	if (query->commandType == CMD_SELECT &&
 		vops_auto_substitute_projections &&
@@ -4570,8 +4599,10 @@ static void vops_explain_hook(Query *query,
 		memset(explain, ' ', prefix);  /* clear "explain" prefix: we need to preseve node locations */
 		vops_substitute_tables_with_projections(explain, query);
 	}
-	(void)query_tree_mutator(query, vops_expression_tree_mutator, &ctx, QTW_DONT_COPY_QUERY);
-
+	if (is_select_from_vops_projection(query, &var))
+	{
+		(void)query_tree_mutator(query, vops_expression_tree_mutator, &var, QTW_DONT_COPY_QUERY);
+	}
 	plan = pg_plan_query(query, cursorOptions, params);
 
 	INSTR_TIME_SET_CURRENT(planduration);
