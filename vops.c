@@ -3785,7 +3785,7 @@ is_select_from_vops_projection(Query* query, vops_var* var)
 		RangeTblEntry* rte = list_nth_node(RangeTblEntry, query->rtable, relno-1);
 		if (rte->rtekind == RTE_RELATION)
 		{
-			Relation rel = table_open(rte->relid, NoLock); /* Assume we already have adequate lock */
+			Relation rel = heap_open(rte->relid, NoLock); /* Assume we already have adequate lock */
 			int attno;
 			for (attno = 1; attno <= rel->rd_att->natts; attno++)
 			{
@@ -3799,7 +3799,7 @@ is_select_from_vops_projection(Query* query, vops_var* var)
 					return true;
 				}
 			}
-			table_close(rel, NoLock);
+			heap_close(rel, NoLock);
 		}
 	}
 	return false;
@@ -4143,12 +4143,12 @@ vops_add_index_cond(Node* clause, List* conjuncts, char const* keyName)
 		{
 			ColumnRef* col = (ColumnRef*)expr->lexpr;
 			if (list_length(col->fields) == 1
-				&& strcmp(strVal(linitial_node(Value, col->fields)), keyName) == 0)
+				&& strcmp(strVal(linitial(col->fields)), keyName) == 0)
 			{
-				char* op = strVal(linitial_node(Value,expr->name));
+				char* op = strVal(linitial(expr->name));
 				if (*op == '<' || *op == '>') {
 					A_Expr* bound = makeNode(A_Expr);
-					FuncCall* call = makeFuncCall(list_make1(makeString(*op == '<' ? "last" : "first")),
+					FuncCall* call = makeFuncCall(list_make1(makeString(*op == '<' ? "first" : "last")),
 												  list_make1(expr->lexpr), -1);
 					bound->kind = expr->kind;
 					bound->name = expr->name;
@@ -4156,9 +4156,29 @@ vops_add_index_cond(Node* clause, List* conjuncts, char const* keyName)
 					bound->rexpr = expr->rexpr;
 					bound->location = -1;
 					conjuncts = lappend(conjuncts, bound);
+				} else if (expr->kind == AEXPR_BETWEEN) {
+					A_Expr* bound = makeNode(A_Expr);
+					FuncCall* call = makeFuncCall(list_make1(makeString("last")),
+												  list_make1(expr->lexpr), -1);
+					bound->kind = AEXPR_OP;
+					bound->name = list_make1(makeString(">="));
+					bound->lexpr = (Node*)call;
+					bound->rexpr = linitial((List*)expr->rexpr);
+					bound->location = -1;
+					conjuncts = lappend(conjuncts, bound);
+
+					bound = makeNode(A_Expr);
+					call = makeFuncCall(list_make1(makeString("first")),
+										list_make1(expr->lexpr), -1);
+					bound->kind = AEXPR_OP;
+					bound->name = list_make1(makeString("<="));
+					bound->lexpr = (Node*)call;
+					bound->rexpr = lsecond((List*)expr->rexpr);
+					bound->location = -1;
+					conjuncts = lappend(conjuncts, bound);
 				} else if (*op == '=') {
 					A_Expr* bound = makeNode(A_Expr);
-					FuncCall* call = makeFuncCall(list_make1(makeString("first")),
+					FuncCall* call = makeFuncCall(list_make1(makeString("last")),
 												  list_make1(expr->lexpr), -1);
 					bound->kind = expr->kind;
 					bound->name = list_make1(makeString(">="));
@@ -4168,7 +4188,7 @@ vops_add_index_cond(Node* clause, List* conjuncts, char const* keyName)
 					conjuncts = lappend(conjuncts, bound);
 
 					bound = makeNode(A_Expr);
-					call = makeFuncCall(list_make1(makeString("last")),
+					call = makeFuncCall(list_make1(makeString("first")),
 										list_make1(expr->lexpr), -1);
 					bound->kind = expr->kind;
 					bound->name = list_make1(makeString("<="));
@@ -4202,6 +4222,14 @@ vops_add_literal_type_casts(Node* node, Const** consts)
 		{
 			Node* conjunct = (Node*)lfirst(cell);
 			vops_add_literal_type_casts(conjunct, consts);
+		}
+	}
+	else if (IsA(node, List))
+	{
+		ListCell* cell;
+		foreach (cell, (List *) node)
+		{
+			lfirst(cell) = vops_add_literal_type_casts(lfirst(cell), consts);
 		}
 	}
 	else if (IsA(node, A_Expr))
