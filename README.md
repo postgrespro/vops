@@ -208,7 +208,7 @@ correspondingly.
 | SQL type                | C type    | VOPS tile type  |
 | ----------------------- | --------- | --------------- |
 | bool                    | bool      | vops\_bool      |
-| "char", char or char(1) | char      | vops\_char      |
+| "char"                  | char      | vops\_char      |
 | int2                    | int16     | vops\_int2      |
 | int4                    | int32     | vops\_int4      |
 | int8                    | int64     | vops\_int8      |
@@ -216,6 +216,7 @@ correspondingly.
 | float8                  | float8    | vops\_float8    |
 | date                    | DateADT   | vops\_date      |
 | timestamp               | Timestamp | vops\_timestamp |
+| char(N), varchar(N)     | text      | vops\_text      |
 
 VOPS doesn't support work with strings (char or varchar types), except
 case of single character. If strings are used as identifiers, in most
