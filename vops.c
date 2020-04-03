@@ -2514,7 +2514,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 		types[i].tid = vops_get_type(type_id);
 		get_typlenbyvalalign(type_id, &types[i].len, &types[i].byval, &types[i].align);
 		if (types[i].tid != VOPS_LAST && types[i].len < 0) { /* varying length type: extract size from atttypmod */
-			types[i].len = DatumGetInt32(SPI_getbinval(spi_tuple, spi_tupdesc, 3, &is_null)) - VARHDRSZ;
+			types[i].len = DatumGetInt32(SPI_getbinval(spi_tuple, spi_tupdesc, 3, &is_null));
 			if (types[i].len < 0) {
 				elog(ERROR, "Size of column %s is unknown", name);
 			}
@@ -2751,7 +2751,7 @@ Datum vops_import(PG_FUNCTION_ARGS)
 		}
 		get_typlenbyvalalign(type_id, &types[i].len, &types[i].byval, &types[i].align);
 		if (types[i].len < 0) { /* varying length type: extract size from atttypmod */
-			types[i].len = DatumGetInt32(SPI_getbinval(spi_tuple, spi_tupdesc, 3, &is_null)) - VARHDRSZ;
+			types[i].len = DatumGetInt32(SPI_getbinval(spi_tuple, spi_tupdesc, 3, &is_null));
 			if (types[i].len < 0) {
 				elog(ERROR, "Size of column %s is unknown", name);
 			}
