@@ -47,6 +47,7 @@
 #endif
 #include "parser/parsetree.h"
 #include "utils/builtins.h"
+#include "utils/hsearch.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
 #include "utils/syscache.h"

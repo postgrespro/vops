@@ -3792,7 +3792,7 @@ is_select_from_vops_projection(Query* query, vops_var* var)
 				Oid typid = TupleDescAttr(rel->rd_att, attno-1)->atttypid;
 				if (is_vops_type(typid))
 				{
-					table_close(rel, NoLock);
+					heap_close(rel, NoLock);
 					var->varno = relno;
 					var->varattno = attno;
 					var->vartype = typid;
