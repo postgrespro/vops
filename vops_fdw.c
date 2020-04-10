@@ -1402,7 +1402,8 @@ add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	fpinfo->total_cost = total_cost;
 
 	/* Create and add foreign path to the grouping relation. */
-	grouppath = create_foreign_upper_path(root,
+#if PG_VERSION_NUM>=120000
+	grouppath = create_foreign_upper_path(root, 
 										  grouped_rel,
 										  grouped_rel->reltarget,
 										  rows,
@@ -1411,6 +1412,18 @@ add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 										  NIL,	/* no pathkeys */
 										  NULL,
 										  NIL); /* no fdw_private */
+#else
+	grouppath = create_foreignscan_path(root,
+										grouped_rel,
+										grouped_rel->reltarget,
+										rows,
+										startup_cost,
+										total_cost,
+										NIL,	/* no pathkeys */
+										grouped_rel->lateral_relids,
+										NULL,
+										NIL);	/* no fdw_private */
+#endif
 
 	/* Add generated path into grouped_rel by add_path(). */
 	add_path(grouped_rel, (Path *) grouppath);
