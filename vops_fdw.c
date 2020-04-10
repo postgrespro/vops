@@ -343,7 +343,7 @@ postgresGetForeignRelSize(PlannerInfo *root,
 	 * Identify which baserestrictinfo clauses can be sent to the remote
 	 * server and which can't.
 	 */
-	classifyConditions(root, baserel, baserel->baserestrictinfo,
+	vopsClassifyConditions(root, baserel, baserel->baserestrictinfo,
 					   &fpinfo->remote_conds, &fpinfo->local_conds);
 
 
@@ -532,7 +532,7 @@ postgresGetForeignPlan(PlannerInfo *root,
 		}
 		else if (list_member_ptr(fpinfo->local_conds, rinfo))
 			local_exprs = lappend(local_exprs, rinfo->clause);
-		else if (is_foreign_expr(root, foreignrel, rinfo->clause))
+		else if (vops_is_foreign_expr(root, foreignrel, rinfo->clause))
 		{
 			remote_conds = lappend(remote_conds, rinfo);
 			remote_exprs = lappend(remote_exprs, rinfo->clause);
@@ -549,7 +549,7 @@ postgresGetForeignPlan(PlannerInfo *root,
 		local_exprs = fpinfo->local_conds;
 
 		/* Build the list of columns to be fetched from the foreign server. */
-		fdw_scan_tlist = build_tlist_to_deparse(foreignrel);
+		fdw_scan_tlist = vops_build_tlist_to_deparse(foreignrel);
 	}
 
 	/*
@@ -557,7 +557,7 @@ postgresGetForeignPlan(PlannerInfo *root,
 	 * expressions to be sent as parameters.
 	 */
 	initStringInfo(&sql);
-	deparseSelectStmtForRel(&sql, root, foreignrel, fdw_scan_tlist,
+	vopsDeparseSelectStmtForRel(&sql, root, foreignrel, fdw_scan_tlist,
 							remote_conds, best_path->path.pathkeys,
 							&retrieved_attrs, &params_list);
 	elog(LOG, "Execute VOPS query %s", sql.data);
@@ -759,7 +759,7 @@ postgresIterateForeignScan(ForeignScanState *node)
 								break;
 							  case VOPS_TEXT:
 							  {
-								  size_t elem_size = VOPS_ELEM_SIZE((char*)tile - VARHDRSZ);
+								  size_t elem_size = VOPS_ELEM_SIZE((char*)tile - LONGALIGN(VARHDRSZ));
 								  char* src = (char*)(tile + 1) + elem_size * j;
 								  size_t len = strnlen(src, elem_size);
 								  text* t = (text*)palloc(VARHDRSZ + len);
@@ -1158,7 +1158,7 @@ foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
 			 * If any of the GROUP BY expression is not shippable we can not
 			 * push down aggregation to the foreign server.
 			 */
-			if (!is_foreign_expr(root, grouped_rel, expr))
+			if (!vops_is_foreign_expr(root, grouped_rel, expr))
 				return false;
 
 			pull_varattnos((Node *)expr, fpinfo->upperrel->relid, &groupby_attrs);
@@ -1169,7 +1169,7 @@ foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
 		else
 		{
 			/* Check entire expression whether it is pushable or not */
-			if (is_foreign_expr(root, grouped_rel, expr))
+			if (vops_is_foreign_expr(root, grouped_rel, expr))
 			{
 				/* Pushable, add to tlist */
 				tlist = add_to_flat_tlist(tlist, list_make1(expr));
@@ -1188,7 +1188,7 @@ foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
 				aggvars = pull_var_clause((Node *) expr,
 										  PVC_INCLUDE_AGGREGATES);
 
-				if (!is_foreign_expr(root, grouped_rel, (Expr *) aggvars))
+				if (!vops_is_foreign_expr(root, grouped_rel, (Expr *) aggvars))
 					return false;
 
 				/*
@@ -1235,7 +1235,7 @@ foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
 		{
 			Expr	   *expr = (Expr *) lfirst(lc);
 
-			if (!is_foreign_expr(root, grouped_rel, expr))
+			if (!vops_is_foreign_expr(root, grouped_rel, expr))
 				fpinfo->local_conds = lappend(fpinfo->local_conds, expr);
 			else
 				fpinfo->remote_conds = lappend(fpinfo->remote_conds, expr);
@@ -1264,7 +1264,7 @@ foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
 			 */
 			if (IsA(expr, Aggref))
 			{
-				if (!is_foreign_expr(root, grouped_rel, expr))
+				if (!vops_is_foreign_expr(root, grouped_rel, expr))
 					return false;
 
 				tlist = add_to_flat_tlist(tlist, aggvars);
@@ -1351,7 +1351,6 @@ add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	PgFdwRelationInfo *ifpinfo = input_rel->fdw_private;
 	PgFdwRelationInfo *fpinfo = grouped_rel->fdw_private;
 	ForeignPath *grouppath;
-	PathTarget *grouping_target;
 	double		rows;
 	int			width;
 	Cost		startup_cost;
@@ -1362,13 +1361,12 @@ add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 		!root->hasHavingQual)
 		return;
 
-	grouping_target = root->upper_targets[UPPERREL_GROUP_AGG];
-	/* save the input_rel as upperrel in fpinfo */
+	/* save the input_rel as outerrel in fpinfo */
 	fpinfo->upperrel = input_rel;
 
 	/*
-	 * Copy foreign table, foreign server, user mapping, shippable extensions
-	 * etc. details from the input relation's fpinfo.
+	 * Copy foreign table, foreign server, user mapping, FDW options etc.
+	 * details from the input relation's fpinfo.
 	 */
 	fpinfo->table = ifpinfo->table;
 	fpinfo->server = ifpinfo->server;
@@ -1377,9 +1375,25 @@ add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	if (!foreign_grouping_ok(root, grouped_rel))
 		return;
 
+	/*
+	 * Compute the selectivity and cost of the local_conds, so we don't have
+	 * to do it over again for each path.  (Currently we create just a single
+	 * path here, but in future it would be possible that we build more paths
+	 * such as pre-sorted paths as in postgresGetForeignPaths and
+	 * postgresGetForeignJoinPaths.)  The best we can do for these conditions
+	 * is to estimate selectivity on the basis of local statistics.
+	 */
+	fpinfo->local_conds_sel = clauselist_selectivity(root,
+													 fpinfo->local_conds,
+													 0,
+													 JOIN_INNER,
+													 NULL);
+
+	cost_qual_eval(&fpinfo->local_conds_cost, fpinfo->local_conds, root);
+
 	/* Estimate the cost of push down */
-	estimate_path_cost_size(root, grouped_rel, NIL, NIL, &rows,
-							&width, &startup_cost, &total_cost);
+	estimate_path_cost_size(root, grouped_rel, NIL, NIL,
+							&rows, &width, &startup_cost, &total_cost);
 
 	/* Now update this information in the fpinfo */
 	fpinfo->rows = rows;
@@ -1388,16 +1402,15 @@ add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 	fpinfo->total_cost = total_cost;
 
 	/* Create and add foreign path to the grouping relation. */
-	grouppath = create_foreignscan_path(root,
-										grouped_rel,
-										grouping_target,
-										rows,
-										startup_cost,
-										total_cost,
-										NIL,	/* no pathkeys */
-										NULL,	/* no required_outer */
-										NULL,
-										NIL);	/* no fdw_private */
+	grouppath = create_foreign_upper_path(root,
+										  grouped_rel,
+										  grouped_rel->reltarget,
+										  rows,
+										  startup_cost,
+										  total_cost,
+										  NIL,	/* no pathkeys */
+										  NULL,
+										  NIL); /* no fdw_private */
 
 	/* Add generated path into grouped_rel by add_path(). */
 	add_path(grouped_rel, (Path *) grouppath);
@@ -1468,10 +1481,10 @@ postgresAcquireSampleRowsFunc(Relation relation, int elevel,
 		appendStringInfoString(&sql, "r.");                                         
  		appendStringInfoString(&sql, quote_identifier(colname));
 		
-		appendStringInfo(&record, "%s %s", quote_identifier(colname), deparse_type_name(TupleDescAttr(tupdesc, i)->atttypid, TupleDescAttr(tupdesc, i)->atttypmod));
+		appendStringInfo(&record, "%s %s", quote_identifier(colname), vops_deparse_type_name(TupleDescAttr(tupdesc, i)->atttypid, TupleDescAttr(tupdesc, i)->atttypmod));
 	}
 	appendStringInfoString(&sql, " FROM ");
-	deparseRelation(&sql, relation);
+	vopsDeparseRelation(&sql, relation);
 	appendStringInfo(&sql, " t,unnest(t) r(%s)", record.data);
 	
 	portal = SPI_cursor_open_with_args(NULL, sql.data, 0, NULL, NULL, NULL, true, 0);

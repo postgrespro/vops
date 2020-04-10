@@ -3619,7 +3619,7 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
 							break;
 						  case VOPS_TEXT:
 						  {
-							  size_t elem_size = VOPS_ELEM_SIZE((char*)tile - VARHDRSZ);
+							  size_t elem_size = VOPS_ELEM_SIZE((char*)tile - LONGALIGN(VARHDRSZ));
 							  char* src = (char*)(tile + 1) + elem_size * j;
 							  size_t len = strnlen(src, elem_size);
 							  text* t = (text*)palloc(VARHDRSZ + len);

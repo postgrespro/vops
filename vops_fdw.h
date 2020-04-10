@@ -90,67 +90,20 @@ typedef struct PgFdwRelationInfo
 	List	   *grouped_tlist;
 } PgFdwRelationInfo;
 
-/* in connection.c */
-extern PGconn *GetConnection(UserMapping *user, bool will_prep_stmt);
-extern void ReleaseConnection(PGconn *conn);
-extern unsigned int GetPrepStmtNumber(PGconn *conn);
-extern PGresult *pgfdw_get_result(PGconn *conn, const char *query);
-extern PGresult *pgfdw_exec_query(PGconn *conn, const char *query);
-extern void pgfdw_report_error(int elevel, PGresult *res, PGconn *conn,
-				   bool clear, const char *sql);
-
-/* in option.c */
-extern int ExtractConnectionOptions(List *defelems,
-						 const char **keywords,
-						 const char **values);
-extern List *ExtractExtensionList(const char *extensionsString,
-					 bool warnOnMissing);
-
-/* in deparse.c */
-extern void classifyConditions(PlannerInfo *root,
-				   RelOptInfo *baserel,
-				   List *input_conds,
-				   List **remote_conds,
-				   List **local_conds);
-extern bool is_foreign_expr(PlannerInfo *root,
-				RelOptInfo *baserel,
-				Expr *expr);
-extern void deparseInsertSql(StringInfo buf, PlannerInfo *root,
-				 Index rtindex, Relation rel,
-				 List *targetAttrs, bool doNothing, List *returningList,
-				 List **retrieved_attrs);
-extern void deparseUpdateSql(StringInfo buf, PlannerInfo *root,
-				 Index rtindex, Relation rel,
-				 List *targetAttrs, List *returningList,
-				 List **retrieved_attrs);
-extern void deparseDirectUpdateSql(StringInfo buf, PlannerInfo *root,
-					   Index rtindex, Relation rel,
-					   List *targetlist,
-					   List *targetAttrs,
-					   List *remote_conds,
-					   List **params_list,
-					   List *returningList,
-					   List **retrieved_attrs);
-extern void deparseDeleteSql(StringInfo buf, PlannerInfo *root,
-				 Index rtindex, Relation rel,
-				 List *returningList,
-				 List **retrieved_attrs);
-extern void deparseDirectDeleteSql(StringInfo buf, PlannerInfo *root,
-					   Index rtindex, Relation rel,
-					   List *remote_conds,
-					   List **params_list,
-					   List *returningList,
-					   List **retrieved_attrs);
-extern void deparseAnalyzeSizeSql(StringInfo buf, Relation rel);
-extern void deparseAnalyzeSql(StringInfo buf, Relation rel,
-				  List **retrieved_attrs);
-extern void deparseStringLiteral(StringInfo buf, const char *val);
-extern List *build_tlist_to_deparse(RelOptInfo *foreignrel);
-extern void deparseSelectStmtForRel(StringInfo buf, PlannerInfo *root,
+extern void vopsClassifyConditions(PlannerInfo *root,
+							   RelOptInfo *baserel,
+							   List *input_conds,
+							   List **remote_conds,
+							   List **local_conds);
+extern bool vops_is_foreign_expr(PlannerInfo *root,
+							RelOptInfo *baserel,
+							Expr *expr);
+extern List *vops_build_tlist_to_deparse(RelOptInfo *foreignrel);
+extern void vopsDeparseSelectStmtForRel(StringInfo buf, PlannerInfo *root,
 						RelOptInfo *foreignrel, List *tlist,
 						List *remote_conds, List *pathkeys,
 						List **retrieved_attrs, List **params_list);
-extern char *deparse_type_name(Oid type_oid, int32 typemod);
-extern void deparseRelation(StringInfo buf, Relation rel);
+extern char *vops_deparse_type_name(Oid type_oid, int32 typemod);
+extern void vopsDeparseRelation(StringInfo buf, Relation rel);
 
 #endif   /* POSTGRES_FDW_H */
