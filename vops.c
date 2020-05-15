@@ -1810,7 +1810,7 @@ Datum vops_text_input(PG_FUNCTION_ARGS)
 	result = VOPS_TEXT_TILE(var);
 	result->null_mask = 0;
 	result->empty_mask = 0;
-	dst = (char*)result + 1;
+	dst = (char*)(result + 1);
 	if (*str != '{')
 	{
 		len = (int)strlen(str);
@@ -1862,7 +1862,7 @@ Datum vops_text_input(PG_FUNCTION_ARGS)
 			elog(ERROR, "Failed to parse tile: unexpected trailing data '%s'", str);
 		}
 	}
-	PG_RETURN_POINTER(result);
+	PG_RETURN_POINTER(var);
 }
 
 PG_FUNCTION_INFO_V1(vops_text_output);

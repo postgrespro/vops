@@ -3549,7 +3549,7 @@ declare
 		end if;
 		if att_typname='bpchar' or att_typname='varchar'
 		then
-			att_typname:='text('||att_typmod||')';
+			att_typname:='text('||(att_typmod-4)||')';
 		end if;
 		vector_attno := vector_attno||att_num;
 		create_table := create_table||sep||att_name||' vops_'||att_typname;
