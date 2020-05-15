@@ -4631,7 +4631,12 @@ static void vops_explain_hook(Query *query,
 	{
 		(void)query_tree_mutator(query, vops_expression_tree_mutator, &var, QTW_DONT_COPY_QUERY);
 	}
-	plan = pg_plan_query(query, cursorOptions, params);
+	plan = pg_plan_query(query,
+#if PG_VERSION_NUM>=130000
+						 queryString,
+#endif
+						 cursorOptions,
+						 params);
 
 	INSTR_TIME_SET_CURRENT(planduration);
 	INSTR_TIME_SUBTRACT(planduration, planstart);
@@ -4641,7 +4646,11 @@ static void vops_explain_hook(Query *query,
 #if PG_VERSION_NUM>=100000
 				   queryEnv,
 #endif
-				   &planduration);
+				   &planduration
+#if PG_VERSION_NUM>=130000
+				   ,NULL
+#endif
+		);
 }
 
 static void reset_static_cache(void)

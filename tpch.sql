@@ -31,7 +31,7 @@ create table vops_lineitem(
    l_linestatus vops_char not null
 );
 
-create table vops_lineitem_projection(                                                                                    
+create table vops_lineitem_projection(
    l_shipdate vops_date not null,
    l_quantity vops_float4 not null,
    l_extendedprice vops_float4 not null,
