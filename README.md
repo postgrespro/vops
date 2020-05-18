@@ -789,7 +789,7 @@ The `create_projection(PNAME,...)` functions does the following:
 5. Insert information about created projection in `vops_projections` table. This table is used by optimizer to
     automatically substitute table with partition.
 
-The `order_by` attribute is on of the VOPS projection vector columns by which data is sorted. Usually it is some kind of timestamp
+The `order_by` attribute is one of the VOPS projection vector columns by which data is sorted. Usually it is some kind of timestamp
 used in *time series* (for example trade date). Presence of such column in projection allows to incrementally update projection.
 Generated `PNAME_refresh()` method calls `populate` method with correspondent values of `predicate` and
 `sort` parameters, selecting from original table only rows with `order_by` column value greater than maximal
