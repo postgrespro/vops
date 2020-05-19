@@ -793,15 +793,15 @@ The `order_by` attribute is one of the VOPS projection vector columns by which d
 used in *time series* (for example trade date). Presence of such column in projection allows to incrementally update projection.
 Generated `PNAME_refresh()` method calls `populate` method with correspondent values of `predicate` and
 `sort` parameters, selecting from original table only rows with `order_by` column value greater than maximal
-value of this column in projection. It assumes that `order_by` is unique or at least refresh is done at the moment when there is some gap
+value of this column in the projection. It assumes that `order_by` is unique or at least refresh is done at the moment when there is some gap
 in collected events. In addition to `order_by`, sort list for `populate` includes all scalar (grouping) columns.
 It allows to efficiently group imported data by scalar columns and fill VOPS tiles (vector columns) with data.
 
 When `order_by` attribute is specified, VOPS creates two functional  BRIN indexes on `first()` and `last()`
 functions of this attribute. Presence of such indexes allows to efficiently select time slices. If original query contains
-predicates like `(trade_date between '01-01-2017' and '01-01-2018')` then VOPS projection substitution mechanism adds
-`(first(trade_date) >= '01-01-2017' and last(trade_date) >= '01-01-2018')` conjuncts which allows Postgres optimizer to use BRIN
-indexes to locate affected pages.
+predicate like `(trade_date between '01-01-2017' and '01-01-2018')` then VOPS projection substitution mechanism adds
+`(first(trade_date) >= '01-01-2017' and last(trade_date) >= '01-01-2018')` conjuncts which allow Postgres optimizer to use BRIN
+index to locate affected pages.
 
 In in addition to BRIN indexes for `order_by` attribute, VOPS also creates BRIN index for grouping (scalar) columns.
 Such index allows to efficiently select groups and perform index join.
@@ -821,7 +821,7 @@ Right now projections can be automatically substituted only if:
 
 1. Query doesn't contain joins.
 2. Query performs aggregation of vector (tile) columns.
-3. All other expressions in target list, `ORDER BY` / `GROUP BY` clauses refers only to scalar attributes of projection.
+3. All other expressions in target list, `ORDER BY` / `GROUP BY` clauses refer only to scalar attributes of projection.
 
 Projection can be removed using `drop_projection(projection_name text)` function.
 It not only drops the correspondent table, but also removes information about it from `vops_partitions` table
