@@ -1494,11 +1494,9 @@ static uint32 murmur_hash3_32(const void* key, const int len, const uint32 seed)
     {
       case 3:
         k1 ^= tail[2] << 16;
-        /* no break */
         /* fall through */
       case 2:
         k1 ^= tail[1] << 8;
-        /* no break */
         /* fall through */
       case 1:
         k1 ^= tail[0];
