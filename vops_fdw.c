@@ -35,6 +35,9 @@
 #include "optimizer/paths.h"
 #include "optimizer/planmain.h"
 #include "optimizer/plancat.h"
+#if PG_VERSION_NUM>=150000
+#include "optimizer/prep.h"
+#endif
 #include "optimizer/restrictinfo.h"
 #if PG_VERSION_NUM>=120000
 #include "access/table.h"
@@ -997,10 +1000,14 @@ estimate_path_cost_size(PlannerInfo *root,
 		MemSet(&aggcosts, 0, sizeof(AggClauseCosts));
 		if (root->parse->hasAggs)
 		{
+#if PG_VERSION_NUM>=150000
+			get_agg_clause_costs(root, AGGSPLIT_SIMPLE, &aggcosts);
+#else
 			get_agg_clause_costs(root, (Node *) fpinfo->grouped_tlist,
 								 AGGSPLIT_SIMPLE, &aggcosts);
 			get_agg_clause_costs(root, (Node *) root->parse->havingQual,
 								 AGGSPLIT_SIMPLE, &aggcosts);
+#endif
 		}
 		
 		/* Get number of grouping columns and possible number of groups */
@@ -1008,7 +1015,11 @@ estimate_path_cost_size(PlannerInfo *root,
 		numGroups = estimate_num_groups(root,
 										get_sortgrouplist_exprs(root->parse->groupClause,
 																fpinfo->grouped_tlist),
-										input_rows, NULL);
+										input_rows,
+#if PG_VERSION_NUM>=150000
+										NULL,
+#endif
+										NULL);
 		
 		/*
 		 * Number of rows expected from foreign server will be same as

@@ -59,6 +59,12 @@ PG_MODULE_MAGIC;
 #error VOPS requires 64-bit version of Postgres
 #endif
 
+#if PG_VERSION_NUM>=150000
+#define FUNC_CALL_CTX COERCE_EXPLICIT_CALL, -1
+#else
+#define FUNC_CALL_CTX -1
+#endif
+
 /* pg module functions */
 void _PG_init(void);
 void _PG_fini(void);
@@ -1151,13 +1157,24 @@ UserTableUpdateOpenIndexes()
 	if (HeapTupleIsHeapOnly(tuple))
 		return;
 
+#if PG_VERSION_NUM>=150000
+	if (estate->es_result_relations[0]->ri_NumIndices > 0)
+	{
+		recheckIndexes = ExecInsertIndexTuples(estate->es_result_relations[0],
+#else
 	if (estate->es_result_relation_info->ri_NumIndices > 0)
 	{
-		recheckIndexes = ExecInsertIndexTuples(slot,
+		recheckIndexes = ExecInsertIndexTuples(
+#endif
+											   slot,
 #if PG_VERSION_NUM<120000
 											   &tuple->t_self,
 #endif
-											   estate, false, NULL, NIL);
+											   estate,
+#if PG_VERSION_NUM>=150000
+											   true,
+#endif
+											   false, NULL, NIL);
 		if (recheckIndexes != NIL)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -1181,10 +1198,15 @@ static void begin_batch_insert(Oid oid)
 	resultRelInfo->ri_RelationDesc = rel;
 	resultRelInfo->ri_TrigInstrument = NULL;
 
+#if PG_VERSION_NUM>=150000
+	estate->es_result_relations = (ResultRelInfo **)palloc(sizeof(ResultRelInfo *));
+	estate->es_result_relations[0] = resultRelInfo;
+#else
 	estate->es_result_relations = resultRelInfo;
 	estate->es_num_result_relations = 1;
 	estate->es_result_relation_info = resultRelInfo;
-	ExecOpenIndices(estate->es_result_relation_info, false);
+#endif
+	ExecOpenIndices(resultRelInfo, false);
 #if PG_VERSION_NUM>=120000
 	slot = ExecInitExtraTupleSlot(estate, RelationGetDescr(rel), &TTSOpsHeapTuple);
 #elif PG_VERSION_NUM>=110000
@@ -1210,7 +1232,11 @@ static void insert_tuple(Datum* values, bool* nulls)
 
 static void end_batch_insert()
 {
+#if PG_VERSION_NUM>=150000
+	ExecCloseIndices(estate->es_result_relations[0]);
+#else
 	ExecCloseIndices(estate->es_result_relation_info);
+#endif
 	if (ActiveSnapshotSet()) {
 		PopActiveSnapshot();
 	}
@@ -4149,7 +4175,7 @@ vops_add_index_cond(Node* clause, List* conjuncts, char const* keyName)
 				if (*op == '<' || *op == '>') {
 					A_Expr* bound = makeNode(A_Expr);
 					FuncCall* call = makeFuncCall(list_make1(makeString(*op == '<' ? "first" : "last")),
-												  list_make1(expr->lexpr), -1);
+												  list_make1(expr->lexpr), FUNC_CALL_CTX);
 					bound->kind = expr->kind;
 					bound->name = expr->name;
 					bound->lexpr = (Node*)call;
@@ -4159,7 +4185,7 @@ vops_add_index_cond(Node* clause, List* conjuncts, char const* keyName)
 				} else if (expr->kind == AEXPR_BETWEEN) {
 					A_Expr* bound = makeNode(A_Expr);
 					FuncCall* call = makeFuncCall(list_make1(makeString("last")),
-												  list_make1(expr->lexpr), -1);
+												  list_make1(expr->lexpr), FUNC_CALL_CTX);
 					bound->kind = AEXPR_OP;
 					bound->name = list_make1(makeString(">="));
 					bound->lexpr = (Node*)call;
@@ -4169,7 +4195,7 @@ vops_add_index_cond(Node* clause, List* conjuncts, char const* keyName)
 
 					bound = makeNode(A_Expr);
 					call = makeFuncCall(list_make1(makeString("first")),
-										list_make1(expr->lexpr), -1);
+										list_make1(expr->lexpr), FUNC_CALL_CTX);
 					bound->kind = AEXPR_OP;
 					bound->name = list_make1(makeString("<="));
 					bound->lexpr = (Node*)call;
@@ -4179,7 +4205,7 @@ vops_add_index_cond(Node* clause, List* conjuncts, char const* keyName)
 				} else if (*op == '=') {
 					A_Expr* bound = makeNode(A_Expr);
 					FuncCall* call = makeFuncCall(list_make1(makeString("last")),
-												  list_make1(expr->lexpr), -1);
+												  list_make1(expr->lexpr), FUNC_CALL_CTX);
 					bound->kind = expr->kind;
 					bound->name = list_make1(makeString(">="));
 					bound->lexpr = (Node*)call;
@@ -4189,7 +4215,7 @@ vops_add_index_cond(Node* clause, List* conjuncts, char const* keyName)
 
 					bound = makeNode(A_Expr);
 					call = makeFuncCall(list_make1(makeString("first")),
-										list_make1(expr->lexpr), -1);
+										list_make1(expr->lexpr), FUNC_CALL_CTX);
 					bound->kind = expr->kind;
 					bound->name = list_make1(makeString("<="));
 					bound->lexpr = (Node*)call;
@@ -4554,13 +4580,21 @@ vops_resolve_functions(void)
 	}
 }
 
+#if PG_VERSION_NUM>=150000
+static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query, JumbleState *jstate)
+#else
 static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
+#endif
 {
 	vops_var var;
 	/* Invoke original hook if needed */
 	if (post_parse_analyze_hook_next)
 	{
+#if PG_VERSION_NUM>=150000
+		post_parse_analyze_hook_next(pstate, query, jstate);
+#else
 		post_parse_analyze_hook_next(pstate, query);
+#endif
 	}
 	vops_resolve_functions();
 
