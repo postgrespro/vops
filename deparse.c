@@ -405,7 +405,7 @@ vops_deparse_type_name(Oid type_oid, int32 typemod)
 #if PG_VERSION_NUM>=110000
 	uint8 flags = FORMAT_TYPE_TYPEMOD_GIVEN;
 
-#if PG_VERSION_NUM>=150000
+#if PG_VERSION_NUM>=140000
 	if (type_oid >= FirstGenbkiObjectId)
 #else
 	if (type_oid >= FirstBootstrapObjectId)

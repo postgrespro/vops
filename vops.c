@@ -59,7 +59,7 @@ PG_MODULE_MAGIC;
 #error VOPS requires 64-bit version of Postgres
 #endif
 
-#if PG_VERSION_NUM>=150000
+#if PG_VERSION_NUM>=140000
 #define FUNC_CALL_CTX COERCE_EXPLICIT_CALL, -1
 #else
 #define FUNC_CALL_CTX -1
@@ -1157,7 +1157,7 @@ UserTableUpdateOpenIndexes()
 	if (HeapTupleIsHeapOnly(tuple))
 		return;
 
-#if PG_VERSION_NUM>=150000
+#if PG_VERSION_NUM>=140000
 	if (estate->es_result_relations[0]->ri_NumIndices > 0)
 	{
 		recheckIndexes = ExecInsertIndexTuples(estate->es_result_relations[0],
@@ -1171,7 +1171,7 @@ UserTableUpdateOpenIndexes()
 											   &tuple->t_self,
 #endif
 											   estate,
-#if PG_VERSION_NUM>=150000
+#if PG_VERSION_NUM>=140000
 											   true,
 #endif
 											   false, NULL, NIL);
@@ -1198,7 +1198,7 @@ static void begin_batch_insert(Oid oid)
 	resultRelInfo->ri_RelationDesc = rel;
 	resultRelInfo->ri_TrigInstrument = NULL;
 
-#if PG_VERSION_NUM>=150000
+#if PG_VERSION_NUM>=140000
 	estate->es_result_relations = (ResultRelInfo **)palloc(sizeof(ResultRelInfo *));
 	estate->es_result_relations[0] = resultRelInfo;
 #else
@@ -1232,7 +1232,7 @@ static void insert_tuple(Datum* values, bool* nulls)
 
 static void end_batch_insert()
 {
-#if PG_VERSION_NUM>=150000
+#if PG_VERSION_NUM>=140000
 	ExecCloseIndices(estate->es_result_relations[0]);
 #else
 	ExecCloseIndices(estate->es_result_relation_info);
@@ -3857,8 +3857,10 @@ vops_expression_tree_mutator(Node *node, void *context)
 	}
 	/* depth first traversal */
 	node = expression_tree_mutator(node, vops_expression_tree_mutator, context
+#if PG_VERSION_NUM<140000
 #ifdef 	QTW_DONT_COPY_DEFAULT
 								   ,0
+#endif
 #endif
 	);
 
@@ -4267,7 +4269,11 @@ vops_add_literal_type_casts(Node* node, Const** consts)
 	else if (IsA(node, A_Const))
 	{
 		A_Const* ac = (A_Const*)node;
+#if PG_VERSION_NUM >= 150000
+		if (ac->val.sval.type == T_String && ac->location >= 0)
+#else
 		if (ac->val.type == T_String && ac->location >= 0)
+#endif
 		{
 			Const* c = consts[ac->location];
 			if (c != NULL && c->consttype != TEXTOID) {
@@ -4447,7 +4453,15 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 					}
 #if PG_VERSION_NUM>=100000
 					parsetree = linitial_node(RawStmt, parsetree_list);
-					select = (SelectStmt*)parsetree->stmt;
+#if PG_VERSION_NUM>=140000
+					if (parsetree->stmt->type == T_ExplainStmt)
+					{
+						ExplainStmt* explain = (ExplainStmt*)parsetree->stmt;
+						select = (SelectStmt*)explain->query;
+					}
+					else
+#endif
+						select = (SelectStmt*)parsetree->stmt;
 #else
 					parsetree = (Node*) linitial(parsetree_list);
 					select = (SelectStmt*) parsetree;
@@ -4580,17 +4594,18 @@ vops_resolve_functions(void)
 	}
 }
 
-#if PG_VERSION_NUM>=150000
+#if PG_VERSION_NUM>=140000
 static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query, JumbleState *jstate)
 #else
 static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
 #endif
 {
 	vops_var var;
+
 	/* Invoke original hook if needed */
 	if (post_parse_analyze_hook_next)
 	{
-#if PG_VERSION_NUM>=150000
+#if PG_VERSION_NUM>=140000
 		post_parse_analyze_hook_next(pstate, query, jstate);
 #else
 		post_parse_analyze_hook_next(pstate, query);

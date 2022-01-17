@@ -35,7 +35,7 @@
 #include "optimizer/paths.h"
 #include "optimizer/planmain.h"
 #include "optimizer/plancat.h"
-#if PG_VERSION_NUM>=150000
+#if PG_VERSION_NUM>=140000
 #include "optimizer/prep.h"
 #endif
 #include "optimizer/restrictinfo.h"
@@ -1000,7 +1000,7 @@ estimate_path_cost_size(PlannerInfo *root,
 		MemSet(&aggcosts, 0, sizeof(AggClauseCosts));
 		if (root->parse->hasAggs)
 		{
-#if PG_VERSION_NUM>=150000
+#if PG_VERSION_NUM>=140000
 			get_agg_clause_costs(root, AGGSPLIT_SIMPLE, &aggcosts);
 #else
 			get_agg_clause_costs(root, (Node *) fpinfo->grouped_tlist,
@@ -1016,7 +1016,7 @@ estimate_path_cost_size(PlannerInfo *root,
 										get_sortgrouplist_exprs(root->parse->groupClause,
 																fpinfo->grouped_tlist),
 										input_rows,
-#if PG_VERSION_NUM>=150000
+#if PG_VERSION_NUM>=140000
 										NULL,
 #endif
 										NULL);
@@ -1542,7 +1542,11 @@ postgresAcquireSampleRowsFunc(Relation relation, int elevel,
 			if (rowstoskip <= 0)
 			{
 				/* Choose a random reservoir element to replace. */
+#if PG_VERSION_NUM >= 150000
+				int pos = (int) (targrows * sampler_random_fract(&rstate.randstate));
+#else
 				int pos = (int) (targrows * sampler_random_fract(rstate.randstate));
+#endif
 				Assert(pos >= 0 && pos < targrows);
 				SPI_freetuple(rows[pos]);
 				rows[pos] = SPI_copytuple(SPI_tuptable->vals[0]);
