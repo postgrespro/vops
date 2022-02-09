@@ -3964,7 +3964,9 @@ vops_expression_tree_mutator(Node *node, void *context)
 }
 
 static post_parse_analyze_hook_type	post_parse_analyze_hook_next;
+#if PG_VERSION_NUM<140000
 static ExplainOneQuery_hook_type save_explain_hook;
+#endif
 
 
 typedef enum
@@ -4458,6 +4460,7 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 					{
 						ExplainStmt* explain = (ExplainStmt*)parsetree->stmt;
 						select = (SelectStmt*)explain->query;
+						parsetree->stmt = (Node*)select;
 					}
 					else
 #endif
@@ -4626,6 +4629,7 @@ static void vops_post_parse_analysis_hook(ParseState *pstate, Query *query)
 	}
 }
 
+#if PG_VERSION_NUM<140000
 #if PG_VERSION_NUM>=110000
 static void vops_explain_hook(Query *query,
 							  int cursorOptions,
@@ -4701,6 +4705,7 @@ static void vops_explain_hook(Query *query,
 #endif
 		);
 }
+#endif
 
 static void reset_static_cache(void)
 {
@@ -4713,8 +4718,10 @@ void _PG_init(void)
 	elog(LOG, "Initialize VOPS extension");
 	post_parse_analyze_hook_next	= post_parse_analyze_hook;
 	post_parse_analyze_hook			= vops_post_parse_analysis_hook;
+#if PG_VERSION_NUM<140000
 	save_explain_hook = ExplainOneQuery_hook;
 	ExplainOneQuery_hook = vops_explain_hook;
+#endif
     DefineCustomBoolVariable("vops.auto_substitute_projections",
 							 "Automatically substitute tables with thier projections",
 							 NULL,
@@ -4732,7 +4739,9 @@ void _PG_fini(void)
 	elog(LOG, "Finalize VOPS extension");
 	/* Restore hooks */
 	post_parse_analyze_hook = post_parse_analyze_hook_next;
+#if PG_VERSION_NUM<140000
 	ExplainOneQuery_hook = save_explain_hook;
+#endif
 
 	/* undo static initializations */
 	reset_static_cache();
