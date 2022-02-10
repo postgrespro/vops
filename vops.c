@@ -1172,7 +1172,7 @@ UserTableUpdateOpenIndexes()
 #endif
 											   estate,
 #if PG_VERSION_NUM>=140000
-											   true,
+											   false,
 #endif
 											   false, NULL, NIL);
 		if (recheckIndexes != NIL)
