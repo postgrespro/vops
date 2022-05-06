@@ -9,9 +9,9 @@ select populate(destination:='v'::regclass, source:='s'::regclass);
         6
 (1 row)
 
-select unnest(v.*) from v where x > 1;
- unnest 
---------
+select vops_unnest(v.*) from v where x > 1;
+ vops_unnest 
+-------------
  (2)
  (3)
  (4)
@@ -71,8 +71,8 @@ select count(*) from v where coalesce(x, 0.0::float8::vops_float4) >= 0;
      6
 (1 row)
 
-select unnest(t.*) from (select mcount(*) over w,mcount(x) over w,msum(x) over w,mavg(x) over w,mmin(x) over w,mmax(x) over w,x - lag(x) over w from v window w as (rows between unbounded preceding and current row)) t;
-      unnest       
+select vops_unnest(t.*) from (select mcount(*) over w,mcount(x) over w,msum(x) over w,mavg(x) over w,mmin(x) over w,mmax(x) over w,x - lag(x) over w from v window w as (rows between unbounded preceding and current row)) t;
+    vops_unnest    
 -------------------
  (1,1,1,1,1,1,)
  (2,2,3,1.5,1,2,1)
@@ -92,9 +92,9 @@ select populate(destination:='v2'::regclass, source:='s2'::regclass,sort:='id');
       100
 (1 row)
 
-select unnest(t.*) from (select msum(x,10) over (order by first(id)) from v2) t;
- unnest 
---------
+select vops_unnest(t.*) from (select msum(x,10) over (order by first(id)) from v2) t;
+ vops_unnest 
+-------------
  (1)
  (3)
  (6)

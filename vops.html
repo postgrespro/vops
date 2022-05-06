@@ -15,7 +15,7 @@
  <li><a href="#window">Vector window functions</a></li>
  <li><a href="#indexes">Using indexes</a></li>
  <li><a href="#populating">Preparing data for VOPS</a></li>
- <li><a href="#unnest">Back to normal tuples</a></li>
+ <li><a href="#vops_unnest">Back to normal tuples</a></li>
  <li><a href="#fdw">Back to normal tables</a></li>
 </ul>
 <li><a href="#transform">Standard SQL query transformation</a></li>
@@ -389,7 +389,7 @@ There are also two important restrictions:
 Example of using window functions with VOPS:
 </p>
 <pre>
-select unnest(t.*) from (select mcount(*) over w,mcount(x) over w,msum(x) over w,mavg(x) over w,mmin(x) over w,mmax(x) over w,x - lag(x) over w 
+select vops_unnest(t.*) from (select mcount(*) over w,mcount(x) over w,msum(x) over w,mavg(x) over w,mmin(x) over w,mmax(x) over w,x - lag(x) over w 
 from v window w as (rows between unbounded preceding and current row)) t;
 </pre>
 
@@ -562,15 +562,15 @@ It accepts name of target VOPS table, path to CSV file, optional separator (defa
 (no header by default). The function returns number of imported rows.
 </p>
 
-<h3><a name="unnest">Back to normal tuples</a></h3>
+<h3><a name="vops_unnest">Back to normal tuples</a></h3>
 <p>
 A query from VOPS projection returns set of tiles. Output function of tile type is able to print content of the tile.
 But in some cases it is preferable to transfer result to normal (horizontal) format where each tuple represents one record.
-It can be done using <code>unnest</code> function:
+It can be done using <code>vops_unnest</code> function:
 </p>
 <pre>
-postgres=# select unnest(l.*) from vops_lineitem l where filter(l_shipdate &lt;= '1998-12-01'::date) limit 3;
-                unnest                 
+postgres=# select vops_unnest(l.*) from vops_lineitem l where filter(l_shipdate &lt;= '1998-12-01'::date) limit 3;
+              vops_unnest                 
 ---------------------------------------
  (1996-03-13,17,33078.9,0.04,0.02,N,O)
  (1996-04-12,36,38306.2,0.09,0.06,N,O)
@@ -581,14 +581,14 @@ postgres=# select unnest(l.*) from vops_lineitem l where filter(l_shipdate &lt;=
 
 <h3><a name="fdw">Back to normal tables</a></h3>
 <p>
-As it was mentioned in previous section, <code>unnest</code> function can scatter records with VOPS types into normal records with scalar types.
+As it was mentioned in previous section, <code>vops_unnest</code> function can scatter records with VOPS types into normal records with scalar types.
 So it is possible to use this records in arbitrary SQL queries.
-But there are two problems with unnest function:
+But there are two problems with vops_unnest function:
 </p>
 <ol>
 <li>It is not convenient to use. This function has no static knowledge about the format of output record and this is why programmer has to specify it manually, 
 if here wants to decompose this record.</li>
-<li>PostgreSQL optimizer has completely no knowledge on result of transformation performed by unnest() function. 
+<li>PostgreSQL optimizer has completely no knowledge on result of transformation performed by vops_unnest() function. 
 This is why it is not able to choose optimal query execution plan for data retrieved from VOPS table.</li>
 </ol>
 <p>

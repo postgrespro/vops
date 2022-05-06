@@ -1509,7 +1509,7 @@ postgresAcquireSampleRowsFunc(Relation relation, int elevel,
 	}
 	appendStringInfoString(&sql, " FROM ");
 	vopsDeparseRelation(&sql, relation);
-	appendStringInfo(&sql, " t,unnest(t) r(%s)", record.data);
+	appendStringInfo(&sql, " t,vops_unnest(t) r(%s)", record.data);
 	
 	portal = SPI_cursor_open_with_args(NULL, sql.data, 0, NULL, NULL, NULL, true, 0);
 
