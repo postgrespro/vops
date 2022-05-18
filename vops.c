@@ -2955,6 +2955,12 @@ Datum vops_import(PG_FUNCTION_ARGS)
 				  case VOPS_INTERVAL:
 				  {
 					  Interval* it = DatumGetIntervalP(val);
+
+					  if (it == NULL) {
+						  elog(ERROR, "NULL intervals are not supported");
+						  break;
+					  }
+
 					  if (it->day || it->month)
 						  elog(ERROR, "Day, month and year intervals are not supported");
 					  ((vops_int8*)tile)->payload[j] = it->time;
