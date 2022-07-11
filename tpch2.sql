@@ -118,17 +118,17 @@ select
     count(*),
     sum(l_extendedprice * (1-l_discount)) as revenue
 from
-    (select c.* from vcustomer vc, unnest(vc.*) c(c_custkey int4,c_nationkey int4,c_acctbal real)) c1
+    (select c.* from vcustomer vc, vops_unnest(vc.*) c(c_custkey int4,c_nationkey int4,c_acctbal real)) c1
 	 join 
-	(select o.* from vorders vo,unnest(vo.*) o(o_orderkey int4,o_custkey int4,o_orderstatus "char",
+	(select o.* from vorders vo,vops_unnest(vo.*) o(o_orderkey int4,o_custkey int4,o_orderstatus "char",
 	  o_totalprice real,o_orderdate date,o_shippriority int4)
 	 where vo.o_orderdate >= '1996-01-01'::date and vo.o_orderdate < '1997-01-01'::date) o1
      on c_custkey = o_custkey
      join
-    (select l.* from vlineitem vl, unnest(vl.*) l(l_suppkey int4,l_orderkey int4,l_partkey int4,l_shipdate date,l_quantity float4,
+    (select l.* from vlineitem vl, vops_unnest(vl.*) l(l_suppkey int4,l_orderkey int4,l_partkey int4,l_shipdate date,l_quantity float4,
          l_extendedprice float4,l_discount float4,l_tax float4,l_returnflag "char",l_linestatus "char")) l1 on l_orderkey = o_orderkey
      join 
-	(select s.* from vsupplier vs,unnest(vs.*) s(s_suppkey int4,s_nationkey int4,s_acctbal real)) s1 on l_suppkey = s_suppkey
+	(select s.* from vsupplier vs,vops_unnest(vs.*) s(s_suppkey int4,s_nationkey int4,s_acctbal real)) s1 on l_suppkey = s_suppkey
     join nation on c_nationkey = n_nationkey
     join region on n_regionkey = r_regionkey
 where

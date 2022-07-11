@@ -415,7 +415,7 @@ There are also two important restrictions:
 Example of using window functions with
     VOPS:
 
-    select unnest(t.*) from (select mcount(*) over w,mcount(x) over w,msum(x) over w,mavg(x) over w,mmin(x) over w,mmax(x) over w,x - lag(x) over w 
+    select vops_unnest(t.*) from (select mcount(*) over w,mcount(x) over w,msum(x) over w,mavg(x) over w,mmin(x) over w,mmax(x) over w,x - lag(x) over w 
     from v window w as (rows between unbounded preceding and current row)) t;
 
 ### <span id="indexes">Using indexes</span>
@@ -571,16 +571,16 @@ It accepts name of target VOPS table, path to CSV file, optional
 separator (default is ',') and number of lines in CSV header (no header
 by default). The function returns number of imported rows.
 
-### <span id="unnest">Back to normal tuples</span>
+### <span id="vops_unnest">Back to normal tuples</span>
 
 A query from VOPS projection returns set of tiles. Output function of
 tile type is able to print content of the tile. But in some cases it is
 preferable to transfer result to normal (horizontal) format where each
-tuple represents one record. It can be done using `unnest`
+tuple represents one record. It can be done using `vops_unnest`
     function:
 
-    postgres=# select unnest(l.*) from vops_lineitem l where filter(l_shipdate <= '1998-12-01'::date) limit 3;
-                    unnest                 
+    postgres=# select vops_unnest(l.*) from vops_lineitem l where filter(l_shipdate <= '1998-12-01'::date) limit 3;
+                  vops_unnest                 
     ---------------------------------------
      (1996-03-13,17,33078.9,0.04,0.02,N,O)
      (1996-04-12,36,38306.2,0.09,0.06,N,O)
@@ -589,18 +589,18 @@ tuple represents one record. It can be done using `unnest`
 
 ### <span id="fdw">Back to normal tables</span>
 
-As it was mentioned in previous section, `unnest` function can scatter
-records with VOPS types into normal records with scalar types. So it is
-possible to use this records in arbitrary SQL queries. But there are two
-problems with unnest function:
+As it was mentioned in previous section, `vops_unnest` function can
+scatter records with VOPS types into normal records with scalar types.
+So it is possible to use this records in arbitrary SQL queries. But
+there are two problems with vops_unnest function:
 
 1.  It is not convenient to use. This function has no static knowledge
     about the format of output record and this is why programmer has to
     specify it manually, if here wants to decompose this record.
 2.  PostgreSQL optimizer has completely no knowledge on result of
-    transformation performed by unnest() function. This is why it is not
-    able to choose optimal query execution plan for data retrieved from
-    VOPS table.
+    transformation performed by vops_unnest() function. This is why it
+    is not able to choose optimal query execution plan for data
+    retrieved from VOPS table.
 
 Fortunately Postgres provides solution for both of this problem: foreign
 data wrappers (FDW). In our case data is not really "foreign": it is

@@ -1,4 +1,4 @@
-/* contrib/vops/vops.sql */
+/* contrib/vops/vops--1.0.sql */
 
 -- complain if script is sourced in psql, rather than via CREATE EXTENSION
 \echo Use "create extension vops" to load this file. \quit
@@ -3453,7 +3453,7 @@ create function import(destination regclass, csv_path cstring, separator cstring
 create type vops_aggregates as(group_by int8, count int8, aggs float8[]);
 create function reduce(bigint) returns setof vops_aggregates as 'MODULE_PATHNAME','vops_reduce' language C parallel safe strict immutable;
 
-create function unnest(anyelement) returns setof record as 'MODULE_PATHNAME','vops_unnest' language C parallel safe strict immutable;
+create function vops_unnest(anyelement) returns setof record as 'MODULE_PATHNAME','vops_unnest' language C parallel safe strict immutable;
 
 create cast (vops_bool as bool) with function filter(vops_bool) AS IMPLICIT;
 
