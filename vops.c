@@ -4552,6 +4552,9 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 
 		PG_TRY();
 		{
+#if PG_VERSION_NUM>=150000
+#define parse_analyze parse_analyze_fixedparams
+#endif
 			Query* subst = parse_analyze(parsetree, queryString, NULL, 0
 #if PG_VERSION_NUM>=100000
 										 , NULL
