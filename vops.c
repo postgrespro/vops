@@ -67,7 +67,9 @@ PG_MODULE_MAGIC;
 
 /* pg module functions */
 void _PG_init(void);
+#if PG_VERSION_NUM<150000
 void _PG_fini(void);
+#endif
 
 uint64 filter_mask = ~0;
 static struct {
@@ -4743,6 +4745,7 @@ void _PG_init(void)
 							 NULL);
 }
 
+#if PG_VERSION_NUM<150000
 void _PG_fini(void)
 {
 	elog(LOG, "Finalize VOPS extension");
@@ -4755,3 +4758,4 @@ void _PG_fini(void)
 	/* undo static initializations */
 	reset_static_cache();
 }
+#endif
