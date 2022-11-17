@@ -4568,6 +4568,7 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 			 * We are leaking some relcache entries in case of error, but it is better
 			 * then aborting the query
 			 */
+			FlushErrorState();
 		}
 		PG_END_TRY();
 	}
