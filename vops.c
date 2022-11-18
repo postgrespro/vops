@@ -1924,7 +1924,7 @@ Datum vops_text_output(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(vops_text_typmod_in);
 Datum vops_text_typmod_in(PG_FUNCTION_ARGS)
 {
-    ArrayType* arr = (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(PG_GETARG_DATUM(0)));
+    ArrayType* arr = (ArrayType*) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
     int n;
     int32* typemods = ArrayGetIntegerTypmods(arr, &n);
     int len;
@@ -4418,7 +4418,7 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 			datum = SPI_getbinval(tuple, tupDesc, 3, &isnull);
 			if (!isnull)
 			{
-				vectorColumns = (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(datum));
+				vectorColumns = (ArrayType*) PG_DETOAST_DATUM(datum);
 
 				/* Construct set of used vector columns */
 				deconstruct_array(vectorColumns, INT4OID, 4, true, 'i', &vectorAttnos, NULL, &nVectorColumns);
@@ -4431,7 +4431,7 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 			datum = SPI_getbinval(tuple, tupDesc, 4, &isnull);
 			if (!isnull)
 			{
-				scalarColumns = isnull ? NULL : (ArrayType*)DatumGetPointer(PG_DETOAST_DATUM(datum));
+				scalarColumns = isnull ? NULL : (ArrayType*) PG_DETOAST_DATUM(datum);
 
 				/* Construct set of used scalar columns */
 				deconstruct_array(scalarColumns, INT4OID, 4, true, 'i', &scalarAttnos, NULL, &nScalarColumns);
