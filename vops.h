@@ -3,8 +3,8 @@
 
 #define VOPS_SIZEOF_TEXT(width) (LONGALIGN(VARHDRSZ) + sizeof(vops_tile_hdr) + (width)*TILE_SIZE)
 #define VOPS_ELEM_SIZE(var)     ((VARSIZE(var) - LONGALIGN(VARHDRSZ) - sizeof(vops_tile_hdr)) / TILE_SIZE)
-#define VOPS_TEXT_TILE(val)     ((vops_tile_hdr*)((char*)DatumGetTextP(val) + LONGALIGN(VARHDRSZ)))
-#define VOPS_GET_TILE(val,tid)  (((tid) == VOPS_TEXT) ? VOPS_TEXT_TILE(val) : (vops_tile_hdr*)DatumGetPointer(val))
+#define VOPS_TEXT_TILE(val)     ((vops_tile_hdr*)((char*) pg_detoast_datum(val) + LONGALIGN(VARHDRSZ)))
+#define VOPS_GET_TILE(val,tid)  (((tid) == VOPS_TEXT) ? VOPS_TEXT_TILE((struct varlena *) DatumGetPointer(val)) : (vops_tile_hdr*)DatumGetPointer(val))
 
 typedef enum
 {
