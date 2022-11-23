@@ -1215,10 +1215,11 @@ foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
 				 */
 				foreach(l, aggvars)
 				{
-					Expr	   *expr = (Expr *) lfirst(l);
+					Expr	   *current_expr = (Expr *) lfirst(l);
 
-					if (IsA(expr, Aggref))
-						tlist = add_to_flat_tlist(tlist, list_make1(expr));
+					if (IsA(current_expr, Aggref))
+						tlist = add_to_flat_tlist(tlist,
+												  list_make1(current_expr));
 				}
 			}
 		}
@@ -1240,8 +1241,6 @@ foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
 	 */
 	if (root->hasHavingQual && query->havingQual)
 	{
-		ListCell   *lc;
-
 		foreach(lc, (List *) query->havingQual)
 		{
 			Expr	   *expr = (Expr *) lfirst(lc);
@@ -1259,9 +1258,8 @@ foreign_grouping_ok(PlannerInfo *root, RelOptInfo *grouped_rel)
 	 */
 	if (fpinfo->local_conds)
 	{
-		ListCell   *lc;
-		List	   *aggvars = pull_var_clause((Node *) fpinfo->local_conds,
-											  PVC_INCLUDE_AGGREGATES);
+		aggvars = pull_var_clause((Node *) fpinfo->local_conds,
+								  PVC_INCLUDE_AGGREGATES);
 
 		foreach(lc, aggvars)
 		{
