@@ -2970,7 +2970,7 @@ Datum vops_import(PG_FUNCTION_ARGS)
 					  text* t = DatumGetTextP(val);
 					  int elem_size = types[i].len;
 					  int len = VARSIZE(t) - VARHDRSZ;
-					  char* dst = (char*)(tile + 1);
+					  dst = (char*)(tile + 1);
 					  if (len < elem_size) {
 						  memcpy(dst + j*elem_size, VARDATA(t), len);
 						  memset(dst + j*elem_size + len, 0, elem_size - len);
