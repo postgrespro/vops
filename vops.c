@@ -3837,6 +3837,13 @@ is_select_from_vops_projection(Query* query, vops_var* var)
 }
 
 
+#if defined(QTW_DONT_COPY_DEFAULT) && (PG_VERSION_NUM < 140000)
+#define expression_tree_mutator_compat(node, mutator, context) \
+	expression_tree_mutator((node), (mutator), (context), 0)
+#else
+#define expression_tree_mutator_compat(node, mutator, context) \
+	expression_tree_mutator((node), (mutator), (context))
+#endif
 
 static Node*
 vops_expression_tree_mutator(Node *node, void *context)
@@ -3861,13 +3868,7 @@ vops_expression_tree_mutator(Node *node, void *context)
 		return node;
 	}
 	/* depth first traversal */
-	node = expression_tree_mutator(node, vops_expression_tree_mutator, context
-#if PG_VERSION_NUM<140000
-#ifdef 	QTW_DONT_COPY_DEFAULT
-								   ,0
-#endif
-#endif
-	);
+	node = expression_tree_mutator_compat(node, vops_expression_tree_mutator, context);
 
 	if (IsA(node, BoolExpr))
 	{
