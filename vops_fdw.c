@@ -201,14 +201,6 @@ vops_fdw_handler(PG_FUNCTION_ARGS)
 }
 
 
-/*
- * Validate the generic options given to a FOREIGN DATA WRAPPER, SERVER,
- * USER MAPPING or FOREIGN TABLE that uses postgres_fdw.
- *
- * Raise an ERROR if the option or its value is considered invalid.
- */
-PG_FUNCTION_INFO_V1(postgres_fdw_validator);
-
 Datum
 vops_fdw_validator(PG_FUNCTION_ARGS)
 {
