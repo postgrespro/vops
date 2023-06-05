@@ -1173,7 +1173,12 @@ UserTableUpdateOpenIndexes()
 #if PG_VERSION_NUM>=140000
 											   false,
 #endif
+
+#if PG_VERSION_NUM>=160000
+											   false, NULL, NIL, false);
+#else
 											   false, NULL, NIL);
+#endif
 		if (recheckIndexes != NIL)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
