@@ -442,7 +442,8 @@ postgresGetForeignPaths(PlannerInfo *root,
 								   fpinfo->total_cost,
 								   NIL, /* no pathkeys */
 								   NULL,		/* no outer rel either */
-								   NULL,		/* no extra plan */
+								   NULL,
+								   NIL,		/* no extra plan */
 								   NIL);		/* no fdw_private list */
 	add_path(baserel, (Path *) path);
 }
@@ -1412,6 +1413,7 @@ add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 										  total_cost,
 										  NIL,	/* no pathkeys */
 										  NULL,
+										  NIL,
 										  NIL); /* no fdw_private */
 #else
 	grouppath = create_foreignscan_path(root,
@@ -1423,6 +1425,7 @@ add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 										NIL,	/* no pathkeys */
 										grouped_rel->lateral_relids,
 										NULL,
+										NIL,
 										NIL);	/* no fdw_private */
 #endif
 
