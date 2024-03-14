@@ -3341,7 +3341,8 @@ Datum vops_agg_combine(PG_FUNCTION_ARGS)
 			switch (state1->agg_kinds[i]) {
 			  case VOPS_AGG_SUM:
 			  case VOPS_AGG_AVG:
-				if (state0->agg_type < VOPS_FLOAT4) {
+				Assert(state0->agg_type != VOPS_TEXT);
+				if (is_vops_type_integer(state0->agg_type)) {
 					entry0->values[i].acc.i8 += entry1->values[i].acc.i8;
 				} else {
 					entry0->values[i].acc.f8 += entry1->values[i].acc.f8;
@@ -3495,12 +3496,14 @@ Datum vops_reduce(PG_FUNCTION_ARGS)
 					user_ctx->nulls[i] = false;
 					break;
 				  case VOPS_AGG_SUM:
-					user_ctx->elems[i] = Float8GetDatum((state->agg_type < VOPS_FLOAT4)
+					Assert(state->agg_type != VOPS_TEXT);
+					user_ctx->elems[i] = Float8GetDatum(is_vops_type_integer(state->agg_type)
 														? (double)entry->values[i].acc.i8
 														: entry->values[i].acc.f8);
 					break;
 				  case VOPS_AGG_AVG:
-					user_ctx->elems[i] = Float8GetDatum(((state->agg_type < VOPS_FLOAT4)
+					Assert(state->agg_type != VOPS_TEXT);
+					user_ctx->elems[i] = Float8GetDatum((is_vops_type_integer(state->agg_type)
 														 ? (double)entry->values[i].acc.i8
 														 : entry->values[i].acc.f8)/entry->values[i].count);
 					break;

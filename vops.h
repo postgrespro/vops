@@ -22,6 +22,11 @@ typedef enum
 	VOPS_LAST,
 } vops_type;
 
+static inline bool is_vops_type_integer(vops_type type)
+{
+	return type < VOPS_FLOAT4 || type == VOPS_INTERVAL;
+}
+
 typedef enum
 {
 	VOPS_AGG_SUM,
