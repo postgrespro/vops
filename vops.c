@@ -2565,6 +2565,9 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 		n += sprintf(stmt + n, " order by %s", sort);
 	}
     plan = SPI_prepare(stmt, 0, NULL);
+	if (plan == NULL)
+		elog(ERROR, "SPI_prepare(\"%s\") failed:%s",
+			 stmt, SPI_result_code_string(SPI_result));
     portal = SPI_cursor_open(NULL, plan, NULL, NULL, true);
 
 	begin_batch_insert(destination);
