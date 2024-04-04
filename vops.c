@@ -3769,7 +3769,10 @@ Datum vops_is_not_null(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(vops_window_accumulate);
 Datum vops_window_accumulate(PG_FUNCTION_ARGS)
 {
-	elog(ERROR, "window function requires an OVER clause");
+	ereport(ERROR,
+			errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+			errmsg("vops aggregates are not supported in current vops version"),
+			errhint("Update vops to version 1.1"));
 	PG_RETURN_NULL();
 }
 

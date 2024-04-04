@@ -8,8 +8,10 @@ PG_CPPFLAGS = -I$(libpq_srcdir)
 SHLIB_LINK = $(libpq)
 
 EXTENSION = vops
-DATA = vops--1.0.sql
+DATA = vops--1.0--1.1.sql vops--1.1.sql
 #CUSTOM_COPT = -O0
+
+REGRESS = test
 
 PG_CPPFLAGS = -I$(libpq_srcdir)
 PG_LIBS = $(libpq_pgport)

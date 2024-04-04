@@ -36,7 +36,7 @@ create function vops_timestamp_input(cstring) returns vops_timestamp as 'MODULE_
 create function vops_timestamp_output(vops_timestamp) returns cstring as 'MODULE_PATHNAME','vops_int8_output' language C parallel safe immutable strict;
 create function vops_interval_input(cstring) returns vops_interval as 'MODULE_PATHNAME','vops_int8_input' language C parallel safe immutable strict;
 create function vops_interval_output(vops_interval) returns cstring as 'MODULE_PATHNAME','vops_int8_output' language C parallel safe immutable strict;
-create function vops_text_input(cstring,oid,integer) returns vops_text as 'MODULE_PATHNAME' language C parallel safe immutable strict;
+create function vops_text_input(cstring, oid, integer) returns vops_text as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_text_output(vops_text) returns cstring as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_text_typmod_in(cstring[]) returns integer as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_deltatime_input(cstring) returns deltatime as 'MODULE_PATHNAME' language C parallel safe immutable strict;
@@ -44,77 +44,73 @@ create function vops_deltatime_output(deltatime) returns cstring as 'MODULE_PATH
 create function vops_time_interval(interval) returns deltatime as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 
 create type vops_bool (
-	input = vops_bool_input, 
-	output = vops_bool_output, 
+	input = vops_bool_input,
+	output = vops_bool_output,
 	alignment = double,
-    internallength = 24
+	internallength = 24
 );
 
 create type vops_char (
-	input = vops_char_input, 
-	output = vops_char_output, 
+	input = vops_char_input,
+	output = vops_char_output,
 	alignment = double,
-    internallength = 80 -- 16+64
+	internallength = 80 -- 16+64
 );
-
 
 create type vops_int2 (
-	input = vops_int2_input, 
-	output = vops_int2_output, 
+	input = vops_int2_input,
+	output = vops_int2_output,
 	alignment = double,
-    internallength = 144 -- 16+64*2
+	internallength = 144 -- 16+64*2
 );
 
-
 create type vops_int4 (
-	input = vops_int4_input, 
-	output = vops_int4_output, 
+	input = vops_int4_input,
+	output = vops_int4_output,
 	alignment = double,
-    internallength = 272 -- 16 + 64*4
+	internallength = 272 -- 16 + 64*4
 );
 
 create type vops_date (
-	input = vops_date_input, 
-	output = vops_date_output, 
+	input = vops_date_input,
+	output = vops_date_output,
 	alignment = double,
-    internallength = 272 -- 16 + 64*4
+	internallength = 272 -- 16 + 64*4
 );
-
 
 create type vops_int8 (
-	input = vops_int8_input, 
-	output = vops_int8_output, 
+	input = vops_int8_input,
+	output = vops_int8_output,
 	alignment = double,
-    internallength = 528 -- 16 + 64*8
+	internallength = 528 -- 16 + 64*8
 );
 
-
 create type vops_float4 (
-	input = vops_float4_input, 
-	output = vops_float4_output, 
+	input = vops_float4_input,
+	output = vops_float4_output,
 	alignment = double,
-    internallength = 272 -- 16 + 64*4
+	internallength = 272 -- 16 + 64*4
 );
 
 create type vops_float8 (
-	input = vops_float8_input, 
-	output = vops_float8_output, 
+	input = vops_float8_input,
+	output = vops_float8_output,
 	alignment = double,
-    internallength = 528 -- 16 + 64*8
+	internallength = 528 -- 16 + 64*8
 );
 
 create type vops_timestamp (
-	input = vops_timestamp_input, 
-	output = vops_timestamp_output, 
+	input = vops_timestamp_input,
+	output = vops_timestamp_output,
 	alignment = double,
-    internallength = 528 -- 16 + 64*8
+	internallength = 528 -- 16 + 64*8
 );
 
 create type vops_interval (
-	input = vops_interval_input, 
-	output = vops_interval_output, 
+	input = vops_interval_input,
+	output = vops_interval_output,
 	alignment = double,
-    internallength = 528 -- 16 + 64*8
+	internallength = 528 -- 16 + 64*8
 );
 
 create type vops_text (
@@ -183,42 +179,42 @@ create function ifnull(opd vops_text, subst vops_text) returns vops_text as 'MOD
 
 create function vops_text_first_accumulate(state internal, val vops_text, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_text_first_final(state internal) returns text as 'MODULE_PATHNAME','vops_first_final' language C parallel safe strict;
-create function vops_first_combine(internal,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE first(vops_text,vops_timestamp) (
-	SFUNC = vops_text_first_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_text_first_final,
- 	COMBINEFUNC = vops_first_combine,
-	PARALLEL = SAFE
+create function vops_first_combine(internal, internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create aggregate first(vops_text, vops_timestamp) (
+	sfunc = vops_text_first_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_text_first_final,
+	combinefunc = vops_first_combine,
+	parallel = safe
 );
 
 create function vops_text_last_accumulate(state internal, val vops_text, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-create function vops_last_combine(internal,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE last(vops_text,vops_timestamp) (
-	SFUNC = vops_text_last_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_text_first_final,
- 	COMBINEFUNC = vops_last_combine,
-	PARALLEL = SAFE
+create function vops_last_combine(internal, internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create aggregate last(vops_text, vops_timestamp) (
+	sfunc = vops_text_last_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_text_first_final,
+	combinefunc = vops_last_combine,
+	parallel = safe
 );
 
 create function vops_approxdc_final(state internal) returns int8 as 'MODULE_PATHNAME' language C parallel safe strict;
-create function vops_approxdc_combine(internal,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_approxdc_combine(internal, internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_approxdc_serial(internal) returns bytea as 'MODULE_PATHNAME' language C parallel safe strict;
-create function vops_approxdc_deserial(bytea,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe strict;
+create function vops_approxdc_deserial(bytea, internal) returns internal as 'MODULE_PATHNAME' language C parallel safe strict;
 
 create function vops_text_approxdc_accumulate(state internal, val vops_text) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE approxdc(vops_text) (
-	SFUNC = vops_text_approxdc_accumulate,
-	STYPE = internal,
-	SSPACE = 128,
-	FINALFUNC = vops_approxdc_final,
-	COMBINEFUNC = vops_approxdc_combine,
-	SERIALFUNC = vops_approxdc_serial,
-	DESERIALFUNC = vops_approxdc_deserial,
-	PARALLEL = SAFE
+create aggregate approxdc(vops_text) (
+	sfunc = vops_text_approxdc_accumulate,
+	stype = internal,
+	sspace = 128,
+	finalfunc = vops_approxdc_final,
+	combinefunc = vops_approxdc_combine,
+	serialfunc = vops_approxdc_serial,
+	deserialfunc = vops_approxdc_deserial,
+	parallel = safe
 );
 
 create function first(tile vops_text) returns text as 'MODULE_PATHNAME','vops_text_first' language C parallel safe immutable strict;
@@ -237,16 +233,16 @@ create operator || (leftarg=vops_char, rightarg=vops_char, procedure=vops_char_c
 create function vops_char_group_by(state internal, group_by vops_char, aggregates cstring, variadic anyarray) returns internal as 'MODULE_PATHNAME' language C parallel safe immutable;
 create function vops_agg_combine(state1 internal, state2 internal) returns internal as 'MODULE_PATHNAME' language C parallel safe immutable;
 create function vops_agg_serial(internal) returns bytea as 'MODULE_PATHNAME' language C parallel safe strict;
-create function vops_agg_deserial(bytea,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe strict;
+create function vops_agg_deserial(bytea, internal) returns internal as 'MODULE_PATHNAME' language C parallel safe strict;
 create function vops_agg_final(internal) returns bigint as 'MODULE_PATHNAME' language C parallel safe strict;
 create aggregate map(group_by vops_char, aggregates cstring, variadic anyarray) (
-	   sfunc = vops_char_group_by, 
-	   stype = internal,
-	   finalfunc=vops_agg_final,
-	   combinefunc = vops_agg_combine,
-	   serialfunc = vops_agg_serial,
-	   deserialfunc = vops_agg_deserial,	   
-	   parallel = safe);
+	sfunc = vops_char_group_by,
+	stype = internal,
+	finalfunc=vops_agg_final,
+	combinefunc = vops_agg_combine,
+	serialfunc = vops_agg_serial,
+	deserialfunc = vops_agg_deserial,
+	parallel = safe);
 
 create function vops_char_sub(left vops_char, right vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_char_sub_rconst(left vops_char, right "char") returns vops_char as 'MODULE_PATHNAME' language C parallel safe immutable strict;
@@ -334,72 +330,70 @@ create function vops_char_neg(right vops_char) returns vops_char as 'MODULE_PATH
 create operator - (rightarg=vops_char, procedure=vops_char_neg);
 
 create function vops_char_sum_accumulate(state int8, val vops_char) returns int8 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE sum(vops_char) (
-	SFUNC = vops_char_sum_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	PARALLEL = SAFE
+create aggregate sum(vops_char) (
+	sfunc = vops_char_sum_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	parallel = safe
 );
-create function vops_char_sum_stub(state vops_int8, val vops_char) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_char_sum_extend(state vops_int8, val vops_char) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_char_sum_reduce(state vops_int8, val vops_char) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE msum(vops_char) (
-	SFUNC = vops_char_sum_stub,
-	STYPE = vops_int8,
-    mstype = vops_int8,
+create aggregate msum(vops_char) (
+	sfunc = vops_char_sum_extend,
+	stype = vops_int8,
+	mstype = vops_int8,
 	msfunc = vops_char_sum_extend,
 	minvfunc = vops_char_sum_reduce,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
-create function vops_char_msum_stub(state internal, val vops_char, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_char_msum_extend(state internal, val vops_char, winsize integer) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_char_msum_reduce(state internal, val vops_char, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
 create function vops_char_msum_final(state internal) returns vops_int8 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE msum(vops_char,winsize integer) (
-	SFUNC = vops_char_msum_stub,
-	STYPE = internal,
+create aggregate msum(vops_char, winsize integer) (
+	sfunc = vops_char_msum_extend,
+	stype = internal,
 	finalfunc = vops_char_msum_final,
-    mstype = internal,
+	mstype = internal,
 	msfunc = vops_char_msum_extend,
 	minvfunc = vops_char_msum_reduce,
 	mfinalfunc = vops_char_msum_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_avg_final(state internal) returns float8 as 'MODULE_PATHNAME' language C parallel safe strict;
-create function vops_avg_combine(internal,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_avg_combine(internal, internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_avg_serial(internal) returns bytea as 'MODULE_PATHNAME' language C parallel safe strict;
-create function vops_avg_deserial(bytea,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe strict;
+create function vops_avg_deserial(bytea, internal) returns internal as 'MODULE_PATHNAME' language C parallel safe strict;
 
 create function vops_char_avg_accumulate(state internal, val vops_char) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE avg(vops_char) (
-	SFUNC = vops_char_avg_accumulate,
-	STYPE = internal,
-	SSPACE = 16,
-	FINALFUNC = vops_avg_final,
-	COMBINEFUNC = vops_avg_combine,
-	SERIALFUNC = vops_avg_serial,
-	DESERIALFUNC = vops_avg_deserial,
-	PARALLEL = SAFE
+create aggregate avg(vops_char) (
+	sfunc = vops_char_avg_accumulate,
+	stype = internal,
+	sspace = 16,
+	finalfunc = vops_avg_final,
+	combinefunc = vops_avg_combine,
+	serialfunc = vops_avg_serial,
+	deserialfunc = vops_avg_deserial,
+	parallel = safe
 );
-create function vops_char_avg_stub(state internal, val vops_char) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_char_avg_extend(state internal, val vops_char) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_char_avg_reduce(state internal, val vops_char) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
 create function vops_mavg_final(state internal) returns vops_float8 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE mavg(vops_char) (
-	SFUNC = vops_char_avg_stub,
-	STYPE = internal,
-	FINALFUNC = vops_mavg_final,
-    mstype = internal,
-    msfunc = vops_char_avg_extend,
-    minvfunc = vops_char_avg_reduce,
-	mfinalfunc = vops_mavg_final
+create aggregate mavg(vops_char) (
+	sfunc = vops_char_avg_extend,
+	stype = internal,
+	finalfunc = vops_mavg_final,
+	mstype = internal,
+	msfunc = vops_char_avg_extend,
+	minvfunc = vops_char_avg_reduce,
+	mfinalfunc = vops_mavg_final,
+	parallel = safe
 );
 
-create function vops_var_combine(internal,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
+create function vops_var_combine(internal, internal) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_var_serial(internal) returns bytea as 'MODULE_PATHNAME' language C parallel safe strict;
-create function vops_var_deserial(bytea,internal) returns internal as 'MODULE_PATHNAME' language C parallel safe strict;
+create function vops_var_deserial(bytea, internal) returns internal as 'MODULE_PATHNAME' language C parallel safe strict;
 create function vops_var_pop_final(state internal) returns float8 as 'MODULE_PATHNAME' language C parallel safe strict;
 create function vops_var_samp_final(state internal) returns float8 as 'MODULE_PATHNAME' language C parallel safe strict;
 create function vops_stddev_pop_final(state internal) returns float8 as 'MODULE_PATHNAME' language C parallel safe strict;
@@ -407,188 +401,184 @@ create function vops_stddev_samp_final(state internal) returns float8 as 'MODULE
 create function vops_wavg_final(state internal) returns float8 as 'MODULE_PATHNAME' language C parallel safe;
 
 create function vops_char_var_accumulate(state internal, val vops_char) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE var_pop(vops_char) (
-	SFUNC = vops_char_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_pop(vops_char) (
+	sfunc = vops_char_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE var_samp(vops_char) (
-	SFUNC = vops_char_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_samp(vops_char) (
+	sfunc = vops_char_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE variance(vops_char) (
-	SFUNC = vops_char_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate variance(vops_char) (
+	sfunc = vops_char_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_pop(vops_char) (
-	SFUNC = vops_char_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_pop(vops_char) (
+	sfunc = vops_char_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_samp(vops_char) (
-	SFUNC = vops_char_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_samp(vops_char) (
+	sfunc = vops_char_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev(vops_char) (
-	SFUNC = vops_char_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev(vops_char) (
+	sfunc = vops_char_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_char_wavg_accumulate(state internal, x vops_char, y vops_char) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE wavg(vops_char, vops_char) (
-	SFUNC = vops_char_wavg_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_wavg_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate wavg(vops_char, vops_char) (
+	sfunc = vops_char_wavg_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_wavg_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_char_max_accumulate(state char, val vops_char) returns char as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE max(vops_char) (
-	SFUNC = vops_char_max_accumulate,
-	STYPE = char,
-	PARALLEL = SAFE
+create aggregate max(vops_char) (
+	sfunc = vops_char_max_accumulate,
+	stype = char,
+	parallel = safe
 );
-create function vops_char_max_stub(state vops_char, val vops_char) returns vops_char as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_char_max_extend(state vops_char, val vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_char_max_reduce(state vops_char, val vops_char) returns vops_char as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmax(vops_char) (
-	SFUNC = vops_char_max_stub,
-	STYPE = vops_char,
-    mstype = vops_char,
-    msfunc = vops_char_max_extend,
-    minvfunc = vops_char_max_reduce, 
-	PARALLEL = SAFE
+create aggregate mmax(vops_char) (
+	sfunc = vops_char_max_extend,
+	stype = vops_char,
+	mstype = vops_char,
+	msfunc = vops_char_max_extend,
+	minvfunc = vops_char_max_reduce,
+	parallel = safe
 );
 
 create function vops_char_min_accumulate(state char, val vops_char) returns char as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE min(vops_char) (
-	SFUNC = vops_char_min_accumulate,
-	STYPE = char,
-	PARALLEL = SAFE
+create aggregate min(vops_char) (
+	sfunc = vops_char_min_accumulate,
+	stype = char,
+	parallel = safe
 );
-create function vops_char_min_stub(state vops_char, val vops_char) returns vops_char as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_char_min_extend(state vops_char, val vops_char) returns vops_char as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_char_min_reduce(state vops_char, val vops_char) returns vops_char as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmin(vops_char) (
-	SFUNC = vops_char_min_stub,
-	STYPE = vops_char,
+create aggregate mmin(vops_char) (
+	sfunc = vops_char_min_extend,
+	stype = vops_char,
 	mstype = vops_char,
-    msfunc = vops_char_min_extend,
-    minvfunc = vops_char_min_reduce, 
-	PARALLEL = SAFE
+	msfunc = vops_char_min_extend,
+	minvfunc = vops_char_min_reduce,
+	parallel = safe
 );
 
-create function vops_char_lag_accumulate(state internal, val vops_char) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_char_lag_extend(state internal, val vops_char) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_char_lag_reduce(state internal, val vops_char) returns internal as 'MODULE_PATHNAME','vops_lag_reduce' language C parallel safe;
 create function vops_win_char_final(state internal) returns vops_char as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE lag(vops_char) (
-	SFUNC = vops_char_lag_accumulate,
-	STYPE = internal,
+create aggregate lag(vops_char) (
+	sfunc = vops_char_lag_extend,
+	stype = internal,
 	finalfunc = vops_win_char_final,
 	mstype = internal,
-    msfunc = vops_char_lag_extend,
-    minvfunc = vops_char_lag_reduce,
+	msfunc = vops_char_lag_extend,
+	minvfunc = vops_char_lag_reduce,
 	mfinalfunc = vops_win_char_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_char_count_accumulate(state int8, val vops_char) returns int8 as 'MODULE_PATHNAME','vops_count_any_accumulate' language C parallel safe strict;
-CREATE AGGREGATE count(vops_char) (
-	SFUNC = vops_char_count_accumulate,
-	STYPE = int8,
-	COMBINEFUNC = int8pl,
-	INITCOND = '0', 
-	PARALLEL = SAFE
+create aggregate count(vops_char) (
+	sfunc = vops_char_count_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	INITCOND = '0',
+	parallel = safe
 );
-create function vops_char_count_stub(state vops_int8, val vops_char) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe strict;
 create function vops_char_count_extend(state vops_int8, val vops_char) returns vops_int8 as 'MODULE_PATHNAME','vops_count_any_extend' language C parallel safe strict;
 create function vops_char_count_reduce(state vops_int8, val vops_char) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe strict;
-CREATE AGGREGATE mcount(vops_char) (
-	SFUNC = vops_char_count_stub,
-	STYPE = vops_int8,
-	initcond = '0', 
-    mstype = vops_int8,
+create aggregate mcount(vops_char) (
+	sfunc = vops_char_count_extend,
+	stype = vops_int8,
+	initcond = '0',
+	mstype = vops_int8,
 	msfunc = vops_char_count_extend,
 	minvfunc = vops_char_count_reduce,
-	minitcond = '0', 
-	PARALLEL = SAFE
+	minitcond = '0',
+	parallel = safe
 );
 
 create function vops_char_first_accumulate(state internal, val vops_char, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_char_first_final(state internal) returns "char" as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
-CREATE AGGREGATE first(vops_char,vops_timestamp) (
-	SFUNC = vops_char_first_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_char_first_final,
- 	COMBINEFUNC = vops_first_combine,
-	PARALLEL = SAFE
+create aggregate first(vops_char, vops_timestamp) (
+	sfunc = vops_char_first_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_char_first_final,
+	combinefunc = vops_first_combine,
+	parallel = safe
 );
 
 create function vops_char_last_accumulate(state internal, val vops_char, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE last(vops_char,vops_timestamp) (
-	SFUNC = vops_char_last_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_char_first_final,
- 	COMBINEFUNC = vops_last_combine,
-	PARALLEL = SAFE
+create aggregate last(vops_char, vops_timestamp) (
+	sfunc = vops_char_last_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_char_first_final,
+	combinefunc = vops_last_combine,
+	parallel = safe
 );
 
 create function vops_char_approxdc_accumulate(state internal, val vops_char) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE approxdc(vops_char) (
-	SFUNC = vops_char_approxdc_accumulate,
-	STYPE = internal,
-	SSPACE = 128,
-	FINALFUNC = vops_approxdc_final,
-	COMBINEFUNC = vops_approxdc_combine,
-	SERIALFUNC = vops_approxdc_serial,
-	DESERIALFUNC = vops_approxdc_deserial,
-	PARALLEL = SAFE
+create aggregate approxdc(vops_char) (
+	sfunc = vops_char_approxdc_accumulate,
+	stype = internal,
+	sspace = 128,
+	finalfunc = vops_approxdc_final,
+	combinefunc = vops_approxdc_combine,
+	serialfunc = vops_approxdc_serial,
+	deserialfunc = vops_approxdc_deserial,
+	parallel = safe
 );
 
 create function first(tile vops_char) returns "char" as 'MODULE_PATHNAME','vops_char_first' language C parallel safe immutable strict;
@@ -606,13 +596,13 @@ create operator || (leftarg=vops_int2, rightarg=vops_int2, procedure=vops_int2_c
 
 create function vops_int2_group_by(state internal, group_by vops_int2, aggregates cstring, variadic anyarray) returns internal as 'MODULE_PATHNAME' language C parallel safe immutable;
 create aggregate map(group_by vops_int2, aggregates cstring, variadic anyarray) (
-	   sfunc = vops_int2_group_by, 
-	   stype = internal,
-	   finalfunc=vops_agg_final,
-	   combinefunc = vops_agg_combine,
-	   serialfunc = vops_agg_serial,
-	   deserialfunc = vops_agg_deserial,
-	   parallel = safe);
+	sfunc = vops_int2_group_by,
+	stype = internal,
+	finalfunc=vops_agg_final,
+	combinefunc = vops_agg_combine,
+	serialfunc = vops_agg_serial,
+	deserialfunc = vops_agg_deserial,
+	parallel = safe);
 
 create function vops_int2_sub(left vops_int2, right vops_int2) returns vops_int2 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_int2_sub_rconst(left vops_int2, right int4) returns vops_int2 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
@@ -700,247 +690,242 @@ create function vops_int2_neg(right vops_int2) returns vops_int2 as 'MODULE_PATH
 create operator - (rightarg=vops_int2, procedure=vops_int2_neg);
 
 create function vops_int2_sum_accumulate(state int8, val vops_int2) returns int8 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE sum(vops_int2) (
-	SFUNC = vops_int2_sum_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	PARALLEL = SAFE
+create aggregate sum(vops_int2) (
+	sfunc = vops_int2_sum_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	parallel = safe
 );
-create function vops_int2_sum_stub(state vops_int8, val vops_int2) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int2_sum_extend(state vops_int8, val vops_int2) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int2_sum_reduce(state vops_int8, val vops_int2) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE msum(vops_int2) (
-	SFUNC = vops_int2_sum_stub,
-	STYPE = vops_int8,
-    mstype = vops_int8,
+create aggregate msum(vops_int2) (
+	sfunc = vops_int2_sum_extend,
+	stype = vops_int8,
+	mstype = vops_int8,
 	msfunc = vops_int2_sum_extend,
 	minvfunc = vops_int2_sum_reduce,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
-create function vops_int2_msum_stub(state internal, val vops_int2, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int2_msum_extend(state internal, val vops_int2, winsize integer) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int2_msum_reduce(state internal, val vops_int2, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
 create function vops_int2_msum_final(state internal) returns vops_int8 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE msum(vops_int2,winsize integer) (
-	SFUNC = vops_int2_msum_stub,
-	STYPE = internal,
+create aggregate msum(vops_int2, winsize integer) (
+	sfunc = vops_int2_msum_extend,
+	stype = internal,
 	finalfunc = vops_int2_msum_final,
-    mstype = internal,
+	mstype = internal,
 	msfunc = vops_int2_msum_extend,
 	minvfunc = vops_int2_msum_reduce,
 	mfinalfunc = vops_int2_msum_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_int2_var_accumulate(state internal, val vops_int2) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE var_pop(vops_int2) (
-	SFUNC = vops_int2_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_pop(vops_int2) (
+	sfunc = vops_int2_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE var_samp(vops_int2) (
-	SFUNC = vops_int2_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_samp(vops_int2) (
+	sfunc = vops_int2_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE variance(vops_int2) (
-	SFUNC = vops_int2_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate variance(vops_int2) (
+	sfunc = vops_int2_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_pop(vops_int2) (
-	SFUNC = vops_int2_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_pop(vops_int2) (
+	sfunc = vops_int2_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_samp(vops_int2) (
-	SFUNC = vops_int2_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_samp(vops_int2) (
+	sfunc = vops_int2_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev(vops_int2) (
-	SFUNC = vops_int2_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev(vops_int2) (
+	sfunc = vops_int2_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_int2_wavg_accumulate(state internal, x vops_int2, y vops_int2) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE wavg(vops_int2, vops_int2) (
-	SFUNC = vops_int2_wavg_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_wavg_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate wavg(vops_int2, vops_int2) (
+	sfunc = vops_int2_wavg_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_wavg_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_int2_avg_accumulate(state internal, val vops_int2) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE avg(vops_int2) (
-	SFUNC = vops_int2_avg_accumulate,
-	STYPE = internal,
-	SSPACE = 16,
-	FINALFUNC = vops_avg_final,
-	COMBINEFUNC = vops_avg_combine,
-	SERIALFUNC = vops_avg_serial,
-	DESERIALFUNC = vops_avg_deserial,
-	PARALLEL = SAFE
+create aggregate avg(vops_int2) (
+	sfunc = vops_int2_avg_accumulate,
+	stype = internal,
+	sspace = 16,
+	finalfunc = vops_avg_final,
+	combinefunc = vops_avg_combine,
+	serialfunc = vops_avg_serial,
+	deserialfunc = vops_avg_deserial,
+	parallel = safe
 );
-create function vops_int2_avg_stub(state internal, val vops_int2) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int2_avg_extend(state internal, val vops_int2) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int2_avg_reduce(state internal, val vops_int2) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mavg(vops_int2) (
-	SFUNC = vops_int2_avg_stub,
-	FINALFUNC = vops_mavg_final,
-	STYPE = internal,
-    mstype = internal,
-    msfunc = vops_int2_avg_extend,
-    minvfunc = vops_int2_avg_reduce,
+create aggregate mavg(vops_int2) (
+	sfunc = vops_int2_avg_extend,
+	finalfunc = vops_mavg_final,
+	stype = internal,
+	mstype = internal,
+	msfunc = vops_int2_avg_extend,
+	minvfunc = vops_int2_avg_reduce,
 	mfinalfunc = vops_mavg_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_int2_max_accumulate(state int2, val vops_int2) returns int2 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE max(vops_int2) (
-	SFUNC = vops_int2_max_accumulate,
-	STYPE = int2,
-    COMBINEFUNC = int2larger,
-	PARALLEL = SAFE
+create aggregate max(vops_int2) (
+	sfunc = vops_int2_max_accumulate,
+	stype = int2,
+	combinefunc = int2larger,
+	parallel = safe
 );
-create function vops_int2_max_stub(state vops_int2, val vops_int2) returns vops_int2 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int2_max_extend(state vops_int2, val vops_int2) returns vops_int2 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int2_max_reduce(state vops_int2, val vops_int2) returns vops_int2 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmax(vops_int2) (
-	SFUNC = vops_int2_max_stub,
-	STYPE = vops_int2,
-    mstype = vops_int2,
-    msfunc = vops_int2_max_extend,
-    minvfunc = vops_int2_max_reduce
+create aggregate mmax(vops_int2) (
+	sfunc = vops_int2_max_extend,
+	stype = vops_int2,
+	mstype = vops_int2,
+	msfunc = vops_int2_max_extend,
+	minvfunc = vops_int2_max_reduce,
+	parallel = safe
 );
 
 create function vops_int2_min_accumulate(state int2, val vops_int2) returns int2 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE min(vops_int2) (
-	SFUNC = vops_int2_min_accumulate,
-	STYPE = int2,
-    COMBINEFUNC = int2smaller,
-	PARALLEL = SAFE
+create aggregate min(vops_int2) (
+	sfunc = vops_int2_min_accumulate,
+	stype = int2,
+	combinefunc = int2smaller,
+	parallel = safe
 );
-create function vops_int2_min_stub(state vops_int2, val vops_int2) returns vops_int2 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int2_min_extend(state vops_int2, val vops_int2) returns vops_int2 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int2_min_reduce(state vops_int2, val vops_int2) returns vops_int2 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmin(vops_int2) (
-	SFUNC = vops_int2_min_stub,
-	STYPE = vops_int2,
-    mstype = vops_int2,
-    msfunc = vops_int2_min_extend,
-    minvfunc = vops_int2_min_reduce
+create aggregate mmin(vops_int2) (
+	sfunc = vops_int2_min_extend,
+	stype = vops_int2,
+	mstype = vops_int2,
+	msfunc = vops_int2_min_extend,
+	minvfunc = vops_int2_min_reduce,
+	parallel = safe
 );
 
-create function vops_int2_lag_accumulate(state internal, val vops_int2) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int2_lag_extend(state internal, val vops_int2) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int2_lag_reduce(state internal, val vops_int2) returns internal as 'MODULE_PATHNAME','vops_lag_reduce' language C parallel safe;
 create function vops_int2_lag_final(state internal) returns vops_int2 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE lag(vops_int2) (
-	SFUNC = vops_int2_lag_accumulate,
-	STYPE = internal,
+create aggregate lag(vops_int2) (
+	sfunc = vops_int2_lag_extend,
+	stype = internal,
 	finalfunc = vops_int2_lag_final,
-    mstype = internal,
-    msfunc = vops_int2_lag_extend,
-    minvfunc = vops_int2_lag_reduce,
+	mstype = internal,
+	msfunc = vops_int2_lag_extend,
+	minvfunc = vops_int2_lag_reduce,
 	mfinalfunc = vops_int2_lag_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_int2_count_accumulate(state int8, val vops_int2) returns int8 as 'MODULE_PATHNAME','vops_count_any_accumulate' language C parallel safe strict;
-CREATE AGGREGATE count(vops_int2) (
-	SFUNC = vops_int2_count_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	INITCOND = '0', 
-	PARALLEL = SAFE
+create aggregate count(vops_int2) (
+	sfunc = vops_int2_count_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	INITCOND = '0',
+	parallel = safe
 );
-create function vops_int2_count_stub(state vops_int8, val vops_int2) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate'  language C parallel safe strict;
 create function vops_int2_count_extend(state vops_int8, val vops_int2) returns vops_int8 as 'MODULE_PATHNAME','vops_count_any_extend' language C parallel safe strict;
 create function vops_int2_count_reduce(state vops_int8, val vops_int2) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe strict;
-CREATE AGGREGATE mcount(vops_int2) (
-	SFUNC = vops_int2_count_stub,
-	STYPE = vops_int8,
-	initcond = '0', 
-    mstype = vops_int8,
+create aggregate mcount(vops_int2) (
+	sfunc = vops_int2_count_extend,
+	stype = vops_int8,
+	initcond = '0',
+	mstype = vops_int8,
 	msfunc = vops_int2_count_extend,
 	minvfunc = vops_int2_count_reduce,
-	minitcond = '0', 
-	PARALLEL = SAFE
+	minitcond = '0',
+	parallel = safe
 );
 
 create function vops_int2_first_accumulate(state internal, val vops_int2, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int2_first_final(state internal) returns int2 as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
-CREATE AGGREGATE first(vops_int2,vops_timestamp) (
-	SFUNC = vops_int2_first_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_int2_first_final,
- 	COMBINEFUNC = vops_first_combine,
-	PARALLEL = SAFE
+create aggregate first(vops_int2, vops_timestamp) (
+	sfunc = vops_int2_first_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_int2_first_final,
+	combinefunc = vops_first_combine,
+	parallel = safe
 );
 
 create function vops_int2_last_accumulate(state internal, val vops_int2, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE last(vops_int2,vops_timestamp) (
-	SFUNC = vops_int2_last_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_int2_first_final,
- 	COMBINEFUNC = vops_last_combine,
-	PARALLEL = SAFE
+create aggregate last(vops_int2, vops_timestamp) (
+	sfunc = vops_int2_last_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_int2_first_final,
+	combinefunc = vops_last_combine,
+	parallel = safe
 );
 
 create function vops_int2_approxdc_accumulate(state internal, val vops_int2) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE approxdc(vops_int2) (
-	SFUNC = vops_int2_approxdc_accumulate,
-	STYPE = internal,
-	SSPACE = 128,
-	FINALFUNC = vops_approxdc_final,
-	COMBINEFUNC = vops_approxdc_combine,
-	SERIALFUNC = vops_approxdc_serial,
-	DESERIALFUNC = vops_approxdc_deserial,
-	PARALLEL = SAFE
+create aggregate approxdc(vops_int2) (
+	sfunc = vops_int2_approxdc_accumulate,
+	stype = internal,
+	sspace = 128,
+	finalfunc = vops_approxdc_final,
+	combinefunc = vops_approxdc_combine,
+	serialfunc = vops_approxdc_serial,
+	deserialfunc = vops_approxdc_deserial,
+	parallel = safe
 );
 
 create function first(tile vops_int2) returns int2 as 'MODULE_PATHNAME','vops_int2_first' language C parallel safe immutable strict;
@@ -958,13 +943,13 @@ create operator || (leftarg=vops_int4, rightarg=vops_int4, procedure=vops_int4_c
 
 create function vops_int4_group_by(state internal, group_by vops_int4, aggregates cstring, variadic anyarray) returns internal as 'MODULE_PATHNAME' language C parallel safe immutable;
 create aggregate map(group_by vops_int4, aggregates cstring, variadic anyarray) (
-	   sfunc = vops_int4_group_by, 
-	   stype = internal,
-	   finalfunc=vops_agg_final,
-	   combinefunc = vops_agg_combine,
-	   serialfunc = vops_agg_serial,
-	   deserialfunc = vops_agg_deserial,
-	   parallel = safe);
+	sfunc = vops_int4_group_by,
+	stype = internal,
+	finalfunc=vops_agg_final,
+	combinefunc = vops_agg_combine,
+	serialfunc = vops_agg_serial,
+	deserialfunc = vops_agg_deserial,
+	parallel = safe);
 
 create function vops_int4_sub(left vops_int4, right vops_int4) returns vops_int4 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_int4_sub_rconst(left vops_int4, right int4) returns vops_int4 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
@@ -1052,247 +1037,242 @@ create function vops_int4_neg(right vops_int4) returns vops_int4 as 'MODULE_PATH
 create operator - (rightarg=vops_int4, procedure=vops_int4_neg);
 
 create function vops_int4_sum_accumulate(state int8, val vops_int4) returns int8 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE sum(vops_int4) (
-	SFUNC = vops_int4_sum_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	PARALLEL = SAFE
+create aggregate sum(vops_int4) (
+	sfunc = vops_int4_sum_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	parallel = safe
 );
-create function vops_int4_sum_stub(state vops_int8, val vops_int4) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int4_sum_extend(state vops_int8, val vops_int4) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int4_sum_reduce(state vops_int8, val vops_int4) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE msum(vops_int4) (
-	SFUNC = vops_int4_sum_stub,
-	STYPE = vops_int8,
-    mstype = vops_int8,
+create aggregate msum(vops_int4) (
+	sfunc = vops_int4_sum_extend,
+	stype = vops_int8,
+	mstype = vops_int8,
 	msfunc = vops_int4_sum_extend,
 	minvfunc = vops_int4_sum_reduce,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
-create function vops_int4_msum_stub(state internal, val vops_int4, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int4_msum_extend(state internal, val vops_int4, winsize integer) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int4_msum_reduce(state internal, val vops_int4, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
 create function vops_int4_msum_final(state internal) returns vops_int8 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE msum(vops_int4,winsize integer) (
-	SFUNC = vops_int4_msum_stub,
-	STYPE = internal,
+create aggregate msum(vops_int4, winsize integer) (
+	sfunc = vops_int4_msum_extend,
+	stype = internal,
 	finalfunc = vops_int4_msum_final,
-    mstype = internal,
+	mstype = internal,
 	msfunc = vops_int4_msum_extend,
 	minvfunc = vops_int4_msum_reduce,
 	mfinalfunc = vops_int4_msum_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_int4_var_accumulate(state internal, val vops_int4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE var_pop(vops_int4) (
-	SFUNC = vops_int4_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_pop(vops_int4) (
+	sfunc = vops_int4_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE var_samp(vops_int4) (
-	SFUNC = vops_int4_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_samp(vops_int4) (
+	sfunc = vops_int4_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE variance(vops_int4) (
-	SFUNC = vops_int4_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate variance(vops_int4) (
+	sfunc = vops_int4_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_pop(vops_int4) (
-	SFUNC = vops_int4_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_pop(vops_int4) (
+	sfunc = vops_int4_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_samp(vops_int4) (
-	SFUNC = vops_int4_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_samp(vops_int4) (
+	sfunc = vops_int4_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev(vops_int4) (
-	SFUNC = vops_int4_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev(vops_int4) (
+	sfunc = vops_int4_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_int4_wavg_accumulate(state internal, x vops_int4, y vops_int4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE wavg(vops_int4, vops_int4) (
-	SFUNC = vops_int4_wavg_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_wavg_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate wavg(vops_int4, vops_int4) (
+	sfunc = vops_int4_wavg_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_wavg_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_int4_avg_accumulate(state internal, val vops_int4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE avg(vops_int4) (
-	SFUNC = vops_int4_avg_accumulate,
-	STYPE = internal,
-	SSPACE = 16,
-	FINALFUNC = vops_avg_final,
-	COMBINEFUNC = vops_avg_combine,
-	SERIALFUNC = vops_avg_serial,
-	DESERIALFUNC = vops_avg_deserial,
-	PARALLEL = SAFE
+create aggregate avg(vops_int4) (
+	sfunc = vops_int4_avg_accumulate,
+	stype = internal,
+	sspace = 16,
+	finalfunc = vops_avg_final,
+	combinefunc = vops_avg_combine,
+	serialfunc = vops_avg_serial,
+	deserialfunc = vops_avg_deserial,
+	parallel = safe
 );
-create function vops_int4_avg_stub(state internal, val vops_int4) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int4_avg_extend(state internal, val vops_int4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int4_avg_reduce(state internal, val vops_int4) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mavg(vops_int4) (
-	SFUNC = vops_int4_avg_stub,
-	STYPE = internal,
+create aggregate mavg(vops_int4) (
+	sfunc = vops_int4_avg_extend,
+	stype = internal,
 	finalfunc = vops_mavg_final,
-    mstype = internal,
-    msfunc = vops_int4_avg_extend,
-    minvfunc = vops_int4_avg_reduce,
-	mfinalfunc = vops_mavg_final
+	mstype = internal,
+	msfunc = vops_int4_avg_extend,
+	minvfunc = vops_int4_avg_reduce,
+	mfinalfunc = vops_mavg_final,
+	parallel = safe
 );
 
 create function vops_int4_max_accumulate(state int4, val vops_int4) returns int4 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE max(vops_int4) (
-	SFUNC = vops_int4_max_accumulate,
-	STYPE = int4,
-    COMBINEFUNC = int4larger,
-	PARALLEL = SAFE
+create aggregate max(vops_int4) (
+	sfunc = vops_int4_max_accumulate,
+	stype = int4,
+	combinefunc = int4larger,
+	parallel = safe
 );
-create function vops_int4_max_stub(state vops_int4, val vops_int4) returns vops_int4 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int4_max_extend(state vops_int4, val vops_int4) returns vops_int4 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int4_max_reduce(state vops_int4, val vops_int4) returns vops_int4 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmax(vops_int4) (
-	SFUNC = vops_int4_max_stub,
-	STYPE = vops_int4,
-    mstype = vops_int4,
-    msfunc = vops_int4_max_extend,
-    minvfunc = vops_int4_max_reduce
+create aggregate mmax(vops_int4) (
+	sfunc = vops_int4_max_extend,
+	stype = vops_int4,
+	mstype = vops_int4,
+	msfunc = vops_int4_max_extend,
+	minvfunc = vops_int4_max_reduce,
+	parallel = safe
 );
 
 create function vops_int4_min_accumulate(state int4, val vops_int4) returns int4 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE min(vops_int4) (
-	SFUNC = vops_int4_min_accumulate,
-	STYPE = int4,
-    COMBINEFUNC = int4smaller,
-	PARALLEL = SAFE
+create aggregate min(vops_int4) (
+	sfunc = vops_int4_min_accumulate,
+	stype = int4,
+	combinefunc = int4smaller,
+	parallel = safe
 );
-create function vops_int4_min_stub(state vops_int4, val vops_int4) returns vops_int4 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int4_min_extend(state vops_int4, val vops_int4) returns vops_int4 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int4_min_reduce(state vops_int4, val vops_int4) returns vops_int4 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmin(vops_int4) (
-	SFUNC = vops_int4_min_stub,
-	STYPE = vops_int4,
-    mstype = vops_int4,
-    msfunc = vops_int4_min_extend,
-    minvfunc = vops_int4_min_reduce,
-	PARALLEL = SAFE
+create aggregate mmin(vops_int4) (
+	sfunc = vops_int4_min_extend,
+	stype = vops_int4,
+	mstype = vops_int4,
+	msfunc = vops_int4_min_extend,
+	minvfunc = vops_int4_min_reduce,
+	parallel = safe
 );
 
-create function vops_int4_lag_accumulate(state internal, val vops_int4) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int4_lag_extend(state internal, val vops_int4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int4_lag_reduce(state internal, val vops_int4) returns internal as 'MODULE_PATHNAME','vops_lag_reduce' language C parallel safe;
 create function vops_int4_lag_final(state internal) returns vops_int4 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE lag(vops_int4) (
-	SFUNC = vops_int4_lag_accumulate,
-	STYPE = internal,
+create aggregate lag(vops_int4) (
+	sfunc = vops_int4_lag_extend,
+	stype = internal,
 	finalfunc = vops_int4_lag_final,
-    mstype = internal,
-    msfunc = vops_int4_lag_extend,
-    minvfunc = vops_int4_lag_reduce,
-    mfinalfunc = vops_int4_lag_final,
-	PARALLEL = SAFE
+	mstype = internal,
+	msfunc = vops_int4_lag_extend,
+	minvfunc = vops_int4_lag_reduce,
+	mfinalfunc = vops_int4_lag_final,
+	parallel = safe
 );
 
 create function vops_int4_count_accumulate(state int8, val vops_int4) returns int8 as 'MODULE_PATHNAME','vops_count_any_accumulate' language C parallel safe strict;
-CREATE AGGREGATE count(vops_int4) (
-	SFUNC = vops_int4_count_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	INITCOND = '0', 
-	PARALLEL = SAFE
+create aggregate count(vops_int4) (
+	sfunc = vops_int4_count_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	INITCOND = '0',
+	parallel = safe
 );
-create function vops_int4_count_stub(state vops_int8, val vops_int4) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate'  language C parallel safe strict;
 create function vops_int4_count_extend(state vops_int8, val vops_int4) returns vops_int8 as 'MODULE_PATHNAME','vops_count_any_extend' language C parallel safe strict;
 create function vops_int4_count_reduce(state vops_int8, val vops_int4) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe strict;
-CREATE AGGREGATE mcount(vops_int4) (
-	SFUNC = vops_int4_count_stub,
-	STYPE = vops_int8,
-	initcond = '0', 
-    mstype = vops_int8,
+create aggregate mcount(vops_int4) (
+	sfunc = vops_int4_count_extend,
+	stype = vops_int8,
+	initcond = '0',
+	mstype = vops_int8,
 	msfunc = vops_int4_count_extend,
 	minvfunc = vops_int4_count_reduce,
-	minitcond = '0', 
-	PARALLEL = SAFE
+	minitcond = '0',
+	parallel = safe
 );
 
 create function vops_int4_first_accumulate(state internal, val vops_int4, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int4_first_final(state internal) returns int4 as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
-CREATE AGGREGATE first(vops_int4,vops_timestamp) (
-	SFUNC = vops_int4_first_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_int4_first_final,
- 	COMBINEFUNC = vops_first_combine,
-	PARALLEL = SAFE
+create aggregate first(vops_int4, vops_timestamp) (
+	sfunc = vops_int4_first_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_int4_first_final,
+	combinefunc = vops_first_combine,
+	parallel = safe
 );
 
 create function vops_int4_last_accumulate(state internal, val vops_int4, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE last(vops_int4,vops_timestamp) (
-	SFUNC = vops_int4_last_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_int4_first_final,
- 	COMBINEFUNC = vops_last_combine,
-	PARALLEL = SAFE
+create aggregate last(vops_int4, vops_timestamp) (
+	sfunc = vops_int4_last_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_int4_first_final,
+	combinefunc = vops_last_combine,
+	parallel = safe
 );
 
 create function vops_int4_approxdc_accumulate(state internal, val vops_int4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE approxdc(vops_int4) (
-	SFUNC = vops_int4_approxdc_accumulate,
-	STYPE = internal,
-	SSPACE = 128,
-	FINALFUNC = vops_approxdc_final,
-	COMBINEFUNC = vops_approxdc_combine,
-	SERIALFUNC = vops_approxdc_serial,
-	DESERIALFUNC = vops_approxdc_deserial,
-	PARALLEL = SAFE
+create aggregate approxdc(vops_int4) (
+	sfunc = vops_int4_approxdc_accumulate,
+	stype = internal,
+	sspace = 128,
+	finalfunc = vops_approxdc_final,
+	combinefunc = vops_approxdc_combine,
+	serialfunc = vops_approxdc_serial,
+	deserialfunc = vops_approxdc_deserial,
+	parallel = safe
 );
 
 create function first(tile vops_int4) returns int4 as 'MODULE_PATHNAME','vops_int4_first' language C parallel safe immutable strict;
@@ -1309,13 +1289,13 @@ create cast (date as vops_date) with function vops_date_const(date);
 
 create function vops_date_group_by(state internal, group_by vops_date, aggregates cstring, variadic anyarray) returns internal as 'MODULE_PATHNAME','vops_int4_group_by' language C parallel safe immutable;
 create aggregate map(group_by vops_date, aggregates cstring, variadic anyarray) (
-	   sfunc = vops_date_group_by, 
-	   stype = internal,
-	   finalfunc=vops_agg_final,
-	   combinefunc = vops_agg_combine,
-	   serialfunc = vops_agg_serial,
-	   deserialfunc = vops_agg_deserial,
-	   parallel = safe);
+	sfunc = vops_date_group_by,
+	stype = internal,
+	finalfunc=vops_agg_final,
+	combinefunc = vops_agg_combine,
+	serialfunc = vops_agg_serial,
+	deserialfunc = vops_agg_deserial,
+	parallel = safe);
 
 create function vops_date_sub(left vops_date, right vops_date) returns vops_date as 'MODULE_PATHNAME','vops_int4_sub' language C parallel safe immutable strict;
 create function vops_date_sub_rconst(left vops_date, right date) returns vops_date as 'MODULE_PATHNAME','vops_int4_sub_rconst' language C parallel safe immutable strict;
@@ -1399,251 +1379,243 @@ create function vops_date_neg(right vops_date) returns vops_date as 'MODULE_PATH
 create operator - (rightarg=vops_date, procedure=vops_date_neg);
 
 create function vops_date_sum_accumulate(state int8, val vops_date) returns int8 as 'MODULE_PATHNAME','vops_int4_sum_accumulate' language C parallel safe;
-CREATE AGGREGATE sum(vops_date) (
-	SFUNC = vops_date_sum_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	PARALLEL = SAFE
+create aggregate sum(vops_date) (
+	sfunc = vops_date_sum_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	parallel = safe
 );
-create function vops_date_sum_stub(state vops_int8, val vops_date) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_date_sum_extend(state vops_int8, val vops_date) returns vops_int8 as 'MODULE_PATHNAME','vops_int4_sum_extend' language C parallel safe;
 create function vops_date_sum_reduce(state vops_int8, val vops_date) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE msum(vops_date) (
-	SFUNC = vops_date_sum_stub,
-	STYPE = vops_int8,
-    mstype = vops_int8,
+create aggregate msum(vops_date) (
+	sfunc = vops_date_sum_extend,
+	stype = vops_int8,
+	mstype = vops_int8,
 	msfunc = vops_date_sum_extend,
 	minvfunc = vops_date_sum_reduce,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
-create function vops_date_msum_stub(state internal, val vops_date, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_date_msum_extend(state internal, val vops_date, winsize integer) returns internal as 'MODULE_PATHNAME','vops_int4_msum_extend' language C parallel safe;
 create function vops_date_msum_reduce(state internal, val vops_date, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
 create function vops_date_msum_final(state internal) returns vops_int8 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE msum(vops_date,winsize integer) (
-	SFUNC = vops_date_msum_stub,
-	STYPE = internal,
+create aggregate msum(vops_date, winsize integer) (
+	sfunc = vops_date_msum_extend,
+	stype = internal,
 	finalfunc = vops_date_msum_final,
-    mstype = internal,
+	mstype = internal,
 	msfunc = vops_date_msum_extend,
 	minvfunc = vops_date_msum_reduce,
 	mfinalfunc = vops_date_msum_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_date_var_accumulate(state internal, val vops_date) returns internal as 'MODULE_PATHNAME','vops_int4_var_accumulate' language C parallel safe;
-CREATE AGGREGATE var_pop(vops_date) (
-	SFUNC = vops_date_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_pop(vops_date) (
+	sfunc = vops_date_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE var_samp(vops_date) (
-	SFUNC = vops_date_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_samp(vops_date) (
+	sfunc = vops_date_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE variance(vops_date) (
-	SFUNC = vops_date_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate variance(vops_date) (
+	sfunc = vops_date_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_pop(vops_date) (
-	SFUNC = vops_date_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_pop(vops_date) (
+	sfunc = vops_date_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_samp(vops_date) (
-	SFUNC = vops_date_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_samp(vops_date) (
+	sfunc = vops_date_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev(vops_date) (
-	SFUNC = vops_date_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev(vops_date) (
+	sfunc = vops_date_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_date_wavg_accumulate(state internal, x vops_date, y vops_date) returns internal as 'MODULE_PATHNAME','vops_int4_wavg_accumulate' language C parallel safe;
-CREATE AGGREGATE wavg(vops_date, vops_date) (
-	SFUNC = vops_date_wavg_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_wavg_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate wavg(vops_date, vops_date) (
+	sfunc = vops_date_wavg_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_wavg_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_date_avg_accumulate(state internal, val vops_date) returns internal as 'MODULE_PATHNAME','vops_int4_avg_accumulate' language C parallel safe;
-CREATE AGGREGATE avg(vops_date) (
-	SFUNC = vops_date_avg_accumulate,
-	STYPE = internal,
-	SSPACE = 16,
-	FINALFUNC = vops_avg_final,
-	COMBINEFUNC = vops_avg_combine,
-	SERIALFUNC = vops_avg_serial,
-	DESERIALFUNC = vops_avg_deserial,
-	PARALLEL = SAFE
+create aggregate avg(vops_date) (
+	sfunc = vops_date_avg_accumulate,
+	stype = internal,
+	sspace = 16,
+	finalfunc = vops_avg_final,
+	combinefunc = vops_avg_combine,
+	serialfunc = vops_avg_serial,
+	deserialfunc = vops_avg_deserial,
+	parallel = safe
 );
-create function vops_date_avg_stub(state internal, val vops_date) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_date_avg_extend(state internal, val vops_date) returns internal as 'MODULE_PATHNAME','vops_int4_avg_extend' language C parallel safe;
 create function vops_date_avg_reduce(state internal, val vops_date) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mavg(vops_date) (
-	SFUNC = vops_date_avg_stub,
-	STYPE = internal,
-	FINALFUNC = vops_mavg_final,
-    mstype = internal,
-    msfunc = vops_date_avg_extend,
-    minvfunc = vops_date_avg_reduce,
+create aggregate mavg(vops_date) (
+	sfunc = vops_date_avg_extend,
+	stype = internal,
+	finalfunc = vops_mavg_final,
+	mstype = internal,
+	msfunc = vops_date_avg_extend,
+	minvfunc = vops_date_avg_reduce,
 	mfinalfunc = vops_mavg_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_date_max_accumulate(state date, val vops_date) returns date as 'MODULE_PATHNAME','vops_int4_max_accumulate' language C parallel safe;
-CREATE AGGREGATE max(vops_date) (
-	SFUNC = vops_date_max_accumulate,
-	STYPE = date,
-    COMBINEFUNC = date_larger,
-	PARALLEL = SAFE
+create aggregate max(vops_date) (
+	sfunc = vops_date_max_accumulate,
+	stype = date,
+	combinefunc = date_larger,
+	parallel = safe
 );
-create function vops_date_max_stub(state vops_date, val vops_date) returns vops_date as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_date_max_extend(state vops_date, val vops_date) returns vops_date as 'MODULE_PATHNAME','vops_int4_max_extend' language C parallel safe;
 create function vops_date_max_reduce(state vops_date, val vops_date) returns vops_date as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmax(vops_date) (
-	SFUNC = vops_date_max_stub,
-	STYPE = vops_date,
-    mstype = vops_date,
-    msfunc = vops_date_max_extend,
-    minvfunc = vops_date_max_reduce,
-	PARALLEL = SAFE
+create aggregate mmax(vops_date) (
+	sfunc = vops_date_max_extend,
+	stype = vops_date,
+	mstype = vops_date,
+	msfunc = vops_date_max_extend,
+	minvfunc = vops_date_max_reduce,
+	parallel = safe
 );
 
 create function vops_date_min_accumulate(state date, val vops_date) returns date as 'MODULE_PATHNAME','vops_int4_min_accumulate' language C parallel safe;
-CREATE AGGREGATE min(vops_date) (
-	SFUNC = vops_date_min_accumulate,
-	STYPE = date,
-    COMBINEFUNC = date_smaller,
-	PARALLEL = SAFE
+create aggregate min(vops_date) (
+	sfunc = vops_date_min_accumulate,
+	stype = date,
+	combinefunc = date_smaller,
+	parallel = safe
 );
-create function vops_date_min_stub(state vops_date, val vops_date) returns vops_date as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_date_min_extend(state vops_date, val vops_date) returns vops_date as 'MODULE_PATHNAME','vops_int4_min_extend' language C parallel safe;
 create function vops_date_min_reduce(state vops_date, val vops_date) returns vops_date as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmin(vops_date) (
-	SFUNC = vops_date_min_stub,
-	STYPE = vops_date,
-    mstype = vops_date,
-    msfunc = vops_date_min_extend,
-    minvfunc = vops_date_min_reduce,
-	PARALLEL = SAFE
+create aggregate mmin(vops_date) (
+	sfunc = vops_date_min_extend,
+	stype = vops_date,
+	mstype = vops_date,
+	msfunc = vops_date_min_extend,
+	minvfunc = vops_date_min_reduce,
+	parallel = safe
 );
 
-create function vops_date_lag_accumulate(state internal, val vops_date) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_date_lag_extend(state internal, val vops_date) returns internal as 'MODULE_PATHNAME','vops_int4_lag_extend' language C parallel safe;
 create function vops_date_lag_reduce(state internal, val vops_date) returns internal as 'MODULE_PATHNAME','vops_lag_reduce' language C parallel safe;
 create function vops_date_lag_final(state internal) returns vops_date as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE lag(vops_date) (
-	SFUNC = vops_date_lag_accumulate,
-	STYPE = internal,
+create aggregate lag(vops_date) (
+	sfunc = vops_date_lag_extend,
+	stype = internal,
 	finalfunc = vops_date_lag_final,
-    mstype = internal,
-    msfunc = vops_date_lag_extend,
-    minvfunc = vops_date_lag_reduce,
-    mfinalfunc = vops_date_lag_final,
-	PARALLEL = SAFE
+	mstype = internal,
+	msfunc = vops_date_lag_extend,
+	minvfunc = vops_date_lag_reduce,
+	mfinalfunc = vops_date_lag_final,
+	parallel = safe
 );
 
 create function vops_date_count_accumulate(state int8, val vops_date) returns int8 as 'MODULE_PATHNAME','vops_count_any_accumulate' language C parallel safe strict;
-CREATE AGGREGATE count(vops_date) (
-	SFUNC = vops_date_count_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	INITCOND = '0', 
-	PARALLEL = SAFE
+create aggregate count(vops_date) (
+	sfunc = vops_date_count_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	INITCOND = '0',
+	parallel = safe
 );
-create function vops_date_count_stub(state vops_int8, val vops_date) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate'  language C parallel safe strict;
 create function vops_date_count_extend(state vops_int8, val vops_date) returns vops_int8 as 'MODULE_PATHNAME','vops_count_any_extend' language C parallel safe strict;
 create function vops_date_count_reduce(state vops_int8, val vops_date) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe strict;
-CREATE AGGREGATE mcount(vops_date) (
-	SFUNC = vops_date_count_stub,
-	STYPE = vops_int8,
-	initcond = '0', 
-    mstype = vops_int8,
+create aggregate mcount(vops_date) (
+	sfunc = vops_date_count_extend,
+	stype = vops_int8,
+	initcond = '0',
+	mstype = vops_int8,
 	msfunc = vops_date_count_extend,
 	minvfunc = vops_date_count_reduce,
-	minitcond = '0', 
-	PARALLEL = SAFE
+	minitcond = '0',
+	parallel = safe
 );
 
 create function vops_date_first_accumulate(state internal, val vops_date, ts vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int4_first_accumulate' language C parallel safe;
 create function vops_date_first_final(state internal) returns date as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
-CREATE AGGREGATE first(vops_date,vops_timestamp) (
-	SFUNC = vops_date_first_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_date_first_final,
- 	COMBINEFUNC = vops_first_combine,
-	PARALLEL = SAFE
+create aggregate first(vops_date, vops_timestamp) (
+	sfunc = vops_date_first_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_date_first_final,
+	combinefunc = vops_first_combine,
+	parallel = safe
 );
 
 create function vops_date_last_accumulate(state internal, val vops_date, ts vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int4_last_accumulate' language C parallel safe;
-CREATE AGGREGATE last(vops_date,vops_timestamp) (
-	SFUNC = vops_date_last_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_date_first_final,
- 	COMBINEFUNC = vops_last_combine,
-	PARALLEL = SAFE
+create aggregate last(vops_date, vops_timestamp) (
+	sfunc = vops_date_last_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_date_first_final,
+	combinefunc = vops_last_combine,
+	parallel = safe
 );
 
 create function vops_date_approxdc_accumulate(state internal, val vops_date) returns internal as 'MODULE_PATHNAME','vops_int4_approxdc_accumulate' language C parallel safe;
-CREATE AGGREGATE approxdc(vops_date) (
-	SFUNC = vops_date_approxdc_accumulate,
-	STYPE = internal,
-	SSPACE = 128,
-	FINALFUNC = vops_approxdc_final,
-	COMBINEFUNC = vops_approxdc_combine,
-	SERIALFUNC = vops_approxdc_serial,
-	DESERIALFUNC = vops_approxdc_deserial,
-	PARALLEL = SAFE
+create aggregate approxdc(vops_date) (
+	sfunc = vops_date_approxdc_accumulate,
+	stype = internal,
+	sspace = 128,
+	finalfunc = vops_approxdc_final,
+	combinefunc = vops_approxdc_combine,
+	serialfunc = vops_approxdc_serial,
+	deserialfunc = vops_approxdc_deserial,
+	parallel = safe
 );
-
 
 create function first(tile vops_date) returns date as 'MODULE_PATHNAME','vops_int4_first' language C parallel safe immutable strict;
 create function last(tile vops_date) returns date as 'MODULE_PATHNAME','vops_int4_last' language C parallel safe immutable strict;
@@ -1659,13 +1631,13 @@ create cast (timestamp as vops_timestamp) with function vops_timestamp_const(tim
 
 create function vops_timestamp_group_by(state internal, group_by vops_timestamp, aggregates cstring, variadic anyarray) returns internal as 'MODULE_PATHNAME','vops_int8_group_by' language C immutable;
 create aggregate map(group_by vops_timestamp, aggregates cstring, variadic anyarray) (
-	   sfunc = vops_timestamp_group_by, 
-	   stype = internal,
-	   finalfunc=vops_agg_final,
-	   combinefunc = vops_agg_combine,
-	   serialfunc = vops_agg_serial,
-	   deserialfunc = vops_agg_deserial,
-	   parallel = safe);
+	sfunc = vops_timestamp_group_by,
+	stype = internal,
+	finalfunc=vops_agg_final,
+	combinefunc = vops_agg_combine,
+	serialfunc = vops_agg_serial,
+	deserialfunc = vops_agg_deserial,
+	parallel = safe);
 
 create function vops_timestamp_sub(left vops_timestamp, right vops_timestamp) returns vops_interval as 'MODULE_PATHNAME','vops_int8_sub' language C parallel safe immutable strict;
 create function vops_timestamp_interval_sub(left vops_timestamp, right vops_interval) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_sub' language C parallel safe immutable strict;
@@ -1757,228 +1729,221 @@ create function vops_timestamp_neg(right vops_timestamp) returns vops_timestamp 
 create operator - (rightarg=vops_timestamp, procedure=vops_timestamp_neg);
 
 create function vops_timestamp_sum_accumulate(state int8, val vops_timestamp) returns int8 as 'MODULE_PATHNAME','vops_int8_sum_accumulate' language C parallel safe;
-CREATE AGGREGATE sum(vops_timestamp) (
-	SFUNC = vops_timestamp_sum_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	PARALLEL = SAFE
+create aggregate sum(vops_timestamp) (
+	sfunc = vops_timestamp_sum_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	parallel = safe
 );
-create function vops_timestamp_sum_stub(state vops_int8, val vops_timestamp) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_timestamp_sum_extend(state vops_int8, val vops_timestamp) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_sum_extend' language C parallel safe;
 create function vops_timestamp_sum_reduce(state vops_int8, val vops_timestamp) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE msum(vops_timestamp) (
-	SFUNC = vops_timestamp_sum_stub,
-	STYPE = vops_int8,
-    mstype = vops_int8,
+create aggregate msum(vops_timestamp) (
+	sfunc = vops_timestamp_sum_extend,
+	stype = vops_int8,
+	mstype = vops_int8,
 	msfunc = vops_timestamp_sum_extend,
 	minvfunc = vops_timestamp_sum_reduce,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
-create function vops_timestamp_msum_stub(state internal, val vops_timestamp, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_timestamp_msum_extend(state internal, val vops_timestamp, winsize integer) returns internal as 'MODULE_PATHNAME','vops_int8_msum_extend' language C parallel safe;
 create function vops_timestamp_msum_reduce(state internal, val vops_timestamp, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
 create function vops_timestamp_msum_final(state internal) returns vops_int8 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE msum(vops_timestamp,winsize integer) (
-	SFUNC = vops_timestamp_msum_stub,
-	STYPE = internal,
+create aggregate msum(vops_timestamp, winsize integer) (
+	sfunc = vops_timestamp_msum_extend,
+	stype = internal,
 	finalfunc = vops_timestamp_msum_final,
-    mstype = internal,
+	mstype = internal,
 	msfunc = vops_timestamp_msum_extend,
 	minvfunc = vops_timestamp_msum_reduce,
 	mfinalfunc = vops_timestamp_msum_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_timestamp_var_accumulate(state internal, val vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int8_var_accumulate' language C parallel safe;
-CREATE AGGREGATE var_pop(vops_timestamp) (
-	SFUNC = vops_timestamp_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_pop(vops_timestamp) (
+	sfunc = vops_timestamp_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE var_samp(vops_timestamp) (
-	SFUNC = vops_timestamp_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_samp(vops_timestamp) (
+	sfunc = vops_timestamp_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE variance(vops_timestamp) (
-	SFUNC = vops_timestamp_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate variance(vops_timestamp) (
+	sfunc = vops_timestamp_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_pop(vops_timestamp) (
-	SFUNC = vops_timestamp_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_pop(vops_timestamp) (
+	sfunc = vops_timestamp_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_samp(vops_timestamp) (
-	SFUNC = vops_timestamp_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_samp(vops_timestamp) (
+	sfunc = vops_timestamp_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev(vops_timestamp) (
-	SFUNC = vops_timestamp_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev(vops_timestamp) (
+	sfunc = vops_timestamp_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_timestamp_wavg_accumulate(state internal, x vops_timestamp, y vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int8_wavg_accumulate' language C parallel safe;
-CREATE AGGREGATE wavg(vops_timestamp, vops_timestamp) (
-	SFUNC = vops_timestamp_wavg_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_wavg_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate wavg(vops_timestamp, vops_timestamp) (
+	sfunc = vops_timestamp_wavg_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_wavg_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_timestamp_avg_accumulate(state internal, val vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int8_avg_accumulate' language C parallel safe;
-CREATE AGGREGATE avg(vops_timestamp) (
-	SFUNC = vops_timestamp_avg_accumulate,
-	STYPE = internal,
-	SSPACE = 16,
-	FINALFUNC = vops_avg_final,
-	COMBINEFUNC = vops_avg_combine,
-	SERIALFUNC = vops_avg_serial,
-	DESERIALFUNC = vops_avg_deserial,
-	PARALLEL = SAFE
+create aggregate avg(vops_timestamp) (
+	sfunc = vops_timestamp_avg_accumulate,
+	stype = internal,
+	sspace = 16,
+	finalfunc = vops_avg_final,
+	combinefunc = vops_avg_combine,
+	serialfunc = vops_avg_serial,
+	deserialfunc = vops_avg_deserial,
+	parallel = safe
 );
-create function vops_timestamp_avg_stub(state internal, val vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_timestamp_avg_extend(state internal, val vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int8_avg_extend' language C parallel safe;
 create function vops_timestamp_avg_reduce(state internal, val vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mavg(vops_timestamp) (
-	SFUNC = vops_timestamp_avg_stub,
-	STYPE = internal,
-	FINALFUNC = vops_mavg_final,
-    mstype = internal,
-    msfunc = vops_timestamp_avg_extend,
-    minvfunc = vops_timestamp_avg_reduce,
+create aggregate mavg(vops_timestamp) (
+	sfunc = vops_timestamp_avg_extend,
+	stype = internal,
+	finalfunc = vops_mavg_final,
+	mstype = internal,
+	msfunc = vops_timestamp_avg_extend,
+	minvfunc = vops_timestamp_avg_reduce,
 	mfinalfunc = vops_mavg_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_timestamp_max_accumulate(state timestamp, val vops_timestamp) returns timestamp as 'MODULE_PATHNAME','vops_int8_max_accumulate' language C parallel safe;
-CREATE AGGREGATE max(vops_timestamp) (
-	SFUNC = vops_timestamp_max_accumulate,
-	STYPE = timestamp,
-    COMBINEFUNC = timestamp_larger,
-	PARALLEL = SAFE
+create aggregate max(vops_timestamp) (
+	sfunc = vops_timestamp_max_accumulate,
+	stype = timestamp,
+	combinefunc = timestamp_larger,
+	parallel = safe
 );
-create function vops_timestamp_max_stub(state vops_timestamp, val vops_timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_timestamp_max_extend(state vops_timestamp, val vops_timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_max_extend' language C parallel safe;
 create function vops_timestamp_max_reduce(state vops_timestamp, val vops_timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmax(vops_timestamp) (
-	SFUNC = vops_timestamp_max_stub,
-	STYPE = vops_timestamp,
-    mstype = vops_timestamp,
-    msfunc = vops_timestamp_max_extend,
-    minvfunc = vops_timestamp_max_reduce,
-	PARALLEL = SAFE
+create aggregate mmax(vops_timestamp) (
+	sfunc = vops_timestamp_max_extend,
+	stype = vops_timestamp,
+	mstype = vops_timestamp,
+	msfunc = vops_timestamp_max_extend,
+	minvfunc = vops_timestamp_max_reduce,
+	parallel = safe
 );
 
 create function vops_timestamp_min_accumulate(state timestamp, val vops_timestamp) returns timestamp as 'MODULE_PATHNAME','vops_int8_min_accumulate' language C parallel safe;
-CREATE AGGREGATE min(vops_timestamp) (
-	SFUNC = vops_timestamp_min_accumulate,
-	STYPE = timestamp,
-    COMBINEFUNC = timestamp_smaller,
-	PARALLEL = SAFE
+create aggregate min(vops_timestamp) (
+	sfunc = vops_timestamp_min_accumulate,
+	stype = timestamp,
+	combinefunc = timestamp_smaller,
+	parallel = safe
 );
-create function vops_timestamp_min_stub(state vops_timestamp, val vops_timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_timestamp_min_extend(state vops_timestamp, val vops_timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_int8_min_extend' language C parallel safe;
 create function vops_timestamp_min_reduce(state vops_timestamp, val vops_timestamp) returns vops_timestamp as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmin(vops_timestamp) (
-	SFUNC = vops_timestamp_min_stub,
-	STYPE = vops_timestamp,
-    mstype = vops_timestamp,
-    msfunc = vops_timestamp_min_extend,
-    minvfunc = vops_timestamp_min_reduce,
-	PARALLEL = SAFE
+create aggregate mmin(vops_timestamp) (
+	sfunc = vops_timestamp_min_extend,
+	stype = vops_timestamp,
+	mstype = vops_timestamp,
+	msfunc = vops_timestamp_min_extend,
+	minvfunc = vops_timestamp_min_reduce,
+	parallel = safe
 );
 
-create function vops_timestamp_lag_accumulate(state internal, val vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_timestamp_lag_extend(state internal, val vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int8_lag_extend' language C parallel safe;
 create function vops_timestamp_lag_reduce(state internal, val vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_lag_reduce' language C parallel safe;
 create function vops_timestamp_lag_final(state internal) returns vops_timestamp as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE lag(vops_timestamp) (
-	SFUNC = vops_timestamp_lag_accumulate,
-	STYPE = internal,
+create aggregate lag(vops_timestamp) (
+	sfunc = vops_timestamp_lag_extend,
+	stype = internal,
 	finalfunc = vops_timestamp_lag_final,
-    mstype = internal,
-    msfunc = vops_timestamp_lag_extend,
-    minvfunc = vops_timestamp_lag_reduce,
-    mfinalfunc = vops_timestamp_lag_final,
-	PARALLEL = SAFE
+	mstype = internal,
+	msfunc = vops_timestamp_lag_extend,
+	minvfunc = vops_timestamp_lag_reduce,
+	mfinalfunc = vops_timestamp_lag_final,
+	parallel = safe
 );
 
 create function vops_timestamp_count_accumulate(state int8, val vops_timestamp) returns int8 as 'MODULE_PATHNAME','vops_count_any_accumulate' language C parallel safe strict;
-CREATE AGGREGATE count(vops_timestamp) (
-	SFUNC = vops_timestamp_count_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	INITCOND = '0', 
-	PARALLEL = SAFE
+create aggregate count(vops_timestamp) (
+	sfunc = vops_timestamp_count_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	INITCOND = '0',
+	parallel = safe
 );
-create function vops_timestamp_count_stub(state vops_int8, val vops_timestamp) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate'  language C parallel safe strict;
 create function vops_timestamp_count_extend(state vops_int8, val vops_timestamp) returns vops_int8 as 'MODULE_PATHNAME','vops_count_any_extend' language C parallel safe strict;
 create function vops_timestamp_count_reduce(state vops_int8, val vops_timestamp) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe strict;
-CREATE AGGREGATE mcount(vops_timestamp) (
-	SFUNC = vops_timestamp_count_stub,
-	STYPE = vops_int8,
-	initcond = '0', 
-    mstype = vops_int8,
+create aggregate mcount(vops_timestamp) (
+	sfunc = vops_timestamp_count_extend,
+	stype = vops_int8,
+	initcond = '0',
+	mstype = vops_int8,
 	msfunc = vops_timestamp_count_extend,
 	minvfunc = vops_timestamp_count_reduce,
-	minitcond = '0', 
-	PARALLEL = SAFE
+	minitcond = '0',
+	parallel = safe
 );
 
 create function vops_timestamp_approxdc_accumulate(state internal, val vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int8_approxdc_accumulate' language C parallel safe;
-CREATE AGGREGATE approxdc(vops_timestamp) (
-	SFUNC = vops_timestamp_approxdc_accumulate,
-	STYPE = internal,
-	SSPACE = 128,
-	FINALFUNC = vops_approxdc_final,
-	COMBINEFUNC = vops_approxdc_combine,
-	SERIALFUNC = vops_approxdc_serial,
-	DESERIALFUNC = vops_approxdc_deserial,
-	PARALLEL = SAFE
+create aggregate approxdc(vops_timestamp) (
+	sfunc = vops_timestamp_approxdc_accumulate,
+	stype = internal,
+	sspace = 128,
+	finalfunc = vops_approxdc_final,
+	combinefunc = vops_approxdc_combine,
+	serialfunc = vops_approxdc_serial,
+	deserialfunc = vops_approxdc_deserial,
+	parallel = safe
 );
 
 create function first(tile vops_timestamp) returns timestamp as 'MODULE_PATHNAME','vops_int8_first' language C parallel safe immutable strict;
@@ -1993,13 +1958,13 @@ create cast (deltatime as vops_interval) with function vops_interval_const(delta
 
 create function vops_interval_group_by(state internal, group_by vops_interval, aggregates cstring, variadic anyarray) returns internal as 'MODULE_PATHNAME','vops_int8_group_by' language C immutable;
 create aggregate map(group_by vops_interval, aggregates cstring, variadic anyarray) (
-	   sfunc = vops_interval_group_by, 
-	   stype = internal,
-	   finalfunc=vops_agg_final,
-	   combinefunc = vops_agg_combine,
-	   serialfunc = vops_agg_serial,
-	   deserialfunc = vops_agg_deserial,
-	   parallel = safe);
+	sfunc = vops_interval_group_by,
+	stype = internal,
+	finalfunc=vops_agg_final,
+	combinefunc = vops_agg_combine,
+	serialfunc = vops_agg_serial,
+	deserialfunc = vops_agg_deserial,
+	parallel = safe);
 
 create function vops_interval_sub(left vops_interval, right vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_sub' language C parallel safe immutable strict;
 create function vops_interval_sub_rconst(left vops_interval, right deltatime) returns vops_interval as 'MODULE_PATHNAME','vops_int8_sub_rconst' language C parallel safe immutable strict;
@@ -2097,249 +2062,242 @@ create function vops_interval_neg(right vops_interval) returns vops_interval as 
 create operator - (rightarg=vops_interval, procedure=vops_interval_neg);
 
 create function vops_interval_sum_accumulate(state int8, val vops_interval) returns int8 as 'MODULE_PATHNAME','vops_int8_sum_accumulate' language C parallel safe;
-CREATE AGGREGATE sum(vops_interval) (
-	SFUNC = vops_interval_sum_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	PARALLEL = SAFE
+create aggregate sum(vops_interval) (
+	sfunc = vops_interval_sum_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	parallel = safe
 );
-create function vops_interval_sum_stub(state vops_int8, val vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_interval_sum_extend(state vops_int8, val vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_int8_sum_extend' language C parallel safe;
 create function vops_interval_sum_reduce(state vops_int8, val vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE msum(vops_interval) (
-	SFUNC = vops_interval_sum_stub,
-	STYPE = vops_int8,
-    mstype = vops_int8,
+create aggregate msum(vops_interval) (
+	sfunc = vops_interval_sum_extend,
+	stype = vops_int8,
+	mstype = vops_int8,
 	msfunc = vops_interval_sum_extend,
 	minvfunc = vops_interval_sum_reduce,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
-create function vops_interval_msum_stub(state internal, val vops_interval, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_interval_msum_extend(state internal, val vops_interval, winsize integer) returns internal as 'MODULE_PATHNAME','vops_int8_msum_extend' language C parallel safe;
 create function vops_interval_msum_reduce(state internal, val vops_interval, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
 create function vops_interval_msum_final(state internal) returns vops_int8 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE msum(vops_interval,winsize integer) (
-	SFUNC = vops_interval_msum_stub,
-	STYPE = internal,
+create aggregate msum(vops_interval, winsize integer) (
+	sfunc = vops_interval_msum_extend,
+	stype = internal,
 	finalfunc = vops_interval_msum_final,
-    mstype = internal,
+	mstype = internal,
 	msfunc = vops_interval_msum_extend,
 	minvfunc = vops_interval_msum_reduce,
 	mfinalfunc = vops_interval_msum_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_interval_var_accumulate(state internal, val vops_interval) returns internal as 'MODULE_PATHNAME','vops_int8_var_accumulate' language C parallel safe;
-CREATE AGGREGATE var_pop(vops_interval) (
-	SFUNC = vops_interval_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_pop(vops_interval) (
+	sfunc = vops_interval_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE var_samp(vops_interval) (
-	SFUNC = vops_interval_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_samp(vops_interval) (
+	sfunc = vops_interval_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE variance(vops_interval) (
-	SFUNC = vops_interval_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate variance(vops_interval) (
+	sfunc = vops_interval_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_pop(vops_interval) (
-	SFUNC = vops_interval_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_pop(vops_interval) (
+	sfunc = vops_interval_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_samp(vops_interval) (
-	SFUNC = vops_interval_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_samp(vops_interval) (
+	sfunc = vops_interval_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev(vops_interval) (
-	SFUNC = vops_interval_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev(vops_interval) (
+	sfunc = vops_interval_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_interval_wavg_accumulate(state internal, x vops_interval, y vops_interval) returns internal as 'MODULE_PATHNAME','vops_int8_wavg_accumulate' language C parallel safe;
-CREATE AGGREGATE wavg(vops_interval, vops_interval) (
-	SFUNC = vops_interval_wavg_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_wavg_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate wavg(vops_interval, vops_interval) (
+	sfunc = vops_interval_wavg_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_wavg_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_interval_avg_accumulate(state internal, val vops_interval) returns internal as 'MODULE_PATHNAME','vops_int8_avg_accumulate' language C parallel safe;
-CREATE AGGREGATE avg(vops_interval) (
-	SFUNC = vops_interval_avg_accumulate,
-	STYPE = internal,
-	SSPACE = 16,
-	FINALFUNC = vops_avg_final,
-	COMBINEFUNC = vops_avg_combine,
-	SERIALFUNC = vops_avg_serial,
-	DESERIALFUNC = vops_avg_deserial,
-	PARALLEL = SAFE
+create aggregate avg(vops_interval) (
+	sfunc = vops_interval_avg_accumulate,
+	stype = internal,
+	sspace = 16,
+	finalfunc = vops_avg_final,
+	combinefunc = vops_avg_combine,
+	serialfunc = vops_avg_serial,
+	deserialfunc = vops_avg_deserial,
+	parallel = safe
 );
-create function vops_interval_avg_stub(state internal, val vops_interval) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_interval_avg_extend(state internal, val vops_interval) returns internal as 'MODULE_PATHNAME','vops_int8_avg_extend' language C parallel safe;
 create function vops_interval_avg_reduce(state internal, val vops_interval) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mavg(vops_interval) (
-	SFUNC = vops_interval_avg_stub,
-	STYPE = internal,
-	FINALFUNC = vops_mavg_final,
-    mstype = internal,
-    msfunc = vops_interval_avg_extend,
-    minvfunc = vops_interval_avg_reduce,
+create aggregate mavg(vops_interval) (
+	sfunc = vops_interval_avg_extend,
+	stype = internal,
+	finalfunc = vops_mavg_final,
+	mstype = internal,
+	msfunc = vops_interval_avg_extend,
+	minvfunc = vops_interval_avg_reduce,
 	mfinalfunc = vops_mavg_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_interval_max_accumulate(state int8, val vops_interval) returns int8 as 'MODULE_PATHNAME','vops_int8_max_accumulate' language C parallel safe;
-CREATE AGGREGATE max(vops_interval) (
-	SFUNC = vops_interval_max_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8larger,
-	PARALLEL = SAFE
+create aggregate max(vops_interval) (
+	sfunc = vops_interval_max_accumulate,
+	stype = int8,
+	combinefunc = int8larger,
+	parallel = safe
 );
-create function vops_interval_max_stub(state vops_interval, val vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_interval_max_extend(state vops_interval, val vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_max_extend' language C parallel safe;
 create function vops_interval_max_reduce(state vops_interval, val vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmax(vops_interval) (
-	SFUNC = vops_interval_max_stub,
-	STYPE = vops_interval,
-    mstype = vops_interval,
-    msfunc = vops_interval_max_extend,
-    minvfunc = vops_interval_max_reduce,
-	PARALLEL = SAFE
+create aggregate mmax(vops_interval) (
+	sfunc = vops_interval_max_extend,
+	stype = vops_interval,
+	mstype = vops_interval,
+	msfunc = vops_interval_max_extend,
+	minvfunc = vops_interval_max_reduce,
+	parallel = safe
 );
 
 create function vops_interval_min_accumulate(state int8, val vops_interval) returns int8 as 'MODULE_PATHNAME','vops_int8_min_accumulate' language C parallel safe;
-CREATE AGGREGATE min(vops_interval) (
-	SFUNC = vops_interval_min_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8smaller,
-	PARALLEL = SAFE
+create aggregate min(vops_interval) (
+	sfunc = vops_interval_min_accumulate,
+	stype = int8,
+	combinefunc = int8smaller,
+	parallel = safe
 );
-create function vops_interval_min_stub(state vops_interval, val vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_interval_min_extend(state vops_interval, val vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_int8_min_extend' language C parallel safe;
 create function vops_interval_min_reduce(state vops_interval, val vops_interval) returns vops_interval as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmin(vops_interval) (
-	SFUNC = vops_interval_min_stub,
-	STYPE = vops_interval,
-    mstype = vops_interval,
-    msfunc = vops_interval_min_extend,
-    minvfunc = vops_interval_min_reduce,
-	PARALLEL = SAFE
+create aggregate mmin(vops_interval) (
+	sfunc = vops_interval_min_extend,
+	stype = vops_interval,
+	mstype = vops_interval,
+	msfunc = vops_interval_min_extend,
+	minvfunc = vops_interval_min_reduce,
+	parallel = safe
 );
 
-create function vops_interval_lag_accumulate(state internal, val vops_interval) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_interval_lag_extend(state internal, val vops_interval) returns internal as 'MODULE_PATHNAME','vops_int8_lag_extend' language C parallel safe;
 create function vops_interval_lag_reduce(state internal, val vops_interval) returns internal as 'MODULE_PATHNAME','vops_lag_reduce' language C parallel safe;
 create function vops_interval_lag_final(state internal) returns vops_interval as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE lag(vops_interval) (
-	SFUNC = vops_interval_lag_accumulate,
-	STYPE = internal,
+create aggregate lag(vops_interval) (
+	sfunc = vops_interval_lag_extend,
+	stype = internal,
 	finalfunc = vops_interval_lag_final,
-    mstype = internal,
-    msfunc = vops_interval_lag_extend,
-    minvfunc = vops_interval_lag_reduce,
-    mfinalfunc = vops_interval_lag_final,
-	PARALLEL = SAFE
+	mstype = internal,
+	msfunc = vops_interval_lag_extend,
+	minvfunc = vops_interval_lag_reduce,
+	mfinalfunc = vops_interval_lag_final,
+	parallel = safe
 );
 
 create function vops_interval_count_accumulate(state int8, val vops_interval) returns int8 as 'MODULE_PATHNAME','vops_count_any_accumulate' language C parallel safe strict;
-CREATE AGGREGATE count(vops_interval) (
-	SFUNC = vops_interval_count_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	INITCOND = '0', 
-	PARALLEL = SAFE
+create aggregate count(vops_interval) (
+	sfunc = vops_interval_count_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	INITCOND = '0',
+	parallel = safe
 );
-create function vops_interval_count_stub(state vops_int8, val vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate'  language C parallel safe strict;
 create function vops_interval_count_extend(state vops_int8, val vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_count_any_extend' language C parallel safe strict;
 create function vops_interval_count_reduce(state vops_int8, val vops_interval) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe strict;
-CREATE AGGREGATE mcount(vops_interval) (
-	SFUNC = vops_interval_count_stub,
-	STYPE = vops_int8,
-	initcond = '0', 
-    mstype = vops_int8,
+create aggregate mcount(vops_interval) (
+	sfunc = vops_interval_count_extend,
+	stype = vops_int8,
+	initcond = '0',
+	mstype = vops_int8,
 	msfunc = vops_interval_count_extend,
 	minvfunc = vops_interval_count_reduce,
-	minitcond = '0', 
-	PARALLEL = SAFE
+	minitcond = '0',
+	parallel = safe
 );
 
 create function vops_interval_first_accumulate(state internal, val vops_interval, ts vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int8_first_accumulate' language C parallel safe;
 create function vops_interval_first_final(state internal) returns int8 as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
-CREATE AGGREGATE first(vops_interval,vops_timestamp) (
-	SFUNC = vops_interval_first_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_interval_first_final,
- 	COMBINEFUNC = vops_first_combine,
-	PARALLEL = SAFE
+create aggregate first(vops_interval, vops_timestamp) (
+	sfunc = vops_interval_first_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_interval_first_final,
+	combinefunc = vops_first_combine,
+	parallel = safe
 );
 
 create function vops_interval_last_accumulate(state internal, val vops_interval, ts vops_timestamp) returns internal as 'MODULE_PATHNAME','vops_int8_last_accumulate' language C parallel safe;
-CREATE AGGREGATE last(vops_interval,vops_timestamp) (
-	SFUNC = vops_interval_last_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_interval_first_final,
- 	COMBINEFUNC = vops_last_combine,
-	PARALLEL = SAFE
+create aggregate last(vops_interval, vops_timestamp) (
+	sfunc = vops_interval_last_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_interval_first_final,
+	combinefunc = vops_last_combine,
+	parallel = safe
 );
 
 create function vops_interval_approxdc_accumulate(state internal, val vops_interval) returns internal as 'MODULE_PATHNAME','vops_int8_approxdc_accumulate' language C parallel safe;
-CREATE AGGREGATE approxdc(vops_interval) (
-	SFUNC = vops_interval_approxdc_accumulate,
-	STYPE = internal,
-	SSPACE = 128,
-	FINALFUNC = vops_approxdc_final,
-	COMBINEFUNC = vops_approxdc_combine,
-	SERIALFUNC = vops_approxdc_serial,
-	DESERIALFUNC = vops_approxdc_deserial,
-	PARALLEL = SAFE
+create aggregate approxdc(vops_interval) (
+	sfunc = vops_interval_approxdc_accumulate,
+	stype = internal,
+	sspace = 128,
+	finalfunc = vops_approxdc_final,
+	combinefunc = vops_approxdc_combine,
+	serialfunc = vops_approxdc_serial,
+	deserialfunc = vops_approxdc_deserial,
+	parallel = safe
 );
 
 create function first(tile vops_interval) returns deltatime as 'MODULE_PATHNAME','vops_int8_first' language C parallel safe immutable strict;
@@ -2354,13 +2312,13 @@ create cast (int8 as vops_int8) with function vops_int8_const(int8);
 
 create function vops_int8_group_by(state internal, group_by vops_int8, aggregates cstring, variadic anyarray) returns internal as 'MODULE_PATHNAME' language C parallel safe immutable;
 create aggregate map(group_by vops_int8, aggregates cstring, variadic anyarray) (
-	   sfunc = vops_int8_group_by, 
-	   stype = internal,
-	   finalfunc=vops_agg_final,
-	   combinefunc = vops_agg_combine,
-	   serialfunc = vops_agg_serial,
-	   deserialfunc = vops_agg_deserial,
-	   parallel = safe);
+	sfunc = vops_int8_group_by,
+	stype = internal,
+	finalfunc=vops_agg_final,
+	combinefunc = vops_agg_combine,
+	serialfunc = vops_agg_serial,
+	deserialfunc = vops_agg_deserial,
+	parallel = safe);
 
 create function vops_int8_sub(left vops_int8, right vops_int8) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create function vops_int8_sub_rconst(left vops_int8, right int8) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
@@ -2447,252 +2405,243 @@ create function ifnull(opd vops_int8, subst vops_int8) returns vops_int8 as 'MOD
 create function vops_int8_neg(right vops_int8) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator - (rightarg=vops_int8, procedure=vops_int8_neg);
 
-
 create function vops_int8_sum_accumulate(state int8, val vops_int8) returns int8 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE sum(vops_int8) (
-	SFUNC = vops_int8_sum_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	PARALLEL = SAFE
+create aggregate sum(vops_int8) (
+	sfunc = vops_int8_sum_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	parallel = safe
 );
-create function vops_int8_sum_stub(state vops_int8, val vops_int8) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int8_sum_extend(state vops_int8, val vops_int8) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int8_sum_reduce(state vops_int8, val vops_int8) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE msum(vops_int8) (
-	SFUNC = vops_int8_sum_stub,
-	STYPE = vops_int8,
-    mstype = vops_int8,
+create aggregate msum(vops_int8) (
+	sfunc = vops_int8_sum_extend,
+	stype = vops_int8,
+	mstype = vops_int8,
 	msfunc = vops_int8_sum_extend,
 	minvfunc = vops_int8_sum_reduce,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
-create function vops_int8_msum_stub(state internal, val vops_int8, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int8_msum_extend(state internal, val vops_int8, winsize integer) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int8_msum_reduce(state internal, val vops_int8, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
 create function vops_int8_msum_final(state internal) returns vops_int8 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE msum(vops_int8,winsize integer) (
-	SFUNC = vops_int8_msum_stub,
-	STYPE = internal,
+create aggregate msum(vops_int8, winsize integer) (
+	sfunc = vops_int8_msum_extend,
+	stype = internal,
 	finalfunc = vops_int8_msum_final,
-    mstype = internal,
+	mstype = internal,
 	msfunc = vops_int8_msum_extend,
 	minvfunc = vops_int8_msum_reduce,
 	mfinalfunc = vops_int8_msum_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
-
 
 create function vops_int8_var_accumulate(state internal, val vops_int8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE var_pop(vops_int8) (
-	SFUNC = vops_int8_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_pop(vops_int8) (
+	sfunc = vops_int8_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE var_samp(vops_int8) (
-	SFUNC = vops_int8_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_samp(vops_int8) (
+	sfunc = vops_int8_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE variance(vops_int8) (
-	SFUNC = vops_int8_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate variance(vops_int8) (
+	sfunc = vops_int8_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_pop(vops_int8) (
-	SFUNC = vops_int8_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_pop(vops_int8) (
+	sfunc = vops_int8_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_samp(vops_int8) (
-	SFUNC = vops_int8_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_samp(vops_int8) (
+	sfunc = vops_int8_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev(vops_int8) (
-	SFUNC = vops_int8_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev(vops_int8) (
+	sfunc = vops_int8_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_int8_wavg_accumulate(state internal, x vops_int8, y vops_int8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE wavg(vops_int8, vops_int8) (
-	SFUNC = vops_int8_wavg_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_wavg_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate wavg(vops_int8, vops_int8) (
+	sfunc = vops_int8_wavg_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_wavg_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_int8_avg_accumulate(state internal, val vops_int8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE avg(vops_int8) (
-	SFUNC = vops_int8_avg_accumulate,
-	STYPE = internal,
-	SSPACE = 16,
-	FINALFUNC = vops_avg_final,
-	COMBINEFUNC = vops_avg_combine,
-	SERIALFUNC = vops_avg_serial,
-	DESERIALFUNC = vops_avg_deserial,
-	PARALLEL = SAFE
+create aggregate avg(vops_int8) (
+	sfunc = vops_int8_avg_accumulate,
+	stype = internal,
+	sspace = 16,
+	finalfunc = vops_avg_final,
+	combinefunc = vops_avg_combine,
+	serialfunc = vops_avg_serial,
+	deserialfunc = vops_avg_deserial,
+	parallel = safe
 );
-create function vops_int8_avg_stub(state internal, val vops_int8) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int8_avg_extend(state internal, val vops_int8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int8_avg_reduce(state internal, val vops_int8) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mavg(vops_int8) (
-	SFUNC = vops_int8_avg_stub,
-	STYPE = internal,
-	FINALFUNC = vops_mavg_final,
-    mstype = internal,
-    msfunc = vops_int8_avg_extend,
-    minvfunc = vops_int8_avg_reduce,
+create aggregate mavg(vops_int8) (
+	sfunc = vops_int8_avg_extend,
+	stype = internal,
+	finalfunc = vops_mavg_final,
+	mstype = internal,
+	msfunc = vops_int8_avg_extend,
+	minvfunc = vops_int8_avg_reduce,
 	mfinalfunc = vops_mavg_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_int8_max_accumulate(state int8, val vops_int8) returns int8 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE max(vops_int8) (
-	SFUNC = vops_int8_max_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8larger,
-	PARALLEL = SAFE
+create aggregate max(vops_int8) (
+	sfunc = vops_int8_max_accumulate,
+	stype = int8,
+	combinefunc = int8larger,
+	parallel = safe
 );
-create function vops_int8_max_stub(state vops_int8, val vops_int8) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int8_max_extend(state vops_int8, val vops_int8) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int8_max_reduce(state vops_int8, val vops_int8) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmax(vops_int8) (
-	SFUNC = vops_int8_max_stub,
-	STYPE = vops_int8,
-    mstype = vops_int8,
-    msfunc = vops_int8_max_extend,
-    minvfunc = vops_int8_max_reduce,
-	PARALLEL = SAFE
+create aggregate mmax(vops_int8) (
+	sfunc = vops_int8_max_extend,
+	stype = vops_int8,
+	mstype = vops_int8,
+	msfunc = vops_int8_max_extend,
+	minvfunc = vops_int8_max_reduce,
+	parallel = safe
 );
 
 create function vops_int8_min_accumulate(state int8, val vops_int8) returns int8 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE min(vops_int8) (
-	SFUNC = vops_int8_min_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8smaller,
-	PARALLEL = SAFE
+create aggregate min(vops_int8) (
+	sfunc = vops_int8_min_accumulate,
+	stype = int8,
+	combinefunc = int8smaller,
+	parallel = safe
 );
-create function vops_int8_min_stub(state vops_int8, val vops_int8) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int8_min_extend(state vops_int8, val vops_int8) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int8_min_reduce(state vops_int8, val vops_int8) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmin(vops_int8) (
-	SFUNC = vops_int8_min_stub,
-	STYPE = vops_int8,
-    mstype = vops_int8,
-    msfunc = vops_int8_min_extend,
-    minvfunc = vops_int8_min_reduce,
-	PARALLEL = SAFE
+create aggregate mmin(vops_int8) (
+	sfunc = vops_int8_min_extend,
+	stype = vops_int8,
+	mstype = vops_int8,
+	msfunc = vops_int8_min_extend,
+	minvfunc = vops_int8_min_reduce,
+	parallel = safe
 );
 
-create function vops_int8_lag_accumulate(state internal, val vops_int8) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_int8_lag_extend(state internal, val vops_int8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int8_lag_reduce(state internal, val vops_int8) returns internal as 'MODULE_PATHNAME','vops_lag_reduce' language C parallel safe;
 create function vops_int8_lag_final(state internal) returns vops_int8 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE lag(vops_int8) (
-	SFUNC = vops_int8_lag_accumulate,
-	STYPE = internal,
+create aggregate lag(vops_int8) (
+	sfunc = vops_int8_lag_extend,
+	stype = internal,
 	finalfunc = vops_int8_lag_final,
-    mstype = internal,
-    msfunc = vops_int8_lag_extend,
-    minvfunc = vops_int8_lag_reduce,
-    mfinalfunc = vops_int8_lag_final,
- 	PARALLEL = SAFE
+	mstype = internal,
+	msfunc = vops_int8_lag_extend,
+	minvfunc = vops_int8_lag_reduce,
+	mfinalfunc = vops_int8_lag_final,
+	parallel = safe
 );
 
 create function vops_int8_count_accumulate(state int8, val vops_int8) returns int8 as 'MODULE_PATHNAME','vops_count_any_accumulate' language C parallel safe strict;
-CREATE AGGREGATE count(vops_int8) (
-	SFUNC = vops_int8_count_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	INITCOND = '0', 
-	PARALLEL = SAFE
+create aggregate count(vops_int8) (
+	sfunc = vops_int8_count_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	INITCOND = '0',
+	parallel = safe
 );
-create function vops_int8_count_stub(state vops_int8, val vops_int8) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe strict;
 create function vops_int8_count_extend(state vops_int8, val vops_int8) returns vops_int8 as 'MODULE_PATHNAME','vops_count_any_extend' language C parallel safe strict;
 create function vops_int8_count_reduce(state vops_int8, val vops_int8) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe strict;
-CREATE AGGREGATE mcount(vops_int8) (
-	SFUNC = vops_int8_count_stub,
-	STYPE = vops_int8,
-	initcond = '0', 
-    mstype = vops_int8,
+create aggregate mcount(vops_int8) (
+	sfunc = vops_int8_count_extend,
+	stype = vops_int8,
+	initcond = '0',
+	mstype = vops_int8,
 	msfunc = vops_int8_count_extend,
 	minvfunc = vops_int8_count_reduce,
-	minitcond = '0', 
-	PARALLEL = SAFE
+	minitcond = '0',
+	parallel = safe
 );
 
 create function vops_int8_first_accumulate(state internal, val vops_int8, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_int8_first_final(state internal) returns int8 as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
-CREATE AGGREGATE first(vops_int8,vops_timestamp) (
-	SFUNC = vops_int8_first_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_int8_first_final,
- 	COMBINEFUNC = vops_first_combine,
-	PARALLEL = SAFE
+create aggregate first(vops_int8, vops_timestamp) (
+	sfunc = vops_int8_first_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_int8_first_final,
+	combinefunc = vops_first_combine,
+	parallel = safe
 );
 
 create function vops_int8_last_accumulate(state internal, val vops_int8, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE last(vops_int8,vops_timestamp) (
-	SFUNC = vops_int8_last_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_int8_first_final,
- 	COMBINEFUNC = vops_last_combine,
-	PARALLEL = SAFE
+create aggregate last(vops_int8, vops_timestamp) (
+	sfunc = vops_int8_last_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_int8_first_final,
+	combinefunc = vops_last_combine,
+	parallel = safe
 );
 
 create function vops_int8_approxdc_accumulate(state internal, val vops_int8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE approxdc(vops_int8) (
-	SFUNC = vops_int8_approxdc_accumulate,
-	STYPE = internal,
-	SSPACE = 128,
-	FINALFUNC = vops_approxdc_final,
-	COMBINEFUNC = vops_approxdc_combine,
-	SERIALFUNC = vops_approxdc_serial,
-	DESERIALFUNC = vops_approxdc_deserial,
-	PARALLEL = SAFE
+create aggregate approxdc(vops_int8) (
+	sfunc = vops_int8_approxdc_accumulate,
+	stype = internal,
+	sspace = 128,
+	finalfunc = vops_approxdc_final,
+	combinefunc = vops_approxdc_combine,
+	serialfunc = vops_approxdc_serial,
+	deserialfunc = vops_approxdc_deserial,
+	parallel = safe
 );
 
 create function first(tile vops_int8) returns int8 as 'MODULE_PATHNAME','vops_int8_first' language C parallel safe immutable strict;
@@ -2784,252 +2733,243 @@ create function vops_float4_neg(right vops_float4) returns vops_float4 as 'MODUL
 create operator - (rightarg=vops_float4, procedure=vops_float4_neg);
 
 create function vops_float4_sum_accumulate(state float8, val vops_float4) returns float8 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE sum(vops_float4) (
-	SFUNC = vops_float4_sum_accumulate,
-	STYPE = float8,
-    COMBINEFUNC = float8pl,
-	PARALLEL = SAFE
+create aggregate sum(vops_float4) (
+	sfunc = vops_float4_sum_accumulate,
+	stype = float8,
+	combinefunc = float8pl,
+	parallel = safe
 );
-create function vops_float4_sum_stub(state vops_float8, val vops_float4) returns vops_float8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_float4_sum_extend(state vops_float8, val vops_float4) returns vops_float8 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float4_sum_reduce(state vops_float8, val vops_float4) returns vops_float8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE msum(vops_float4) (
-	SFUNC = vops_float4_sum_stub,
-	STYPE = vops_float8,
-    mstype = vops_float8,
+create aggregate msum(vops_float4) (
+	sfunc = vops_float4_sum_extend,
+	stype = vops_float8,
+	mstype = vops_float8,
 	msfunc = vops_float4_sum_extend,
 	minvfunc = vops_float4_sum_reduce,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
-create function vops_float4_msum_stub(state internal, val vops_float4, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_float4_msum_extend(state internal, val vops_float4, winsize integer) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float4_msum_reduce(state internal, val vops_float4, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
 create function vops_float4_msum_final(state internal) returns vops_float8 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE msum(vops_float4,winsize integer) (
-	SFUNC = vops_float4_msum_stub,
-	STYPE = internal,
+create aggregate msum(vops_float4, winsize integer) (
+	sfunc = vops_float4_msum_extend,
+	stype = internal,
 	finalfunc = vops_float4_msum_final,
-    mstype = internal,
+	mstype = internal,
 	msfunc = vops_float4_msum_extend,
 	minvfunc = vops_float4_msum_reduce,
 	mfinalfunc = vops_float4_msum_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
-
 
 create function vops_float4_var_accumulate(state internal, val vops_float4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE var_pop(vops_float4) (
-	SFUNC = vops_float4_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_pop(vops_float4) (
+	sfunc = vops_float4_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE var_samp(vops_float4) (
-	SFUNC = vops_float4_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_samp(vops_float4) (
+	sfunc = vops_float4_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE variance(vops_float4) (
-	SFUNC = vops_float4_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate variance(vops_float4) (
+	sfunc = vops_float4_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_pop(vops_float4) (
-	SFUNC = vops_float4_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_pop(vops_float4) (
+	sfunc = vops_float4_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_samp(vops_float4) (
-	SFUNC = vops_float4_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_samp(vops_float4) (
+	sfunc = vops_float4_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev(vops_float4) (
-	SFUNC = vops_float4_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev(vops_float4) (
+	sfunc = vops_float4_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_float4_wavg_accumulate(state internal, x vops_float4, y vops_float4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE wavg(vops_float4,vops_float4) (
-	SFUNC = vops_float4_wavg_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_wavg_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate wavg(vops_float4, vops_float4) (
+	sfunc = vops_float4_wavg_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_wavg_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_float4_avg_accumulate(state internal, val vops_float4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE avg(vops_float4) (
-	SFUNC = vops_float4_avg_accumulate,
-	STYPE = internal,
-	SSPACE = 16,
-	FINALFUNC = vops_avg_final,
-	COMBINEFUNC = vops_avg_combine,
-	SERIALFUNC = vops_avg_serial,
-	DESERIALFUNC = vops_avg_deserial,
-	PARALLEL = SAFE
+create aggregate avg(vops_float4) (
+	sfunc = vops_float4_avg_accumulate,
+	stype = internal,
+	sspace = 16,
+	finalfunc = vops_avg_final,
+	combinefunc = vops_avg_combine,
+	serialfunc = vops_avg_serial,
+	deserialfunc = vops_avg_deserial,
+	parallel = safe
 );
-create function vops_float4_avg_stub(state internal, val vops_float4) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_float4_avg_extend(state internal, val vops_float4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float4_avg_reduce(state internal, val vops_float4) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mavg(vops_float4) (
-	SFUNC = vops_float4_avg_stub,
-	STYPE = internal,
-	FINALFUNC = vops_mavg_final,
-    mstype = internal,
-    msfunc = vops_float4_avg_extend,
-    minvfunc = vops_float4_avg_reduce,
+create aggregate mavg(vops_float4) (
+	sfunc = vops_float4_avg_extend,
+	stype = internal,
+	finalfunc = vops_mavg_final,
+	mstype = internal,
+	msfunc = vops_float4_avg_extend,
+	minvfunc = vops_float4_avg_reduce,
 	mfinalfunc = vops_mavg_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_float4_max_accumulate(state float4, val vops_float4) returns float4 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE max(vops_float4) (
-	SFUNC = vops_float4_max_accumulate,
-	STYPE = float4,
-    COMBINEFUNC = float4larger,	
- 	PARALLEL = SAFE
+create aggregate max(vops_float4) (
+	sfunc = vops_float4_max_accumulate,
+	stype = float4,
+	combinefunc = float4larger,
+	parallel = safe
 );
-create function vops_float4_max_stub(state vops_float4, val vops_float4) returns vops_float4 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_float4_max_extend(state vops_float4, val vops_float4) returns vops_float4 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float4_max_reduce(state vops_float4, val vops_float4) returns vops_float4 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmax(vops_float4) (
-	SFUNC = vops_float4_max_stub,
-	STYPE = vops_float4,
-    mstype = vops_float4,
-    msfunc = vops_float4_max_extend,
-    minvfunc = vops_float4_max_reduce,
- 	PARALLEL = SAFE
+create aggregate mmax(vops_float4) (
+	sfunc = vops_float4_max_extend,
+	stype = vops_float4,
+	mstype = vops_float4,
+	msfunc = vops_float4_max_extend,
+	minvfunc = vops_float4_max_reduce,
+	parallel = safe
 );
 
 create function vops_float4_min_accumulate(state float4, val vops_float4) returns float4 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE min(vops_float4) (
-	SFUNC = vops_float4_min_accumulate,
-	STYPE = float4,
-    COMBINEFUNC = float4smaller,
-	PARALLEL = SAFE
+create aggregate min(vops_float4) (
+	sfunc = vops_float4_min_accumulate,
+	stype = float4,
+	combinefunc = float4smaller,
+	parallel = safe
 );
-create function vops_float4_min_stub(state vops_float4, val vops_float4) returns vops_float4 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_float4_min_extend(state vops_float4, val vops_float4) returns vops_float4 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float4_min_reduce(state vops_float4, val vops_float4) returns vops_float4 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmin(vops_float4) (
-	SFUNC = vops_float4_min_stub,
-	STYPE = vops_float4,
-    mstype = vops_float4,
-    msfunc = vops_float4_min_extend,
-    minvfunc = vops_float4_min_reduce,
-	PARALLEL = SAFE
+create aggregate mmin(vops_float4) (
+	sfunc = vops_float4_min_extend,
+	stype = vops_float4,
+	mstype = vops_float4,
+	msfunc = vops_float4_min_extend,
+	minvfunc = vops_float4_min_reduce,
+	parallel = safe
 );
 
-create function vops_float4_lag_accumulate(state internal, val vops_float4) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_float4_lag_extend(state internal, val vops_float4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float4_lag_reduce(state internal, val vops_float4) returns internal as 'MODULE_PATHNAME','vops_lag_reduce' language C parallel safe;
 create function vops_float4_lag_final(state internal) returns vops_float4 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE lag(vops_float4) (
-	SFUNC = vops_float4_lag_accumulate,
-	STYPE = internal,
+create aggregate lag(vops_float4) (
+	sfunc = vops_float4_lag_extend,
+	stype = internal,
 	finalfunc = vops_float4_lag_final,
-    mstype = internal,
-    msfunc = vops_float4_lag_extend,
-    minvfunc = vops_float4_lag_reduce,
-    mfinalfunc = vops_float4_lag_final,
-	PARALLEL = SAFE
+	mstype = internal,
+	msfunc = vops_float4_lag_extend,
+	minvfunc = vops_float4_lag_reduce,
+	mfinalfunc = vops_float4_lag_final,
+	parallel = safe
 );
 
 create function vops_float4_count_accumulate(state int8, val vops_float4) returns int8 as 'MODULE_PATHNAME','vops_count_any_accumulate' language C parallel safe strict;
-CREATE AGGREGATE count(vops_float4) (
-	SFUNC = vops_float4_count_accumulate,
-	STYPE = int8,
-    COMBINEFUNC = int8pl,
-	INITCOND = '0', 
-	PARALLEL = SAFE
+create aggregate count(vops_float4) (
+	sfunc = vops_float4_count_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	INITCOND = '0',
+	parallel = safe
 );
-create function vops_float4_count_stub(state vops_int8, val vops_float4) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate'  language C parallel safe strict;
 create function vops_float4_count_extend(state vops_int8, val vops_float4) returns vops_int8 as 'MODULE_PATHNAME','vops_count_any_extend' language C parallel safe strict;
 create function vops_float4_count_reduce(state vops_int8, val vops_float4) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe strict;
-CREATE AGGREGATE mcount(vops_float4) (
-	SFUNC = vops_float4_count_stub,
-	STYPE = vops_int8,
-	initcond = '0', 
-    mstype = vops_int8,
+create aggregate mcount(vops_float4) (
+	sfunc = vops_float4_count_extend,
+	stype = vops_int8,
+	initcond = '0',
+	mstype = vops_int8,
 	msfunc = vops_float4_count_extend,
 	minvfunc = vops_float4_count_reduce,
-	minitcond = '0', 
-	PARALLEL = SAFE
+	minitcond = '0',
+	parallel = safe
 );
 
 create function vops_float4_first_accumulate(state internal, val vops_float4, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float4_first_final(state internal) returns float4 as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
-CREATE AGGREGATE first(vops_float4,vops_timestamp) (
-	SFUNC = vops_float4_first_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_float4_first_final,
- 	COMBINEFUNC = vops_first_combine,
-	PARALLEL = SAFE
+create aggregate first(vops_float4, vops_timestamp) (
+	sfunc = vops_float4_first_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_float4_first_final,
+	combinefunc = vops_first_combine,
+	parallel = safe
 );
 
 create function vops_float4_last_accumulate(state internal, val vops_float4, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE last(vops_float4,vops_timestamp) (
-	SFUNC = vops_float4_last_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_float4_first_final,
- 	COMBINEFUNC = vops_last_combine,
-	PARALLEL = SAFE
+create aggregate last(vops_float4, vops_timestamp) (
+	sfunc = vops_float4_last_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_float4_first_final,
+	combinefunc = vops_last_combine,
+	parallel = safe
 );
 
 create function vops_float4_approxdc_accumulate(state internal, val vops_float4) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE approxdc(vops_float4) (
-	SFUNC = vops_float4_approxdc_accumulate,
-	STYPE = internal,
-	SSPACE = 128,
-	FINALFUNC = vops_approxdc_final,
-	COMBINEFUNC = vops_approxdc_combine,
-	SERIALFUNC = vops_approxdc_serial,
-	DESERIALFUNC = vops_approxdc_deserial,
-	PARALLEL = SAFE
+create aggregate approxdc(vops_float4) (
+	sfunc = vops_float4_approxdc_accumulate,
+	stype = internal,
+	sspace = 128,
+	finalfunc = vops_approxdc_final,
+	combinefunc = vops_approxdc_combine,
+	serialfunc = vops_approxdc_serial,
+	deserialfunc = vops_approxdc_deserial,
+	parallel = safe
 );
-
 
 create function first(tile vops_float4) returns float4 as 'MODULE_PATHNAME','vops_float4_first' language C parallel safe immutable strict;
 create function last(tile vops_float4) returns float4 as 'MODULE_PATHNAME','vops_float4_last' language C parallel safe immutable strict;
@@ -3120,251 +3060,242 @@ create function vops_float8_neg(right vops_float8) returns vops_float8 as 'MODUL
 create operator - (rightarg=vops_float8, procedure=vops_float8_neg);
 
 create function vops_float8_sum_accumulate(state float8, val vops_float8) returns float8 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE sum(vops_float8) (
-	SFUNC = vops_float8_sum_accumulate,
-	STYPE = float8,
-    COMBINEFUNC = float8pl,
-	PARALLEL = SAFE
+create aggregate sum(vops_float8) (
+	sfunc = vops_float8_sum_accumulate,
+	stype = float8,
+	combinefunc = float8pl,
+	parallel = safe
 );
-create function vops_float8_sum_stub(state vops_float8, val vops_float8) returns vops_float8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_float8_sum_extend(state vops_float8, val vops_float8) returns vops_float8 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float8_sum_reduce(state vops_float8, val vops_float8) returns vops_float8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE msum(vops_float8) (
-	SFUNC = vops_float8_sum_stub,
-	STYPE = vops_float8,
-    mstype = vops_float8,
+create aggregate msum(vops_float8) (
+	sfunc = vops_float8_sum_extend,
+	stype = vops_float8,
+	mstype = vops_float8,
 	msfunc = vops_float8_sum_extend,
 	minvfunc = vops_float8_sum_reduce,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
-create function vops_float8_msum_stub(state internal, val vops_float8, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_float8_msum_extend(state internal, val vops_float8, winsize integer) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float8_msum_reduce(state internal, val vops_float8, winsize integer) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
 create function vops_float8_msum_final(state internal) returns vops_float8 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE msum(vops_float8,winsize integer) (
-	SFUNC = vops_float8_msum_stub,
-	STYPE = internal,
+create aggregate msum(vops_float8, winsize integer) (
+	sfunc = vops_float8_msum_extend,
+	stype = internal,
 	finalfunc = vops_float8_msum_final,
-    mstype = internal,
+	mstype = internal,
 	msfunc = vops_float8_msum_extend,
 	minvfunc = vops_float8_msum_reduce,
 	mfinalfunc = vops_float8_msum_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
-
 
 create function vops_float8_var_accumulate(state internal, val vops_float8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE var_pop(vops_float8) (
-	SFUNC = vops_float8_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_pop(vops_float8) (
+	sfunc = vops_float8_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE var_samp(vops_float8) (
-	SFUNC = vops_float8_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate var_samp(vops_float8) (
+	sfunc = vops_float8_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE variance(vops_float8) (
-	SFUNC = vops_float8_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_var_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate variance(vops_float8) (
+	sfunc = vops_float8_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_var_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_pop(vops_float8) (
-	SFUNC = vops_float8_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_pop_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_pop(vops_float8) (
+	sfunc = vops_float8_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_pop_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev_samp(vops_float8) (
-	SFUNC = vops_float8_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev_samp(vops_float8) (
+	sfunc = vops_float8_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
-CREATE AGGREGATE stddev(vops_float8) (
-	SFUNC = vops_float8_var_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_stddev_samp_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate stddev(vops_float8) (
+	sfunc = vops_float8_var_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_stddev_samp_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
 
 create function vops_float8_wavg_accumulate(state internal, x vops_float8, y vops_float8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE wavg(vops_float8, vops_float8) (
-	SFUNC = vops_float8_wavg_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_wavg_final,
-	COMBINEFUNC = vops_var_combine,
-	SERIALFUNC = vops_var_serial,
-	DESERIALFUNC = vops_var_deserial,
-	PARALLEL = SAFE
+create aggregate wavg(vops_float8, vops_float8) (
+	sfunc = vops_float8_wavg_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_wavg_final,
+	combinefunc = vops_var_combine,
+	serialfunc = vops_var_serial,
+	deserialfunc = vops_var_deserial,
+	parallel = safe
 );
-
 
 create function vops_float8_avg_accumulate(state internal, val vops_float8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE avg(vops_float8) (
-	SFUNC = vops_float8_avg_accumulate,
-	STYPE = internal,
-	SSPACE = 16,
-	FINALFUNC = vops_avg_final,
-	COMBINEFUNC = vops_avg_combine,
-	SERIALFUNC = vops_avg_serial,
-	DESERIALFUNC = vops_avg_deserial,
-	PARALLEL = SAFE
+create aggregate avg(vops_float8) (
+	sfunc = vops_float8_avg_accumulate,
+	stype = internal,
+	sspace = 16,
+	finalfunc = vops_avg_final,
+	combinefunc = vops_avg_combine,
+	serialfunc = vops_avg_serial,
+	deserialfunc = vops_avg_deserial,
+	parallel = safe
 );
-create function vops_float8_avg_stub(state internal, val vops_float8) returns internal as 'MODULE_PATHNAME','vops_window_accumulate'  language C parallel safe;
 create function vops_float8_avg_extend(state internal, val vops_float8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float8_avg_reduce(state internal, val vops_float8) returns internal as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mavg(vops_float8) (
-	SFUNC = vops_float8_avg_stub,
-	STYPE = internal,
-	FINALFUNC = vops_mavg_final,
-    mstype = internal,
-    msfunc = vops_float8_avg_extend,
-    minvfunc = vops_float8_avg_reduce,
+create aggregate mavg(vops_float8) (
+	sfunc = vops_float8_avg_extend,
+	stype = internal,
+	finalfunc = vops_mavg_final,
+	mstype = internal,
+	msfunc = vops_float8_avg_extend,
+	minvfunc = vops_float8_avg_reduce,
 	mfinalfunc = vops_mavg_final,
-	PARALLEL = SAFE
+	parallel = safe
 );
 
 create function vops_float8_max_accumulate(state float8, val vops_float8) returns float8 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE max(vops_float8) (
-	SFUNC = vops_float8_max_accumulate,
-	STYPE = float8,
+create aggregate max(vops_float8) (
+	sfunc = vops_float8_max_accumulate,
+	stype = float8,
 	COMBINEFUNC  = float8larger,
-	PARALLEL = SAFE
+	parallel = safe
 );
-create function vops_float8_max_stub(state vops_float8, val vops_float8) returns vops_float8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_float8_max_extend(state vops_float8, val vops_float8) returns vops_float8 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float8_max_reduce(state vops_float8, val vops_float8) returns vops_float8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmax(vops_float8) (
-	SFUNC = vops_float8_max_stub,
-	STYPE = vops_float8,
-    mstype = vops_float8,
-    msfunc = vops_float8_max_extend,
-    minvfunc = vops_float8_max_reduce,
-	PARALLEL = SAFE
+create aggregate mmax(vops_float8) (
+	sfunc = vops_float8_max_extend,
+	stype = vops_float8,
+	mstype = vops_float8,
+	msfunc = vops_float8_max_extend,
+	minvfunc = vops_float8_max_reduce,
+	parallel = safe
 );
 
 create function vops_float8_min_accumulate(state float8, val vops_float8) returns float8 as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE min(vops_float8) (
-	SFUNC = vops_float8_min_accumulate,
-	STYPE = float8,
+create aggregate min(vops_float8) (
+	sfunc = vops_float8_min_accumulate,
+	stype = float8,
 	COMBINEFUNC  = float8smaller,
-	PARALLEL = SAFE
+	parallel = safe
 );
-create function vops_float8_min_stub(state vops_float8, val vops_float8) returns vops_float8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_float8_min_extend(state vops_float8, val vops_float8) returns vops_float8 as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float8_min_reduce(state vops_float8, val vops_float8) returns vops_float8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe;
-CREATE AGGREGATE mmin(vops_float8) (
-	SFUNC = vops_float8_min_stub,
-	STYPE = vops_float8,
-    mstype = vops_float8,
-    msfunc = vops_float8_min_extend,
-    minvfunc = vops_float8_min_reduce,
-	PARALLEL = SAFE
+create aggregate mmin(vops_float8) (
+	sfunc = vops_float8_min_extend,
+	stype = vops_float8,
+	mstype = vops_float8,
+	msfunc = vops_float8_min_extend,
+	minvfunc = vops_float8_min_reduce,
+	parallel = safe
 );
 
-create function vops_float8_lag_accumulate(state internal, val vops_float8) returns internal as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe;
 create function vops_float8_lag_extend(state internal, val vops_float8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float8_lag_reduce(state internal, val vops_float8) returns internal as 'MODULE_PATHNAME','vops_lag_reduce' language C parallel safe;
 create function vops_float8_lag_final(state internal) returns vops_float8 as 'MODULE_PATHNAME','vops_win_final' language C parallel safe strict;
-CREATE AGGREGATE lag(vops_float8) (
-	SFUNC = vops_float8_lag_accumulate,
-	STYPE = internal,
+create aggregate lag(vops_float8) (
+	sfunc = vops_float8_lag_extend,
+	stype = internal,
 	finalfunc = vops_float8_lag_final,
-    mstype = internal,
-    msfunc = vops_float8_lag_extend,
-    minvfunc = vops_float8_lag_reduce,
-    mfinalfunc = vops_float8_lag_final,
-	PARALLEL = SAFE
+	mstype = internal,
+	msfunc = vops_float8_lag_extend,
+	minvfunc = vops_float8_lag_reduce,
+	mfinalfunc = vops_float8_lag_final,
+	parallel = safe
 );
 
 create function vops_float8_count_accumulate(state int8, val vops_float8) returns int8 as 'MODULE_PATHNAME','vops_count_any_accumulate' language C parallel safe strict;
-CREATE AGGREGATE count(vops_float8) (
-	SFUNC = vops_float8_count_accumulate,
-	STYPE = int8,
-	COMBINEFUNC = int8pl,
-	INITCOND = '0', 
-	PARALLEL = SAFE
+create aggregate count(vops_float8) (
+	sfunc = vops_float8_count_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	INITCOND = '0',
+	parallel = safe
 );
-create function vops_float8_count_stub(state vops_int8, val vops_float8) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate'  language C parallel safe strict;
 create function vops_float8_count_extend(state vops_int8, val vops_float8) returns vops_int8 as 'MODULE_PATHNAME','vops_count_any_extend' language C parallel safe strict;
 create function vops_float8_count_reduce(state vops_int8, val vops_float8) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe strict;
-CREATE AGGREGATE mcount(vops_float8) (
-	SFUNC = vops_float8_count_stub,
-	STYPE = vops_int8,
-	initcond = '0', 
-    mstype = vops_int8,
+create aggregate mcount(vops_float8) (
+	sfunc = vops_float8_count_extend,
+	stype = vops_int8,
+	initcond = '0',
+	mstype = vops_int8,
 	msfunc = vops_float8_count_extend,
 	minvfunc = vops_float8_count_reduce,
-	minitcond = '0', 
-	PARALLEL = SAFE
+	minitcond = '0',
+	parallel = safe
 );
 
 create function vops_float8_first_accumulate(state internal, val vops_float8, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_float8_first_final(state internal) returns float8 as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
-CREATE AGGREGATE first(vops_float8,vops_timestamp) (
-	SFUNC = vops_float8_first_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_float8_first_final,
- 	COMBINEFUNC = vops_first_combine,
-	PARALLEL = SAFE
+create aggregate first(vops_float8, vops_timestamp) (
+	sfunc = vops_float8_first_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_float8_first_final,
+	combinefunc = vops_first_combine,
+	parallel = safe
 );
 
 create function vops_float8_last_accumulate(state internal, val vops_float8, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE last(vops_float8,vops_timestamp) (
-	SFUNC = vops_float8_last_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_float8_first_final,
- 	COMBINEFUNC = vops_last_combine,
-	PARALLEL = SAFE
+create aggregate last(vops_float8, vops_timestamp) (
+	sfunc = vops_float8_last_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_float8_first_final,
+	combinefunc = vops_last_combine,
+	parallel = safe
 );
 
 create function vops_float8_approxdc_accumulate(state internal, val vops_float8) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE approxdc(vops_float8) (
-	SFUNC = vops_float8_approxdc_accumulate,
-	STYPE = internal,
-	SSPACE = 128,
-	FINALFUNC = vops_approxdc_final,
-	COMBINEFUNC = vops_approxdc_combine,
-	SERIALFUNC = vops_approxdc_serial,
-	DESERIALFUNC = vops_approxdc_deserial,
-	PARALLEL = SAFE
+create aggregate approxdc(vops_float8) (
+	sfunc = vops_float8_approxdc_accumulate,
+	stype = internal,
+	sspace = 128,
+	finalfunc = vops_approxdc_final,
+	combinefunc = vops_approxdc_combine,
+	serialfunc = vops_approxdc_serial,
+	deserialfunc = vops_approxdc_deserial,
+	parallel = safe
 );
 
 create function first(tile vops_float8) returns float8 as 'MODULE_PATHNAME','vops_float8_first' language C parallel safe immutable strict;
@@ -3383,56 +3314,54 @@ create operator | (leftarg=vops_bool, rightarg=vops_bool, procedure=vops_bool_or
 create function vops_bool_and(left vops_bool, right vops_bool) returns vops_bool as 'MODULE_PATHNAME' language C parallel safe immutable strict;
 create operator & (leftarg=vops_bool, rightarg=vops_bool, procedure=vops_bool_and, commutator= &);
 
-
 create function vops_count_all_accumulate(state int8) returns int8 as 'MODULE_PATHNAME' language C parallel safe strict;
-CREATE AGGREGATE countall(*) (
-	SFUNC = vops_count_all_accumulate,
-	STYPE = int8,
-	COMBINEFUNC = int8pl,
-	INITCOND = '0', 
-	PARALLEL = SAFE
+create aggregate countall(*) (
+	sfunc = vops_count_all_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	INITCOND = '0',
+	parallel = safe
 );
 create function vops_count_accumulate(state int8, val anyelement) returns int8 as 'MODULE_PATHNAME' language C parallel safe strict;
-CREATE AGGREGATE vcount(anyelement) (
-	SFUNC = vops_count_accumulate,
-	STYPE = int8,
-	COMBINEFUNC = int8pl,
-	INITCOND = '0', 
-	PARALLEL = SAFE
+create aggregate vcount(anyelement) (
+	sfunc = vops_count_accumulate,
+	stype = int8,
+	combinefunc = int8pl,
+	INITCOND = '0',
+	parallel = safe
 );
-create function vops_count_stub(state vops_int8) returns vops_int8 as 'MODULE_PATHNAME','vops_window_accumulate' language C parallel safe strict;
 create function vops_count_extend(state vops_int8) returns vops_int8 as 'MODULE_PATHNAME' language C parallel safe strict;
 create function vops_count_reduce(state vops_int8) returns vops_int8 as 'MODULE_PATHNAME','vops_window_reduce' language C parallel safe strict;
-CREATE AGGREGATE mcount(*) (
-	SFUNC = vops_count_stub,
-	STYPE = vops_int8,
-	initcond = '0', 
-    mstype = vops_int8,
+create aggregate mcount(*) (
+	sfunc = vops_count_extend,
+	stype = vops_int8,
+	initcond = '0',
+	mstype = vops_int8,
 	msfunc = vops_count_extend,
 	minvfunc = vops_count_reduce,
-	minitcond = '0', 
-	PARALLEL = SAFE
+	minitcond = '0',
+	parallel = safe
 );
 
 create function vops_bool_first_accumulate(state internal, val vops_bool, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
 create function vops_bool_first_final(state internal) returns bool as 'MODULE_PATHNAME','vops_first_final' language C parallel safe;
-CREATE AGGREGATE first(vops_bool,vops_timestamp) (
-	SFUNC = vops_bool_first_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_bool_first_final,
- 	COMBINEFUNC = vops_first_combine,
-	PARALLEL = SAFE
+create aggregate first(vops_bool, vops_timestamp) (
+	sfunc = vops_bool_first_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_bool_first_final,
+	combinefunc = vops_first_combine,
+	parallel = safe
 );
 
 create function vops_bool_last_accumulate(state internal, val vops_bool, ts vops_timestamp) returns internal as 'MODULE_PATHNAME' language C parallel safe;
-CREATE AGGREGATE last(vops_bool,vops_timestamp) (
-	SFUNC = vops_bool_last_accumulate,
-	STYPE = internal,
-	SSPACE = 24,
-	FINALFUNC = vops_bool_first_final,
- 	COMBINEFUNC = vops_last_combine,
-	PARALLEL = SAFE
+create aggregate last(vops_bool, vops_timestamp) (
+	sfunc = vops_bool_last_accumulate,
+	stype = internal,
+	sspace = 24,
+	finalfunc = vops_bool_first_final,
+	combinefunc = vops_last_combine,
+	parallel = safe
 );
 
 create function first(tile vops_bool) returns bool as 'MODULE_PATHNAME','vops_bool_first' language C parallel safe immutable strict;
@@ -3448,8 +3377,6 @@ create function filter(condition vops_bool) returns bool as 'MODULE_PATHNAME','v
 create function populate(destination regclass, source regclass, predicate cstring default null, sort cstring default null) returns bigint as 'MODULE_PATHNAME','vops_populate' language C;
 create function import(destination regclass, csv_path cstring, separator cstring default ',', skip integer default 0) returns bigint as 'MODULE_PATHNAME','vops_import' language C strict;
 
-
-
 create type vops_aggregates as(group_by int8, count int8, aggs float8[]);
 create function reduce(bigint) returns setof vops_aggregates as 'MODULE_PATHNAME','vops_reduce' language C parallel safe strict immutable;
 
@@ -3462,27 +3389,26 @@ create function is_not_null(anyelement) returns vops_bool as 'MODULE_PATHNAME','
 
 -- VOPS FDW
 
-CREATE FUNCTION vops_fdw_handler()
-RETURNS fdw_handler
-AS 'MODULE_PATHNAME'
-LANGUAGE C STRICT;
+create function vops_fdw_handler()
+returns fdw_handler
+as 'MODULE_PATHNAME'
+language C strict;
 
-CREATE FUNCTION vops_fdw_validator(text[], oid)
-RETURNS void
-AS 'MODULE_PATHNAME'
-LANGUAGE C STRICT;
+create function vops_fdw_validator(text[], oid)
+returns void
+as 'MODULE_PATHNAME'
+language C strict;
 
-CREATE FOREIGN DATA WRAPPER vops_fdw
-  HANDLER vops_fdw_handler
-  VALIDATOR vops_fdw_validator;
+create foreign data wrapper vops_fdw
+	handler vops_fdw_handler
+	validator vops_fdw_validator;
 
-CREATE SERVER vops_server FOREIGN DATA WRAPPER vops_fdw;
+create server vops_server foreign data wrapper vops_fdw;
 
 -- Projection generator
 
 create table vops_projections(projection text primary key, source_table oid, vector_columns integer[], scalar_columns integer[], key_name text);
 create index on vops_projections(source_table);
-
 
 create function drop_projection(projection_name text) returns void as $drop$
 begin
@@ -3492,35 +3418,34 @@ begin
 end;
 $drop$ language plpgsql;
 
-
 create function create_projection(projection_name text, source_table regclass, vector_columns text[], scalar_columns text[] default null, order_by text default null) returns void as $create$
 declare
-    create_table text;
-    create_func  text;
-    create_index text;
+	create_table text;
+	create_func  text;
+	create_index text;
 	vector_attno integer[];
 	scalar_attno integer[];
-    att_num      integer;
-    att_name     text;
-    att_typname  text;
-    att_typid    integer;
+	att_num      integer;
+	att_name     text;
+	att_typname  text;
+	att_typid    integer;
 	sep          text := '';
 	key_type     text;
 	min_value    text;
 	i            integer;
 	att_typmod   integer;
  begin
-    create_table := 'create table '||projection_name||'(';
-    create_func := 'create function '||projection_name||'_refresh() returns bigint as $$ select populate(source:='''||source_table::text||''',destination:='''||projection_name||''',sort:=''';
+	create_table := 'create table '||projection_name||'(';
+	create_func := 'create function '||projection_name||'_refresh() returns bigint as $$ select populate(source:='''||source_table::text||''', destination:='''||projection_name||''', sort:=''';
 	if scalar_columns is not null
 	then
 		create_index := 'create index on '||projection_name||' using brin(';
 		foreach att_name IN ARRAY scalar_columns
 		loop
-			select atttypid,attnum,typname into att_typid,att_num,att_typname from pg_attribute,pg_type where attrelid=source_table::oid and attname=att_name and atttypid=pg_type.oid;
-        	if att_typid is null
+			select atttypid, attnum, typname into att_typid, att_num, att_typname from pg_attribute, pg_type where attrelid=source_table::oid and attname=att_name and atttypid=pg_type.oid;
+		if att_typid is null
 			then
-				raise exception 'No attribute % in table %',att_name,source_table;
+				raise exception 'No attribute % in table %', att_name, source_table;
 			end if;
 			scalar_attno := scalar_attno||att_num;
 			if att_typname='char'
@@ -3534,18 +3459,18 @@ declare
 		end loop;
 	end if;
 
-    if order_by is not null
+	if order_by is not null
 	then
 		create_func := create_func||sep||order_by;
 	end if;
 	create_func := create_func||''''; -- end of sort list
 
-    foreach att_name IN ARRAY vector_columns
+	foreach att_name in array vector_columns
 	loop
-		select atttypid,attnum,typname,atttypmod into att_typid,att_num,att_typname,att_typmod from pg_attribute,pg_type where attrelid=source_table::oid and attname=att_name and atttypid=pg_type.oid;
-        if att_typid is null
+		select atttypid, attnum, typname, atttypmod into att_typid, att_num, att_typname, att_typmod from pg_attribute, pg_type where attrelid=source_table::oid and attname=att_name and atttypid=pg_type.oid;
+		if att_typid is null
 		then
-		    raise exception 'No attribute % in table %',att_name,source_table;
+			raise exception 'No attribute % in table %', att_name, source_table;
 		end if;
 		if att_typname='bpchar' or att_typname='varchar'
 		then
@@ -3569,23 +3494,23 @@ declare
 		execute create_index;
 	end if;
 
-    if order_by is not null
+	if order_by is not null
 	then
 		if key_type is null
 		then
-		    raise exception 'Invalid order column % for projection %',order_by,projection_name;
+			raise exception 'Invalid order column % for projection %', order_by, projection_name;
 		end if;
 		create_index := 'create index on '||projection_name||' using brin(first('||order_by||'))';
- 	    execute create_index;
+		execute create_index;
 		create_index := 'create index on '||projection_name||' using brin(last('||order_by||'))';
- 	    execute create_index;
+		execute create_index;
 		if key_type='timestamp' or key_type='date'
 		then
-		    min_value := '''''-infinity''''::'||key_type;
+			min_value := '''''-infinity''''::'||key_type;
 		else
 			min_value := '-1'; -- assume that key have only non-negative values
 		end if;
-		create_func := create_func||',predicate:='''||order_by||'>(select coalesce(max(last('||order_by||')),'||min_value||') from '||projection_name||')''';
+		create_func := create_func||', predicate:='''||order_by||'>(select coalesce(max(last('||order_by||')),'||min_value||') from '||projection_name||')''';
 	end if;
 	create_func := create_func||'); $$ language sql';
 	execute create_func;
