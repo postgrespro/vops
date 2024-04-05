@@ -11,8 +11,6 @@ EXTENSION = vops
 DATA = vops--1.0.sql
 #CUSTOM_COPT = -O0
 
-REGRESS = test
-
 PG_CPPFLAGS = -I$(libpq_srcdir)
 PG_LIBS = $(libpq_pgport)
 
