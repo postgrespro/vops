@@ -39,9 +39,7 @@ typedef enum
 
 
 #define TILE_SIZE 64 /* just because of maximum size of bitmask */
-#define MAX_SQL_STMT_LEN 1024
 #define MAX_CSV_LINE_LEN 4096
-#define MAX_TILE_STRLEN (TILE_SIZE*16)
 #define INIT_MAP_SIZE (1024*1024)
 
 typedef long long long64;

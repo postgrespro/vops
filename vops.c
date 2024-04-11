@@ -823,23 +823,23 @@ static bool is_vops_type(Oid typeid)
 	Datum vops_##TYPE##_output(PG_FUNCTION_ARGS)						\
 	{																	\
 		vops_##TYPE* tile = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
-		char buf[MAX_TILE_STRLEN];									    \
-		int p = 0;														\
+		StringInfoData str;												\
 		char sep = '{';													\
 		int i;															\
+		initStringInfo(&str);											\
 		for (i = 0; i < TILE_SIZE; i++) {								\
 			if (tile->hdr.empty_mask & ((uint64)1 << i)) {				\
-				p += sprintf(buf + p, "%c", sep);						\
+				appendStringInfo(&str, "%c", sep);						\
 			} else if (tile->hdr.null_mask & ((uint64)1 << i)) {		\
-				p += sprintf(buf + p, "%c?", sep);						\
+				appendStringInfo(&str, "%c?", sep);						\
 			} else {													\
-				p += sprintf(buf + p, "%c%.*" #FORMAT, sep, PREC, (STYPE)tile->payload[i]); \
+				appendStringInfo(&str, "%c%.*" #FORMAT, sep, PREC, (STYPE)tile->payload[i]); \
 			}															\
 			sep = ',';													\
 		}																\
-		strcpy(buf + p, "}");											\
-		PG_RETURN_CSTRING(pstrdup(buf));								\
-    }
+		appendStringInfo(&str, "}");									\
+		PG_RETURN_CSTRING(str.data);									\
+	}
 
 
 
@@ -2497,7 +2497,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 	char* sql;
 	char sep;
 	TupleDesc spi_tupdesc;
-	int i, j, n, n_attrs;
+	int i, j, n_attrs;
 	vops_type_info* types;
 	Datum* values;
 	bool*  nulls;
@@ -2508,7 +2508,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 	int64 loaded;
 	bool type_checked = false;
 	static Oid self_oid = InvalidOid;
-    char stmt[MAX_SQL_STMT_LEN];
+	StringInfoData stmt;
 
 	/* Detect case when extension is drop and created several times */
 	if (fcinfo->flinfo->fn_oid != self_oid)
@@ -2533,7 +2533,8 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 	values = (Datum*)palloc(sizeof(Datum)*n_attrs);
 	nulls = (bool*)palloc0(sizeof(bool)*n_attrs);
 
-	n = sprintf(stmt, "select");
+	initStringInfo(&stmt);
+	appendStringInfo(&stmt, "select");
 	sep = ' ';
 	spi_tupdesc = SPI_tuptable->tupdesc;
 	for (i = 0; i < n_attrs; i++) {
@@ -2549,25 +2550,26 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 				elog(ERROR, "Size of column %s is unknown", name);
 			}
 		}
-		n += sprintf(stmt + n, "%c%s", sep, name);
+		appendStringInfo(&stmt, "%c%s", sep, name);
 		sep = ',';
 		SPI_freetuple(spi_tuple);
 	}
     SPI_freetuptable(SPI_tuptable);
 
-	n += sprintf(stmt + n, " from %s.%s",
+	appendStringInfo(&stmt, " from %s.%s",
 				 get_namespace_name(get_rel_namespace(source)),
 				 get_rel_name(source));
 	if (predicate && *predicate) {
-		n += sprintf(stmt + n, " where %s", predicate);
+		appendStringInfo(&stmt, " where %s", predicate);
 	}
 	if (sort && *sort) {
-		n += sprintf(stmt + n, " order by %s", sort);
+		appendStringInfo(&stmt, " order by %s", sort);
 	}
-    plan = SPI_prepare(stmt, 0, NULL);
+	plan = SPI_prepare(stmt.data, 0, NULL);
 	if (plan == NULL)
 		elog(ERROR, "SPI_prepare(\"%s\") failed:%s",
-			 stmt, SPI_result_code_string(SPI_result));
+			 stmt.data, SPI_result_code_string(SPI_result));
+	pfree(stmt.data);
     portal = SPI_cursor_open(NULL, plan, NULL, NULL, true);
 
 	begin_batch_insert(destination);
