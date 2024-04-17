@@ -22,7 +22,8 @@ typedef enum
 	VOPS_LAST,
 } vops_type;
 
-static inline bool is_vops_type_integer(vops_type type)
+static inline bool
+is_vops_type_integer(vops_type type)
 {
 	return type < VOPS_FLOAT4 || type == VOPS_INTERVAL;
 }
@@ -38,7 +39,7 @@ typedef enum
 } vops_agg_kind;
 
 
-#define TILE_SIZE 64 /* just because of maximum size of bitmask */
+#define TILE_SIZE 64			/* just because of maximum size of bitmask */
 #define MAX_CSV_LINE_LEN 4096
 #define INIT_MAP_SIZE (1024*1024)
 
@@ -47,9 +48,10 @@ typedef long long long64;
 extern uint64 filter_mask;
 
 /* Common prefix for all tile */
-typedef struct {
-	uint64 null_mask;
-	uint64 empty_mask;
+typedef struct
+{
+	uint64		null_mask;
+	uint64		empty_mask;
 } vops_tile_hdr;
 
 #define TILE(TYPE,CTYPE)						\
@@ -58,104 +60,116 @@ typedef struct {
 		CTYPE  payload[TILE_SIZE];				\
 	} vops_##TYPE
 
-TILE(char,char);
-TILE(int2,int16);
-TILE(int4,int32);
-TILE(int8,int64);
-TILE(float4,float4);
-TILE(float8,float8);
+TILE(char, char);
+TILE(int2, int16);
+TILE(int4, int32);
+TILE(int8, int64);
+TILE(float4, float4);
+TILE(float8, float8);
 
-typedef struct {
+typedef struct
+{
 	vops_tile_hdr hdr;
-	uint64 payload;
+	uint64		payload;
 } vops_bool;
 
-typedef struct {
-	uint64 count;
-	double sum;
+typedef struct
+{
+	uint64		count;
+	double		sum;
 } vops_avg_state;
 
-typedef struct {
-	uint64 count;
-	double sum;
-	double sum2;
+typedef struct
+{
+	uint64		count;
+	double		sum;
+	double		sum2;
 } vops_var_state;
 
-typedef struct {
-	HTAB* htab;
-	int   n_aggs;
-	vops_type agg_type;
-	vops_agg_kind* agg_kinds;
+typedef struct
+{
+	HTAB	   *htab;
+	int			n_aggs;
+	vops_type	agg_type;
+	vops_agg_kind *agg_kinds;
 } vops_agg_state;
 
-typedef union {
-	bool b;
-	char ch;
-	int16 i2;
-	int32 i4;
-	int64 i8;
-	float f4;
-	double f8;
+typedef union
+{
+	bool		b;
+	char		ch;
+	int16		i2;
+	int32		i4;
+	int64		i8;
+	float		f4;
+	double		f8;
 } vops_value;
 
-typedef struct {
-	vops_value acc;
-	uint64     count;
+typedef struct
+{
+	vops_value	acc;
+	uint64		count;
 } vops_agg_value;
 
-typedef struct {
-	int64  group_by;
-	uint64 count;
+typedef struct
+{
+	int64		group_by;
+	uint64		count;
 	vops_agg_value values[1];
 } vops_group_by_entry;
 
 #define VOPS_AGGREGATES_ATTRIBUTES 3
 
-typedef struct {
+typedef struct
+{
 	HASH_SEQ_STATUS iter;
-	TupleDesc       desc;
-	Datum*          elems;
-	bool*           nulls;
-	int16           elmlen;
-	bool            elmbyval;
-	char            elmalign;
+	TupleDesc	desc;
+	Datum	   *elems;
+	bool	   *nulls;
+	int16		elmlen;
+	bool		elmbyval;
+	char		elmalign;
 } vops_reduce_context;
 
-typedef struct {
-	Datum*          values;
-	bool*           nulls;
-	vops_type*      types;
-	TupleDesc       desc;
-	int             n_attrs;
-	int             tile_pos;
-	uint64          filter_mask;
-	vops_tile_hdr** tiles;
+typedef struct
+{
+	Datum	   *values;
+	bool	   *nulls;
+	vops_type  *types;
+	TupleDesc	desc;
+	int			n_attrs;
+	int			tile_pos;
+	uint64		filter_mask;
+	vops_tile_hdr **tiles;
 } vops_unnest_context;
 
-typedef struct {
+typedef struct
+{
 	vops_float8 tile;
-	double sum;
-	double sum2;
-	uint64 count;
+	double		sum;
+	double		sum2;
+	uint64		count;
 } vops_window_state;
 
 
-typedef struct {
-	vops_type tid;
-	int16     len;
-	bool      byval;
-	char      align;
-	FmgrInfo  inproc;
-	Oid       inproc_param_oid;
-	Oid       src_type;
-	Oid       dst_type;
+typedef struct
+{
+	vops_type	tid;
+	int16		len;
+	bool		byval;
+	char		align;
+	FmgrInfo	inproc;
+	Oid			inproc_param_oid;
+	Oid			src_type;
+	Oid			dst_type;
 } vops_type_info;
 
-typedef struct {
-	Datum     val;
-	Datum     ts;
-	bool      val_is_null;
-	bool      ts_is_null;
+typedef struct
+{
+	Datum		val;
+	Datum		ts;
+	bool		val_is_null;
+	bool		ts_is_null;
 } vops_first_state;
 
 extern vops_type vops_get_type(Oid typid);
