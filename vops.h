@@ -54,7 +54,7 @@ typedef struct {
 
 #define TILE(TYPE,CTYPE)						\
 	typedef struct {							\
-	    vops_tile_hdr hdr;						\
+		vops_tile_hdr hdr;						\
 		CTYPE  payload[TILE_SIZE];				\
 	} vops_##TYPE
 
@@ -116,16 +116,16 @@ typedef struct {
 	TupleDesc       desc;
 	Datum*          elems;
 	bool*           nulls;
-    int16           elmlen;
-    bool            elmbyval;
-    char            elmalign;
+	int16           elmlen;
+	bool            elmbyval;
+	char            elmalign;
 } vops_reduce_context;
 
 typedef struct {
-    Datum*          values;
-    bool*           nulls;
+	Datum*          values;
+	bool*           nulls;
 	vops_type*      types;
-    TupleDesc       desc;
+	TupleDesc       desc;
 	int             n_attrs;
 	int             tile_pos;
 	uint64          filter_mask;

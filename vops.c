@@ -156,8 +156,8 @@ static bool is_vops_type(Oid typeid)
 	Datum vops_##TYPE##_##OP(PG_FUNCTION_ARGS)							\
 	{																	\
 		vops_##TYPE* left = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
-		vops_##TYPE* right = (vops_##TYPE*)PG_GETARG_POINTER(1);	    \
-		vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));	    \
+		vops_##TYPE* right = (vops_##TYPE*)PG_GETARG_POINTER(1);		\
+		vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));		\
 		int i;															\
 		uint64 payload = 0;												\
 		for (i = 0; i < TILE_SIZE; i++) payload |= (uint64)(left->payload[i] COP right->payload[i]) << i; \
@@ -171,9 +171,9 @@ static bool is_vops_type(Oid typeid)
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_##OP##_rconst);					\
 	Datum vops_##TYPE##_##OP##_rconst(PG_FUNCTION_ARGS)					\
 	{																	\
-	    vops_##TYPE* left = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
-		XTYPE right = PG_GETARG_##GXTYPE(1);					        \
-		vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));	    \
+		vops_##TYPE* left = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
+		XTYPE right = PG_GETARG_##GXTYPE(1);							\
+		vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));		\
 		int i;															\
 		uint64 payload = 0;												\
 		for (i = 0; i < TILE_SIZE; i++) payload |= (uint64)(left->payload[i] COP right) << i; \
@@ -186,9 +186,9 @@ static bool is_vops_type(Oid typeid)
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_##OP##_lconst);					\
 	Datum vops_##TYPE##_##OP##_lconst(PG_FUNCTION_ARGS)					\
 	{																	\
-		XTYPE left = PG_GETARG_##GXTYPE(0);						        \
+		XTYPE left = PG_GETARG_##GXTYPE(0);								\
 		vops_##TYPE* right = (vops_##TYPE*)PG_GETARG_POINTER(1);		\
-		vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));      \
+		vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));		\
 		int i;															\
 		uint64 payload = 0;												\
 		for (i = 0; i < TILE_SIZE; i++) payload |= (uint64)(left COP right->payload[i]) << i; \
@@ -201,10 +201,10 @@ static bool is_vops_type(Oid typeid)
 	PG_FUNCTION_INFO_V1(vops_betwixt_##TYPE);							\
 	Datum vops_betwixt_##TYPE(PG_FUNCTION_ARGS)							\
 	{																	\
-	    vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
-		XTYPE low = PG_GETARG_##GXTYPE(1);					            \
-		XTYPE high = PG_GETARG_##GXTYPE(2);					            \
-		vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));	    \
+		vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
+		XTYPE low = PG_GETARG_##GXTYPE(1);								\
+		XTYPE high = PG_GETARG_##GXTYPE(2);								\
+		vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));		\
 		int i;															\
 		uint64 payload = 0;												\
 		for (i = 0; i < TILE_SIZE; i++) payload |= (uint64)(opd->payload[i] >= low && opd->payload[i] <= high) << i; \
@@ -233,14 +233,14 @@ static bool is_vops_type(Oid typeid)
 	PG_FUNCTION_INFO_V1(vops_ifnull_##TYPE);							\
 	Datum vops_ifnull_##TYPE(PG_FUNCTION_ARGS)							\
 	{																	\
-	    vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
+		vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
 		CTYPE subst = (CTYPE)PG_GETARG_##GXTYPE(1);						\
 		vops_##TYPE* result = (vops_##TYPE*)palloc(sizeof(vops_##TYPE)); \
 		int i;															\
 		for (i = 0; i < TILE_SIZE; i++) {								\
 			result->payload[i] = (opd->hdr.null_mask & ((uint64)1 << i)) ? subst : opd->payload[i]; \
 		}																\
-		result->hdr.null_mask = 0;						                \
+		result->hdr.null_mask = 0;										\
 		result->hdr.empty_mask = opd->hdr.empty_mask;					\
 		PG_RETURN_POINTER(result);										\
 	}																	\
@@ -249,8 +249,8 @@ static bool is_vops_type(Oid typeid)
 	PG_FUNCTION_INFO_V1(vops_coalesce_##TYPE);							\
 	Datum vops_coalesce_##TYPE(PG_FUNCTION_ARGS)						\
 	{																	\
-	    vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
-		vops_##TYPE* subst = (vops_##TYPE*)PG_GETARG_POINTER(1);	    \
+		vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
+		vops_##TYPE* subst = (vops_##TYPE*)PG_GETARG_POINTER(1);		\
 		vops_##TYPE* result = (vops_##TYPE*)palloc(sizeof(vops_##TYPE)); \
 		int i;															\
 		for (i = 0; i < TILE_SIZE; i++) {								\
@@ -262,11 +262,11 @@ static bool is_vops_type(Oid typeid)
 	}																	\
 
 #define BIN_RCONST_OP(TYPE,XTYPE,GXTYPE,OP,COP)							\
-	PG_FUNCTION_INFO_V1(vops_##TYPE##_##OP##_rconst);	                \
+	PG_FUNCTION_INFO_V1(vops_##TYPE##_##OP##_rconst);					\
 	Datum vops_##TYPE##_##OP##_rconst(PG_FUNCTION_ARGS)					\
 	{																	\
-	    vops_##TYPE* left = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
-		XTYPE right = PG_GETARG_##GXTYPE(1);					        \
+		vops_##TYPE* left = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
+		XTYPE right = PG_GETARG_##GXTYPE(1);							\
 		vops_##TYPE* result = (vops_##TYPE*)palloc(sizeof(vops_##TYPE));\
 		int i;															\
 		for (i = 0; i < TILE_SIZE; i++) result->payload[i] = left->payload[i] COP right; \
@@ -279,9 +279,9 @@ static bool is_vops_type(Oid typeid)
 	Datum vops_##TYPE##_##OP##_lconst(PG_FUNCTION_ARGS)					\
 	{																	\
 		XTYPE left = PG_GETARG_##GXTYPE(0);								\
-		vops_##TYPE* right = (vops_##TYPE*)PG_GETARG_POINTER(1);	    \
+		vops_##TYPE* right = (vops_##TYPE*)PG_GETARG_POINTER(1);		\
 		vops_##TYPE* result = (vops_##TYPE*)palloc(sizeof(vops_##TYPE));\
-		int i;														    \
+		int i;															\
 		for (i = 0; i < TILE_SIZE; i++) result->payload[i] = left COP right->payload[i]; \
 		result->hdr = right->hdr;										\
 		PG_RETURN_POINTER(result);										\
@@ -292,9 +292,9 @@ static bool is_vops_type(Oid typeid)
 	Datum vops_##TYPE##_##OP(PG_FUNCTION_ARGS)							\
 	{																	\
 		vops_##TYPE* left = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
-		vops_##TYPE* right = (vops_##TYPE*)PG_GETARG_POINTER(1);	    \
+		vops_##TYPE* right = (vops_##TYPE*)PG_GETARG_POINTER(1);		\
 		vops_##TYPE* result = (vops_##TYPE*)palloc(sizeof(vops_##TYPE));\
-		int i;														    \
+		int i;															\
 		for (i = 0; i < TILE_SIZE; i++) result->payload[i] = left->payload[i] COP right->payload[i]; \
 		result->hdr.null_mask = left->hdr.null_mask | right->hdr.null_mask;	\
 		result->hdr.empty_mask = left->hdr.empty_mask | right->hdr.empty_mask; \
@@ -307,13 +307,13 @@ static bool is_vops_type(Oid typeid)
 	{																	\
 		vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
 		vops_##TYPE* result = (vops_##TYPE*)palloc(sizeof(vops_##TYPE));\
-		int i;														    \
+		int i;															\
 		for (i = 0; i < TILE_SIZE; i++) result->payload[i] = COP opd->payload[i]; \
 		result->hdr = opd->hdr;											\
 		PG_RETURN_POINTER(result);										\
 	}
 
-#define BOOL_BIN_OP(OP,COP)											    \
+#define BOOL_BIN_OP(OP,COP)												\
 	PG_FUNCTION_INFO_V1(vops_bool_##OP);								\
 	Datum vops_bool_##OP(PG_FUNCTION_ARGS)								\
 	{																	\
@@ -330,14 +330,14 @@ static bool is_vops_type(Oid typeid)
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_sum_accumulate);					\
 	Datum vops_##TYPE##_sum_accumulate(PG_FUNCTION_ARGS)				\
 	{																	\
-	    vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
-		bool is_null = PG_ARGISNULL(0);								    \
+		vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
+		bool is_null = PG_ARGISNULL(0);									\
 		STYPE sum = is_null ? 0 : PG_GETARG_##GSTYPE(0);				\
 		uint64 mask = filter_mask & ~opd->hdr.null_mask & ~opd->hdr.empty_mask; \
 		int i;															\
 		if (~mask == 0) {												\
-		    for (i = 0; i < TILE_SIZE; i++) {							\
-			    sum += opd->payload[i];									\
+			for (i = 0; i < TILE_SIZE; i++) {							\
+				sum += opd->payload[i];									\
 			}															\
 			PG_RETURN_##GSTYPE(sum);									\
 		} else {														\
@@ -360,8 +360,8 @@ static bool is_vops_type(Oid typeid)
 	Datum vops_##TYPE##_sum_extend(PG_FUNCTION_ARGS)					\
 	{																	\
  	    vops_##SSTYPE* state = (vops_##SSTYPE*)PG_GETARG_POINTER(0);	\
-	    vops_##TYPE* val = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
-		STYPE sum;												        \
+		vops_##TYPE* val = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
+		STYPE sum;														\
 		int i;															\
 		if (PG_ARGISNULL(0)) {											\
 			MemoryContext agg_context;									\
@@ -369,16 +369,16 @@ static bool is_vops_type(Oid typeid)
 				elog(ERROR, "aggregate function called in non-aggregate context"); \
 			state = (vops_##SSTYPE*)MemoryContextAllocZero(agg_context, sizeof(vops_##SSTYPE)); \
 			state->hdr.null_mask = ~0;									\
-		} else { 														\
+		} else {															\
 			state->hdr.null_mask = (int64)state->hdr.null_mask >> 63;	\
 		}																\
-		state->hdr.empty_mask = ~filter_mask;                           \
+		state->hdr.empty_mask = ~filter_mask;							\
 		sum = state->payload[TILE_SIZE-1];								\
 		if (PG_ARGISNULL(1)) {											\
 			for (i = 0; i < TILE_SIZE; i++) {							\
 				state->payload[i] = sum;								\
 			}															\
-		} else { 														\
+		} else {															\
 			uint64 mask = filter_mask & ~val->hdr.empty_mask & ~val->hdr.null_mask; \
 			state->hdr.empty_mask |= val->hdr.empty_mask;				\
 			for (i = 0; i < TILE_SIZE; i++) {							\
@@ -396,9 +396,9 @@ static bool is_vops_type(Oid typeid)
 	Datum vops_##TYPE##_msum_extend(PG_FUNCTION_ARGS)					\
 	{																	\
  	    vops_##TYPE##_msum_state* state = (vops_##TYPE##_msum_state*)PG_GETARG_POINTER(0); \
-	    vops_##TYPE* val = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
-		uint32 size = PG_ARGISNULL(2) ? 0 : PG_GETARG_UINT32(2);	    \
-		STYPE sum;												        \
+		vops_##TYPE* val = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
+		uint32 size = PG_ARGISNULL(2) ? 0 : PG_GETARG_UINT32(2);		\
+		STYPE sum;														\
 		int i;															\
 		uint64 null_mask = 0;											\
 		if (size == 0 || size > TILE_SIZE) {							\
@@ -449,7 +449,7 @@ static bool is_vops_type(Oid typeid)
 	Datum vops_##TYPE##_avg_extend(PG_FUNCTION_ARGS)					\
 	{																	\
  	    vops_window_state* state = (vops_window_state*)PG_GETARG_POINTER(0); \
-	    vops_##TYPE* val = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
+		vops_##TYPE* val = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
 		int i;															\
 		if (PG_ARGISNULL(0)) {											\
 			MemoryContext agg_context;									\
@@ -457,15 +457,15 @@ static bool is_vops_type(Oid typeid)
 				elog(ERROR, "aggregate function called in non-aggregate context"); \
 			state = (vops_window_state*)MemoryContextAllocZero(agg_context, sizeof(vops_window_state));	\
 			state->tile.hdr.null_mask = ~0;								\
-		} else { 														\
-		    state->tile.hdr.null_mask = (int64)state->tile.hdr.null_mask >> 63;	\
+		} else {														\
+			state->tile.hdr.null_mask = (int64)state->tile.hdr.null_mask >> 63;	\
 		}																\
 		state->tile.hdr.empty_mask = ~filter_mask;						\
 		if (PG_ARGISNULL(1)) {											\
 			for (i = 0; i < TILE_SIZE; i++) {							\
 				state->tile.payload[i] = state->tile.payload[TILE_SIZE-1]; \
 			}															\
-		} else {  														\
+		} else {														\
 			uint64 mask = filter_mask & ~val->hdr.empty_mask & ~val->hdr.null_mask; \
 			state->tile.hdr.empty_mask |= val->hdr.empty_mask;			\
 			for (i = 0; i < TILE_SIZE; i++) {							\
@@ -486,7 +486,7 @@ static bool is_vops_type(Oid typeid)
 	Datum vops_##TYPE##_##OP##_extend(PG_FUNCTION_ARGS)					\
 	{																	\
  	    vops_##TYPE* state = (vops_##TYPE*)PG_GETARG_POINTER(0);		\
-	    vops_##TYPE* val = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
+		vops_##TYPE* val = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
 		CTYPE result;													\
 		bool is_null = PG_ARGISNULL(0);									\
 		int i;															\
@@ -496,17 +496,17 @@ static bool is_vops_type(Oid typeid)
 				elog(ERROR, "aggregate function called in non-aggregate context"); \
 			state = (vops_##TYPE*)MemoryContextAllocZero(agg_context, sizeof(vops_##TYPE));			\
 			state->hdr.null_mask = ~0;									\
-		} else { 														\
+		} else {														\
 			state->hdr.null_mask = (int64)state->hdr.null_mask >> 63;	\
 			is_null = state->hdr.null_mask != 0;						\
 		}																\
-		state->hdr.empty_mask = ~filter_mask;			                \
+		state->hdr.empty_mask = ~filter_mask;							\
 		result = state->payload[TILE_SIZE-1];							\
 		if (PG_ARGISNULL(1)) {											\
 			for (i = 0; i < TILE_SIZE; i++) {							\
 				state->payload[i] = result;								\
 			}															\
-		} else { 														\
+		} else {														\
 			uint64 mask = filter_mask & ~val->hdr.empty_mask & ~val->hdr.null_mask; \
 			state->hdr.empty_mask |= val->hdr.empty_mask;				\
 			for (i = 0; i < TILE_SIZE; i++) {							\
@@ -525,11 +525,11 @@ static bool is_vops_type(Oid typeid)
 
 
 #define MINMAX_AGG(TYPE,CTYPE,GCTYPE,OP,COP)							\
-    PG_FUNCTION_INFO_V1(vops_##TYPE##_##OP##_accumulate);	            \
+	PG_FUNCTION_INFO_V1(vops_##TYPE##_##OP##_accumulate);				\
 	Datum vops_##TYPE##_##OP##_accumulate(PG_FUNCTION_ARGS)				\
 	{																	\
-	    vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
-		bool is_null = PG_ARGISNULL(0);								    \
+		vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
+		bool is_null = PG_ARGISNULL(0);									\
 		CTYPE result = is_null ? 0 : PG_GETARG_##GCTYPE(0);				\
 		int i;															\
 		if (!PG_ARGISNULL(1)) {											\
@@ -551,13 +551,13 @@ static bool is_vops_type(Oid typeid)
 	}
 
 #define LAG_WIN(TYPE,CTYPE)												\
-    typedef struct { vops_##TYPE tile; CTYPE lag; bool is_null; } vops_lag_##TYPE; \
-	PG_FUNCTION_INFO_V1(vops_##TYPE##_lag_extend);					    \
+	typedef struct { vops_##TYPE tile; CTYPE lag; bool is_null; } vops_lag_##TYPE; \
+	PG_FUNCTION_INFO_V1(vops_##TYPE##_lag_extend);						\
 	Datum vops_##TYPE##_lag_extend(PG_FUNCTION_ARGS)					\
 	{																	\
-	    vops_lag_##TYPE* state = (vops_lag_##TYPE*)PG_GETARG_POINTER(0);\
-	    vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
-		int i;														    \
+		vops_lag_##TYPE* state = (vops_lag_##TYPE*)PG_GETARG_POINTER(0);\
+		vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
+		int i;															\
 		CTYPE lag;														\
 		bool is_null = PG_ARGISNULL(0);									\
 		if (is_null) {													\
@@ -568,7 +568,7 @@ static bool is_vops_type(Oid typeid)
 			state = (vops_lag_##TYPE*)MemoryContextAllocZero(agg_context, sizeof(vops_lag_##TYPE));	\
 			state->is_null = true;										\
 			lag = 0;													\
-		} else { 														\
+		} else {														\
 			is_null = state->is_null;									\
 			lag = state->lag;											\
 		}																\
@@ -584,7 +584,7 @@ static bool is_vops_type(Oid typeid)
 				}														\
 			}															\
   	    } else {														\
-		    uint64 mask = filter_mask & ~opd->hdr.empty_mask;			\
+			uint64 mask = filter_mask & ~opd->hdr.empty_mask;			\
 			state->tile.hdr.empty_mask |= opd->hdr.empty_mask;			\
 			for (i = 0; i < TILE_SIZE; i++) {							\
 				if (mask & ((uint64)1 << i)) {							\
@@ -594,7 +594,7 @@ static bool is_vops_type(Oid typeid)
 					is_null = (opd->hdr.null_mask >> i) & 1;			\
 				}														\
 			}															\
-        }																\
+		}																\
 		state->lag = lag;												\
 		state->is_null = is_null;										\
 		PG_RETURN_POINTER(state);										\
@@ -604,13 +604,13 @@ static bool is_vops_type(Oid typeid)
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_avg_accumulate);					\
 	Datum vops_##TYPE##_avg_accumulate(PG_FUNCTION_ARGS)				\
 	{																	\
-	    vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
+		vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
 		vops_avg_state* state = PG_ARGISNULL(0) ? NULL : (vops_avg_state*)PG_GETARG_POINTER(0); \
 		uint64 mask = filter_mask & ~opd->hdr.empty_mask & ~opd->hdr.null_mask; \
 		int i;															\
 		for (i = 0; i < TILE_SIZE; i++) {								\
-		    if (mask & ((uint64)1 << i)) {								\
-			    if (state == NULL) {									\
+			if (mask & ((uint64)1 << i)) {								\
+				if (state == NULL) {									\
 					MemoryContext agg_context;							\
 					if (!AggCheckCallContext(fcinfo, &agg_context))		\
 						elog(ERROR, "aggregate function called in non-aggregate context"); \
@@ -625,14 +625,14 @@ static bool is_vops_type(Oid typeid)
 		} else {														\
 			PG_RETURN_POINTER(state);									\
 		}																\
-	}																    \
+	}																	\
 
 #define WAVG_AGG(TYPE)													\
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_wavg_accumulate);					\
 	Datum vops_##TYPE##_wavg_accumulate(PG_FUNCTION_ARGS)				\
 	{																	\
 		vops_var_state* state = PG_ARGISNULL(0) ? NULL : (vops_var_state*)PG_GETARG_POINTER(0); \
-	    vops_##TYPE* price = (vops_##TYPE*)PG_GETARG_POINTER(1);		\
+		vops_##TYPE* price = (vops_##TYPE*)PG_GETARG_POINTER(1);		\
 		vops_##TYPE* volume = (vops_##TYPE*)PG_GETARG_POINTER(2);		\
 		uint64 mask = filter_mask & ~price->hdr.empty_mask & ~price->hdr.null_mask & ~volume->hdr.null_mask; \
 		int i;															\
@@ -653,19 +653,19 @@ static bool is_vops_type(Oid typeid)
 		} else {														\
 			PG_RETURN_POINTER(state);									\
 		}																\
-	}																    \
+	}																	\
 
 #define VAR_AGG(TYPE)													\
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_var_accumulate);					\
 	Datum vops_##TYPE##_var_accumulate(PG_FUNCTION_ARGS)				\
 	{																	\
-	    vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
+		vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
 		vops_var_state* state = PG_ARGISNULL(0) ? NULL : (vops_var_state*)PG_GETARG_POINTER(0); \
 		uint64 mask = filter_mask & ~opd->hdr.empty_mask & ~opd->hdr.null_mask; \
 		int i;															\
 		for (i = 0; i < TILE_SIZE; i++) {								\
-		    if (mask & ((uint64)1 << i)) {								\
-			    if (state == NULL) {									\
+			if (mask & ((uint64)1 << i)) {								\
+				if (state == NULL) {									\
 					MemoryContext agg_context;							\
 					if (!AggCheckCallContext(fcinfo, &agg_context))		\
 						elog(ERROR, "aggregate function called in non-aggregate context"); \
@@ -681,47 +681,47 @@ static bool is_vops_type(Oid typeid)
 		} else {														\
 			PG_RETURN_POINTER(state);									\
 		}																\
-	}																    \
+	}																	\
 
 	#define FIRST_AGG(TYPE,GCTYPE,PAYLOAD)								\
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_first);							\
 	Datum vops_##TYPE##_first(PG_FUNCTION_ARGS)							\
 	{																	\
-	    vops_##TYPE* tile = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
+		vops_##TYPE* tile = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
 		uint64 mask = ~(tile->hdr.empty_mask | tile->hdr.null_mask);	\
 		int i;															\
 		for (i = 0; i < TILE_SIZE; i++) {								\
 			if (mask & ((uint64)1 << i)) {								\
 				PG_RETURN_##GCTYPE(PAYLOAD(tile, i));					\
 			}															\
-		} 																\
-		PG_RETURN_NULL();											    \
+		}																\
+		PG_RETURN_NULL();												\
 	}
 
 	#define LAST_AGG(TYPE,GCTYPE,PAYLOAD)								\
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_last);							\
 	Datum vops_##TYPE##_last(PG_FUNCTION_ARGS)							\
 	{																	\
-	    vops_##TYPE* tile = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
+		vops_##TYPE* tile = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
 		uint64 mask = ~(tile->hdr.empty_mask | tile->hdr.null_mask);	\
 		int i;															\
 		for (i = TILE_SIZE; --i >= 0;) {								\
 			if (mask & ((uint64)1 << i)) {								\
 				PG_RETURN_##GCTYPE(PAYLOAD(tile, i));					\
 			}															\
-		} 																\
-		PG_RETURN_NULL();											    \
+		}																\
+		PG_RETURN_NULL();												\
 	}
 
 #define LOW_AGG(TYPE,CTYPE,GCTYPE)										\
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_low);								\
 	Datum vops_##TYPE##_low(PG_FUNCTION_ARGS)							\
 	{																	\
-	    vops_##TYPE* tile = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
+		vops_##TYPE* tile = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
 		CTYPE min = 0;													\
 		bool is_null = true;											\
 		uint64 mask = ~(tile->hdr.empty_mask | tile->hdr.null_mask);	\
-		int i;														    \
+		int i;															\
 		for (i = 0; i < TILE_SIZE; i++) {								\
 			if (mask & ((uint64)1 << i)) {								\
 				if (is_null || tile->payload[i] < min) {				\
@@ -729,10 +729,10 @@ static bool is_vops_type(Oid typeid)
 					min = tile->payload[i];								\
 				}														\
 			}															\
-		} 																\
+		}																\
 		if (is_null) {													\
 			PG_RETURN_NULL();											\
-	    } else {														\
+		} else {														\
 			PG_RETURN_##GCTYPE(min);									\
 		}																\
 	}
@@ -741,11 +741,11 @@ static bool is_vops_type(Oid typeid)
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_high);							\
 	Datum vops_##TYPE##_high(PG_FUNCTION_ARGS)							\
 	{																	\
-	    vops_##TYPE* tile = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
+		vops_##TYPE* tile = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
 		CTYPE max = 0;													\
 		bool is_null = true;											\
 		uint64 mask = ~(tile->hdr.empty_mask | tile->hdr.null_mask);	\
-		int i;														    \
+		int i;															\
 		for (i = 0; i < TILE_SIZE; i++) {								\
 			if (mask & ((uint64)1 << i)) {								\
 				if (is_null || tile->payload[i] > max) {				\
@@ -753,10 +753,10 @@ static bool is_vops_type(Oid typeid)
 					max = tile->payload[i];								\
 				}														\
 			}															\
-		} 																\
+		}																\
 		if (is_null) {													\
 			PG_RETURN_NULL();											\
-	    } else {														\
+		} else {														\
 			PG_RETURN_##GCTYPE(max);									\
 		}																\
 	}
@@ -765,7 +765,7 @@ static bool is_vops_type(Oid typeid)
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_input);							\
 	Datum vops_##TYPE##_input(PG_FUNCTION_ARGS)							\
 	{																	\
-	    char const* str = PG_GETARG_CSTRING(0);							\
+		char const* str = PG_GETARG_CSTRING(0);							\
 		int i, n;														\
 		STYPE val = 0;													\
 		vops_##TYPE* result;											\
@@ -782,10 +782,10 @@ static bool is_vops_type(Oid typeid)
 			if (str[n] != '\0') {										\
 				elog(ERROR, "Failed to parse constant: '%s'", str);		\
 			}															\
-			for (i=0; i < TILE_SIZE; i++) {							    \
+			for (i=0; i < TILE_SIZE; i++) {								\
 				result->payload[i] = (CTYPE)val;						\
 			}															\
-		} else { 														\
+		} else {														\
 			str += 1;													\
 			for (i=0; i < TILE_SIZE; i++) {								\
 				if (*str == ',' || *str == '}') {						\
@@ -814,12 +814,12 @@ static bool is_vops_type(Oid typeid)
 			if (*str != '}') {											\
 				elog(ERROR, "Failed to parse tile: unexpected trailing data '%s'", str); \
 			}															\
-		} 																\
+		}																\
 		PG_RETURN_POINTER(result);										\
 	}
 
-#define OUT_FUNC(TYPE,STYPE,FORMAT,PREC)						     	\
-	PG_FUNCTION_INFO_V1(vops_##TYPE##_output);						    \
+#define OUT_FUNC(TYPE,STYPE,FORMAT,PREC)								\
+	PG_FUNCTION_INFO_V1(vops_##TYPE##_output);							\
 	Datum vops_##TYPE##_output(PG_FUNCTION_ARGS)						\
 	{																	\
 		vops_##TYPE* tile = (vops_##TYPE*)PG_GETARG_POINTER(0);			\
@@ -849,7 +849,7 @@ static bool is_vops_type(Oid typeid)
 	{																	\
 		vops_agg_state* state = (vops_agg_state*)(PG_ARGISNULL(0) ? NULL : PG_GETARG_POINTER(0)); \
 		vops_##TYPE* gby = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
-		char const* aggregates = PG_GETARG_CSTRING(2);				    \
+		char const* aggregates = PG_GETARG_CSTRING(2);					\
 		ArrayType* args = PG_GETARG_ARRAYTYPE_P(3);						\
 		int i;															\
 		int16 elmlen;													\
@@ -870,17 +870,17 @@ static bool is_vops_type(Oid typeid)
 			state = vops_init_agg_state(aggregates, args->elemtype, n_elems); \
 		}																\
 		for (i = 0; i < TILE_SIZE; i++) {								\
-			if (mask & ((uint64)1 << i)) {	                            \
+			if (mask & ((uint64)1 << i)) {								\
 				vops_agg_state_accumulate(state, gby->payload[i], i, elems, nulls); \
 			}															\
 		}																\
 		MemoryContextSwitchTo(old_context);								\
-        PG_RETURN_POINTER(state);										\
-    }
+		PG_RETURN_POINTER(state);										\
+	}
 
 
 #define FIRST_FUNC(TYPE,DTYPE,NAME,CMP,PAYLOAD)							\
-PG_FUNCTION_INFO_V1(vops_##TYPE##_##NAME##_accumulate);				    \
+PG_FUNCTION_INFO_V1(vops_##TYPE##_##NAME##_accumulate);					\
 Datum vops_##TYPE##_##NAME##_accumulate(PG_FUNCTION_ARGS)				\
 {																		\
 	vops_first_state* state = (vops_first_state*)PG_GETARG_POINTER(0);	\
@@ -1231,7 +1231,7 @@ static void insert_tuple(Datum* values, bool* nulls)
 	ExecStoreTuple(tup, slot, InvalidBuffer, true);
 	simple_heap_insert(rel, slot->tts_tuple);
 #endif
-    UserTableUpdateOpenIndexes();
+	UserTableUpdateOpenIndexes();
 }
 
 static void end_batch_insert()
@@ -1244,9 +1244,9 @@ static void end_batch_insert()
 	if (ActiveSnapshotSet()) {
 		PopActiveSnapshot();
 	}
-    heap_close(rel, NoLock);
-    ExecResetTupleTable(estate->es_tupleTable, true);
-    FreeExecutorState(estate);
+	heap_close(rel, NoLock);
+	ExecResetTupleTable(estate->es_tupleTable, true);
+	FreeExecutorState(estate);
 }
 
 PG_FUNCTION_INFO_V1(vops_avg_final);
@@ -1433,8 +1433,8 @@ Datum vops_agg_serial(PG_FUNCTION_ARGS)
 
 	pq_sendint64(&buf, hash_get_num_entries(state->htab));
 
-    while ((entry = (vops_group_by_entry*)hash_seq_search(&iter)) != NULL)
-    {
+	while ((entry = (vops_group_by_entry*)hash_seq_search(&iter)) != NULL)
+	{
 		pq_sendint64(&buf, entry->group_by);
 		pq_sendint64(&buf, entry->count);
 		for (i = 0; i < n_aggregates; i++) {
@@ -1491,125 +1491,125 @@ Datum vops_agg_deserial(PG_FUNCTION_ARGS)
 
 static uint32 murmur_hash3_32(const void* key, const int len, const uint32 seed)
 {
-    const uint8* data = (const uint8*)key;
-    const int nblocks = len / 4;
+	const uint8* data = (const uint8*)key;
+	const int nblocks = len / 4;
 
-    uint32 h1 = seed;
+	uint32 h1 = seed;
 
-    uint32 c1 = 0xcc9e2d51;
-    uint32 c2 = 0x1b873593;
-    int i;
-    uint32 k1;
-    const uint8* tail;
-    const uint32* blocks = (const uint32 *)(data + nblocks*4);
+	uint32 c1 = 0xcc9e2d51;
+	uint32 c2 = 0x1b873593;
+	int i;
+	uint32 k1;
+	const uint8* tail;
+	const uint32* blocks = (const uint32 *)(data + nblocks*4);
 
-    for(i = -nblocks; i; i++)
-    {
-        k1 = blocks[i];
+	for(i = -nblocks; i; i++)
+	{
+		k1 = blocks[i];
 
-        k1 *= c1;
-        k1 = ROTL32(k1,15);
-        k1 *= c2;
+		k1 *= c1;
+		k1 = ROTL32(k1,15);
+		k1 *= c2;
 
-        h1 ^= k1;
-        h1 = ROTL32(h1,13);
-        h1 = h1*5+0xe6546b64;
-    }
+		h1 ^= k1;
+		h1 = ROTL32(h1,13);
+		h1 = h1*5+0xe6546b64;
+	}
 
-    tail = (const uint8*)(data + nblocks*4);
+	tail = (const uint8*)(data + nblocks*4);
 
-    k1 = 0;
+	k1 = 0;
 
-    switch(len & 3)
-    {
-      case 3:
-        k1 ^= tail[2] << 16;
-        /* fall through */
-      case 2:
-        k1 ^= tail[1] << 8;
-        /* fall through */
-      case 1:
-        k1 ^= tail[0];
-        k1 *= c1;
-        k1 = ROTL32(k1,15);
-        k1 *= c2;
-        h1 ^= k1;
-    }
+	switch(len & 3)
+	{
+	  case 3:
+		k1 ^= tail[2] << 16;
+		/* fall through */
+	  case 2:
+		k1 ^= tail[1] << 8;
+		/* fall through */
+	  case 1:
+		k1 ^= tail[0];
+		k1 *= c1;
+		k1 = ROTL32(k1,15);
+		k1 *= c2;
+		h1 ^= k1;
+	}
 
-    h1 ^= len;
-    h1 ^= h1 >> 16;
-    h1 *= 0x85ebca6b;
-    h1 ^= h1 >> 13;
-    h1 *= 0xc2b2ae35;
-    h1 ^= h1 >> 16;
+	h1 ^= len;
+	h1 ^= h1 >> 16;
+	h1 *= 0x85ebca6b;
+	h1 ^= h1 >> 13;
+	h1 *= 0xc2b2ae35;
+	h1 ^= h1 >> 16;
 
-    return h1;
+	return h1;
 }
 
 inline static void calculate_zero_bits(uint32 h, uint8* max_zero_bits)
 {
-    int j = h >> HASH_BITS;
-    int zero_bits = 1;
-    while ((h & 1) == 0 && zero_bits <= HASH_BITS)  {
-        h >>= 1;
-        zero_bits += 1;
-    }
-    if (max_zero_bits[j] < zero_bits) {
-        max_zero_bits[j] = zero_bits;
-    }
+	int j = h >> HASH_BITS;
+	int zero_bits = 1;
+	while ((h & 1) == 0 && zero_bits <= HASH_BITS)  {
+		h >>= 1;
+		zero_bits += 1;
+	}
+	if (max_zero_bits[j] < zero_bits) {
+		max_zero_bits[j] = zero_bits;
+	}
 }
 
 inline static void calculate_hash_functions(void const* val, int size, uint8* max_zero_bits)
 {
-    uint32 h = murmur_hash3_32(val, size, MURMUR_SEED);
-    calculate_zero_bits(h, max_zero_bits);
+	uint32 h = murmur_hash3_32(val, size, MURMUR_SEED);
+	calculate_zero_bits(h, max_zero_bits);
 }
 
 inline static void merge_zero_bits(uint8* dst_max_zero_bits, uint8* src_max_zero_bits)
 {
-    int i;
-    for (i = 0; i < N_HASHES; i++) {
-        if (dst_max_zero_bits[i] < src_max_zero_bits[i]) {
-            dst_max_zero_bits[i] = src_max_zero_bits[i];
-        }
-    }
+	int i;
+	for (i = 0; i < N_HASHES; i++) {
+		if (dst_max_zero_bits[i] < src_max_zero_bits[i]) {
+			dst_max_zero_bits[i] = src_max_zero_bits[i];
+		}
+	}
 }
 
 static uint64 approximate_distinct_count(uint8* max_zero_bits)
 {
-    const int m = N_HASHES;
-    const double alpha_m = 0.7213 / (1 + 1.079 / (double)m);
-    const double pow_2_32 = 0xffffffff;
-    double E, c = 0;
-    int i;
-    for (i = 0; i < m; i++)
-    {
-        c += 1 / pow(2., (double)max_zero_bits[i]);
-    }
-    E = alpha_m * m * m / c;
+	const int m = N_HASHES;
+	const double alpha_m = 0.7213 / (1 + 1.079 / (double)m);
+	const double pow_2_32 = 0xffffffff;
+	double E, c = 0;
+	int i;
+	for (i = 0; i < m; i++)
+	{
+		c += 1 / pow(2., (double)max_zero_bits[i]);
+	}
+	E = alpha_m * m * m / c;
 
-    if (E <= (5 / 2. * m))
-    {
-        double V = 0;
-        for (i = 0; i < m; i++)
-        {
-            if (max_zero_bits[i] == 0) V++;
-        }
+	if (E <= (5 / 2. * m))
+	{
+		double V = 0;
+		for (i = 0; i < m; i++)
+		{
+			if (max_zero_bits[i] == 0) V++;
+		}
 
-        if (V > 0)
-        {
-            E = m * log(m / V);
-        }
-    }
-    else if (E > (1 / 30. * pow_2_32))
-    {
-        E = -pow_2_32 * log(1 - E / pow_2_32);
-    }
-    return (uint64)E;
+		if (V > 0)
+		{
+			E = m * log(m / V);
+		}
+	}
+	else if (E > (1 / 30. * pow_2_32))
+	{
+		E = -pow_2_32 * log(1 - E / pow_2_32);
+	}
+	return (uint64)E;
 }
 
 typedef struct {
-    uint8 max_zero_bits[N_HASHES];
+	uint8 max_zero_bits[N_HASHES];
 } vops_approxdc_state;
 
 
@@ -1665,13 +1665,13 @@ Datum vops_approxdc_deserial(PG_FUNCTION_ARGS)
 	PG_FUNCTION_INFO_V1(vops_##TYPE##_approxdc_accumulate);				\
 	Datum vops_##TYPE##_approxdc_accumulate(PG_FUNCTION_ARGS)			\
 	{																	\
-	    vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
+		vops_##TYPE* opd = (vops_##TYPE*)PG_GETARG_POINTER(1);			\
 		vops_approxdc_state* state = PG_ARGISNULL(0) ? NULL : (vops_approxdc_state*)PG_GETARG_POINTER(0); \
 		uint64 mask = filter_mask & ~opd->hdr.empty_mask & ~opd->hdr.null_mask; \
 		int i;															\
 		for (i = 0; i < TILE_SIZE; i++) {								\
-		    if (mask & ((uint64)1 << i)) {								\
-			    if (state == NULL) {									\
+			if (mask & ((uint64)1 << i)) {								\
+				if (state == NULL) {									\
 					MemoryContext agg_context;							\
 					if (!AggCheckCallContext(fcinfo, &agg_context))		\
 						elog(ERROR, "aggregate function called in non-aggregate context"); \
@@ -1685,7 +1685,7 @@ Datum vops_approxdc_deserial(PG_FUNCTION_ARGS)
 		} else {														\
 			PG_RETURN_POINTER(state);									\
 		}																\
-	}																    \
+	}																	\
 
 
 PG_FUNCTION_INFO_V1(vops_text_approxdc_accumulate);
@@ -1761,7 +1761,7 @@ Datum vops_text_approxdc_accumulate(PG_FUNCTION_ARGS)
 	HIGH_AGG(TYPE,CTYPE,GCTYPE)								\
 	IN_FUNC(TYPE,CTYPE,STYPE,FORMAT)						\
 	OUT_FUNC(TYPE,STYPE,FORMAT,PREC)						\
-	GROUP_BY_FUNC(TYPE)									    \
+	GROUP_BY_FUNC(TYPE)										\
 	FIRST_FUNC(TYPE,DTYPE,first,<,SCALAR_PAYLOAD)			\
 	FIRST_FUNC(TYPE,DTYPE,last,>,SCALAR_PAYLOAD)
 
@@ -1926,24 +1926,24 @@ Datum vops_text_output(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(vops_text_typmod_in);
 Datum vops_text_typmod_in(PG_FUNCTION_ARGS)
 {
-    ArrayType* arr = (ArrayType*) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
-    int n;
-    int32* typemods = ArrayGetIntegerTypmods(arr, &n);
-    int len;
-    if (n != 1)
+	ArrayType* arr = (ArrayType*) PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
+	int n;
+	int32* typemods = ArrayGetIntegerTypmods(arr, &n);
+	int len;
+	if (n != 1)
 	   elog(ERROR, "vops_text should have exactly one type modifier");
-    len = typemods[0];
-    PG_RETURN_INT32(len);
+	len = typemods[0];
+	PG_RETURN_INT32(len);
 }
 
-#define VOPS_TEXT_CMP(op,cmp)										    \
-PG_FUNCTION_INFO_V1(vops_text_##op);								    \
+#define VOPS_TEXT_CMP(op,cmp)											\
+PG_FUNCTION_INFO_V1(vops_text_##op);									\
 Datum vops_text_##op(PG_FUNCTION_ARGS)									\
 {																		\
 	struct varlena* vl = PG_GETARG_VARLENA_PP(0);						\
 	struct varlena* vr = PG_GETARG_VARLENA_PP(1);						\
-    vops_tile_hdr* left = VOPS_TEXT_TILE(vl);							\
-    vops_tile_hdr* right = VOPS_TEXT_TILE(vl);							\
+	vops_tile_hdr* left = VOPS_TEXT_TILE(vl);							\
+	vops_tile_hdr* right = VOPS_TEXT_TILE(vl);							\
 	size_t left_elem_size = VOPS_ELEM_SIZE(vl);							\
 	size_t right_elem_size = VOPS_ELEM_SIZE(vr);						\
 	char* l = (char*)(left + 1);										\
@@ -1971,8 +1971,8 @@ Datum vops_text_##op(PG_FUNCTION_ARGS)									\
 	result->hdr.empty_mask = left->empty_mask | right->empty_mask;		\
 	PG_RETURN_POINTER(result);											\
 }																		\
-PG_FUNCTION_INFO_V1(vops_text_##op##_rconst);						    \
-Datum vops_text_##op##_rconst(PG_FUNCTION_ARGS)						    \
+PG_FUNCTION_INFO_V1(vops_text_##op##_rconst);							\
+Datum vops_text_##op##_rconst(PG_FUNCTION_ARGS)							\
 {																		\
 	struct varlena* var = PG_GETARG_VARLENA_PP(0);						\
 	text* t = PG_GETARG_TEXT_P(1);										\
@@ -1985,19 +1985,19 @@ Datum vops_text_##op##_rconst(PG_FUNCTION_ARGS)						    \
 	int i;																\
 	uint64 payload = 0;													\
 	if (elem_size > const_size) {										\
-        for (i = 0; i < TILE_SIZE; i++) {								\
+		for (i = 0; i < TILE_SIZE; i++) {								\
 			int diff = memcmp(l + elem_size*i, const_data, const_size); \
 			if (diff == 0) diff = (l[elem_size*i + const_size] == '\0') ? 0 : 1; \
 			payload |= (uint64)(diff cmp 0) << i;						\
 		}																\
 	} else if (elem_size < const_size) {								\
-        for (i = 0; i < TILE_SIZE; i++) {								\
+		for (i = 0; i < TILE_SIZE; i++) {								\
 			int diff = memcmp(l + elem_size*i, const_data, elem_size);	\
 			if (diff == 0) diff = -1;									\
 			payload |= (uint64)(diff cmp 0) << i;						\
 		}																\
 	} else {															\
-        for (i = 0; i < TILE_SIZE; i++) {								\
+		for (i = 0; i < TILE_SIZE; i++) {								\
 			int diff = memcmp(l + elem_size*i, const_data, elem_size);	\
 			payload |= (uint64)(diff cmp 0) << i;						\
 		}																\
@@ -2006,12 +2006,12 @@ Datum vops_text_##op##_rconst(PG_FUNCTION_ARGS)						    \
 	result->hdr = *left;												\
 	PG_RETURN_POINTER(result);											\
 }																		\
-PG_FUNCTION_INFO_V1(vops_text_##op##_lconst);						    \
+PG_FUNCTION_INFO_V1(vops_text_##op##_lconst);							\
 Datum vops_text_##op##_lconst(PG_FUNCTION_ARGS)							\
 {																		\
 	struct varlena* var = PG_GETARG_VARLENA_PP(1);						\
 	text* t = PG_GETARG_TEXT_P(0);										\
-    vops_tile_hdr* right = VOPS_TEXT_TILE(var);							\
+	vops_tile_hdr* right = VOPS_TEXT_TILE(var);							\
 	size_t elem_size = VOPS_ELEM_SIZE(var);								\
 	char* const_data = (char*)VARDATA(t);								\
 	size_t const_size = VARSIZE(t) - VARHDRSZ;							\
@@ -2020,19 +2020,19 @@ Datum vops_text_##op##_lconst(PG_FUNCTION_ARGS)							\
 	int i;																\
 	uint64 payload = 0;													\
 	if (elem_size > const_size) {										\
-        for (i = 0; i < TILE_SIZE; i++) {								\
+		for (i = 0; i < TILE_SIZE; i++) {								\
 			int diff = memcmp(const_data, r + elem_size*i, const_size);	\
 			if (diff == 0) diff = (r[elem_size*i + const_size] == '\0') ? 0 : -1; \
 			payload |= (uint64)(diff cmp 0) << i;						\
 		}																\
 	} else if (elem_size < const_size) {								\
-        for (i = 0; i < TILE_SIZE; i++) {								\
+		for (i = 0; i < TILE_SIZE; i++) {								\
 			int diff = memcmp(const_data, r + elem_size*i, elem_size);	\
 			if (diff == 0) diff = 1;									\
 			payload |= (uint64)(diff cmp 0) << i;						\
 		}																\
 	} else {															\
-        for (i = 0; i < TILE_SIZE; i++) {								\
+		for (i = 0; i < TILE_SIZE; i++) {								\
 			int diff = memcmp(const_data, r + elem_size*i, elem_size);	\
 			payload |= (uint64)(diff cmp 0) << i;						\
 		}																\
@@ -2083,8 +2083,8 @@ Datum vops_text_concat(PG_FUNCTION_ARGS)
 {
 	struct varlena* vl = PG_GETARG_VARLENA_PP(0);
 	struct varlena* vr = PG_GETARG_VARLENA_PP(1);
-    vops_tile_hdr* left = VOPS_TEXT_TILE(vl);
-    vops_tile_hdr* right = VOPS_TEXT_TILE(vl);
+	vops_tile_hdr* left = VOPS_TEXT_TILE(vl);
+	vops_tile_hdr* right = VOPS_TEXT_TILE(vl);
 	size_t left_elem_size = VOPS_ELEM_SIZE(vl);
 	size_t right_elem_size = VOPS_ELEM_SIZE(vr);
 	char* l = (char*)(left + 1);
@@ -2113,7 +2113,7 @@ Datum vops_betwixt_text(PG_FUNCTION_ARGS)
 	size_t from_size = VARSIZE(from) - VARHDRSZ;
 	char* till_data = (char*)VARDATA(till);
 	size_t till_size = VARSIZE(till) - VARHDRSZ;
-    vops_tile_hdr* left = VOPS_TEXT_TILE(var);
+	vops_tile_hdr* left = VOPS_TEXT_TILE(var);
 	char* l = (char*)(left + 1);
 	vops_bool* result = (vops_bool*)palloc(sizeof(vops_bool));
 	int i;
@@ -2490,10 +2490,10 @@ const size_t vops_sizeof[] =
 PG_FUNCTION_INFO_V1(vops_populate);
 Datum vops_populate(PG_FUNCTION_ARGS)
 {
-    Oid destination = PG_GETARG_OID(0);
-    Oid source = PG_GETARG_OID(1);
-    char const* predicate = PG_GETARG_CSTRING(2);
-    char const* sort = PG_GETARG_CSTRING(3);
+	Oid destination = PG_GETARG_OID(0);
+	Oid source = PG_GETARG_OID(1);
+	char const* predicate = PG_GETARG_CSTRING(2);
+	char const* sort = PG_GETARG_CSTRING(3);
 	char* sql;
 	char sep;
 	TupleDesc spi_tupdesc;
@@ -2501,8 +2501,8 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 	vops_type_info* types;
 	Datum* values;
 	bool*  nulls;
-    SPIPlanPtr plan;
-    Portal portal;
+	SPIPlanPtr plan;
+	Portal portal;
 	int rc;
 	bool is_null;
 	int64 loaded;
@@ -2517,18 +2517,18 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 		self_oid = fcinfo->flinfo->fn_oid;
 	}
 
-    SPI_connect();
+	SPI_connect();
 	sql = psprintf("select attname,atttypid,atttypmod from pg_attribute where attrelid=%d and attnum>0 order by attnum", destination);
-    rc = SPI_execute(sql, true, 0);
-    if (rc != SPI_OK_SELECT) {
-        elog(ERROR, "Select failed with status %d", rc);
-    }
-    n_attrs = SPI_processed;
-    if (n_attrs == 0) {
-        elog(ERROR, "Table %s.%s doesn't exist",
+	rc = SPI_execute(sql, true, 0);
+	if (rc != SPI_OK_SELECT) {
+		elog(ERROR, "Select failed with status %d", rc);
+	}
+	n_attrs = SPI_processed;
+	if (n_attrs == 0) {
+		elog(ERROR, "Table %s.%s doesn't exist",
 			 get_namespace_name(get_rel_namespace(destination)),
 			 get_rel_name(destination));
-    }
+	}
 	types = (vops_type_info*)palloc(sizeof(vops_type_info)*n_attrs);
 	values = (Datum*)palloc(sizeof(Datum)*n_attrs);
 	nulls = (bool*)palloc0(sizeof(bool)*n_attrs);
@@ -2538,9 +2538,9 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 	sep = ' ';
 	spi_tupdesc = SPI_tuptable->tupdesc;
 	for (i = 0; i < n_attrs; i++) {
-        HeapTuple spi_tuple = SPI_tuptable->vals[i];
-        char const* name = SPI_getvalue(spi_tuple, spi_tupdesc, 1);
-        Oid type_id = DatumGetObjectId(SPI_getbinval(spi_tuple, spi_tupdesc, 2, &is_null));
+		HeapTuple spi_tuple = SPI_tuptable->vals[i];
+		char const* name = SPI_getvalue(spi_tuple, spi_tupdesc, 1);
+		Oid type_id = DatumGetObjectId(SPI_getbinval(spi_tuple, spi_tupdesc, 2, &is_null));
 		types[i].dst_type = type_id;
 		types[i].tid = vops_get_type(type_id);
 		get_typlenbyvalalign(type_id, &types[i].len, &types[i].byval, &types[i].align);
@@ -2554,7 +2554,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 		sep = ',';
 		SPI_freetuple(spi_tuple);
 	}
-    SPI_freetuptable(SPI_tuptable);
+	SPI_freetuptable(SPI_tuptable);
 
 	appendStringInfo(&stmt, " from %s.%s",
 				 get_namespace_name(get_rel_namespace(source)),
@@ -2570,7 +2570,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 		elog(ERROR, "SPI_prepare(\"%s\") failed:%s",
 			 stmt.data, SPI_result_code_string(SPI_result));
 	pfree(stmt.data);
-    portal = SPI_cursor_open(NULL, plan, NULL, NULL, true);
+	portal = SPI_cursor_open(NULL, plan, NULL, NULL, true);
 
 	begin_batch_insert(destination);
 
@@ -2579,10 +2579,10 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 	}
 
 	for (j = 0, loaded = 0; ; j++, loaded++) {
-        SPI_cursor_fetch(portal, true, 1);
-        if (SPI_processed) {
-            HeapTuple spi_tuple = SPI_tuptable->vals[0];
-            spi_tupdesc = SPI_tuptable->tupdesc;
+		SPI_cursor_fetch(portal, true, 1);
+		if (SPI_processed) {
+			HeapTuple spi_tuple = SPI_tuptable->vals[0];
+			spi_tupdesc = SPI_tuptable->tupdesc;
 			if (!type_checked)
 			{
 				for (i = 0; i < n_attrs; i++)
@@ -2700,8 +2700,8 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 					}
 				}
 			}
-            SPI_freetuple(spi_tuple);
-            SPI_freetuptable(SPI_tuptable);
+			SPI_freetuple(spi_tuple);
+			SPI_freetuptable(SPI_tuptable);
 		} else {
 			break;
 		}
@@ -2720,7 +2720,7 @@ Datum vops_populate(PG_FUNCTION_ARGS)
 	}
 	end_batch_insert();
 
-    SPI_cursor_close(portal);
+	SPI_cursor_close(portal);
  	SPI_finish();
 
 	PG_RETURN_INT64(loaded);
@@ -2741,9 +2741,9 @@ static void vops_import_error_callback(void* arg)
 PG_FUNCTION_INFO_V1(vops_import);
 Datum vops_import(PG_FUNCTION_ARGS)
 {
-    Oid destination = PG_GETARG_OID(0);
-    char const* csv_path = PG_GETARG_CSTRING(1);
-    char sep = *(char*)PG_GETARG_CSTRING(2);
+	Oid destination = PG_GETARG_OID(0);
+	char const* csv_path = PG_GETARG_CSTRING(1);
+	char sep = *(char*)PG_GETARG_CSTRING(2);
 	int skip = PG_GETARG_INT32(3);
 	char* sql;
 	TupleDesc spi_tupdesc;
@@ -2756,29 +2756,29 @@ Datum vops_import(PG_FUNCTION_ARGS)
 	bool is_null;
 	int64 loaded;
 	ErrorContextCallback errcallback;
-    char buf[MAX_CSV_LINE_LEN];
+	char buf[MAX_CSV_LINE_LEN];
 
-    SPI_connect();
+	SPI_connect();
 	sql = psprintf("select attname,atttypid,atttypmod from pg_attribute where attrelid=%d and attnum>0 order by attnum", destination);
-    rc = SPI_execute(sql, true, 0);
-    if (rc != SPI_OK_SELECT) {
-        elog(ERROR, "Select failed with status %d", rc);
-    }
-    n_attrs = SPI_processed;
-    if (n_attrs == 0) {
-        elog(ERROR, "Table %s.%s doesn't exist",
+	rc = SPI_execute(sql, true, 0);
+	if (rc != SPI_OK_SELECT) {
+		elog(ERROR, "Select failed with status %d", rc);
+	}
+	n_attrs = SPI_processed;
+	if (n_attrs == 0) {
+		elog(ERROR, "Table %s.%s doesn't exist",
 			 get_namespace_name(get_rel_namespace(destination)),
 			 get_rel_name(destination));
-    }
+	}
 	types = (vops_type_info*)palloc(sizeof(vops_type_info)*n_attrs);
 	values = (Datum*)palloc(sizeof(Datum)*n_attrs);
 	nulls = (bool*)palloc0(sizeof(bool)*n_attrs);
 
 	spi_tupdesc = SPI_tuptable->tupdesc;
 	for (i = 0; i < n_attrs; i++) {
-        HeapTuple spi_tuple = SPI_tuptable->vals[i];
-        char const* name = SPI_getvalue(spi_tuple, spi_tupdesc, 1);
-        Oid type_id = DatumGetObjectId(SPI_getbinval(spi_tuple, spi_tupdesc, 2, &is_null));
+		HeapTuple spi_tuple = SPI_tuptable->vals[i];
+		char const* name = SPI_getvalue(spi_tuple, spi_tupdesc, 1);
+		Oid type_id = DatumGetObjectId(SPI_getbinval(spi_tuple, spi_tupdesc, 2, &is_null));
 		Oid input_oid;
 		types[i].tid = vops_get_type(type_id);
 		if (types[i].tid != VOPS_LAST) {
@@ -2795,7 +2795,7 @@ Datum vops_import(PG_FUNCTION_ARGS)
 		fmgr_info_cxt(input_oid, &types[i].inproc, fcinfo->flinfo->fn_mcxt);
 		SPI_freetuple(spi_tuple);
 	}
-    SPI_freetuptable(SPI_tuptable);
+	SPI_freetuptable(SPI_tuptable);
 
 	for (i = 0; i < n_attrs; i++) {
 		values[i] = PointerGetDatum(types[i].tid != VOPS_LAST ? types[i].tid == VOPS_TEXT ? vops_alloc_text(types[i].len) : palloc0(vops_sizeof[types[i].tid]) : NULL);
@@ -3318,19 +3318,19 @@ Datum vops_agg_combine(PG_FUNCTION_ARGS)
 	n_aggregates = state1->n_aggs;
 
 	if (state0 == NULL) {
-	    state0 = vops_create_agg_state(n_aggregates);
+		state0 = vops_create_agg_state(n_aggregates);
 		state0->agg_type = state1->agg_type;
 		for (i = 0; i < n_aggregates; i++) {
  	        state0->agg_kinds[i] = state1->agg_kinds[i];
-        }
-    }
+		}
+	}
 
-    while ((entry1 = (vops_group_by_entry*)hash_seq_search(&iter)) != NULL)
-    {
+	while ((entry1 = (vops_group_by_entry*)hash_seq_search(&iter)) != NULL)
+	{
 		bool found;
 		entry0 = (vops_group_by_entry*)hash_search(state0->htab, &entry1->group_by, HASH_ENTER, &found);
 
-	    if (!found) {
+		if (!found) {
 			entry0->count = 0;
 			for (i = 0; i < n_aggregates; i++) {
 				entry0->values[i].count = 0;
@@ -3353,7 +3353,7 @@ Datum vops_agg_combine(PG_FUNCTION_ARGS)
 			  case VOPS_AGG_MAX:
 				if (entry0->values[i].count == 0) {
 					entry0->values[i].acc = entry1->values[i].acc;
-                } else {
+				} else {
 					switch (state0->agg_type) {
 					  case VOPS_BOOL:
 						if (!entry0->values[i].acc.b) {
@@ -3401,7 +3401,7 @@ Datum vops_agg_combine(PG_FUNCTION_ARGS)
 			  case VOPS_AGG_MIN:
 				if (entry0->values[i].count == 0) {
 					entry0->values[i].acc = entry1->values[i].acc;
-                } else {
+				} else {
 					switch (state0->agg_type) {
 					  case VOPS_BOOL:
 						if (entry0->values[i].acc.b) {
@@ -3443,14 +3443,14 @@ Datum vops_agg_combine(PG_FUNCTION_ARGS)
 						break;
 					  default:
 						Assert(false);
-                    }
+					}
 					break;
 				  default:
 					break;
-                }
+				}
 			}
 			entry0->values[i].count += entry1->values[i].count;
-        }
+		}
 	}
 	MemoryContextSwitchTo(old_context);
 
@@ -3461,13 +3461,13 @@ PG_FUNCTION_INFO_V1(vops_reduce);
 Datum vops_reduce(PG_FUNCTION_ARGS)
 {
 	vops_agg_state* state = (vops_agg_state*)(size_t)PG_GETARG_INT64(0);
-    FuncCallContext* func_ctx;
-    vops_reduce_context* user_ctx;
+	FuncCallContext* func_ctx;
+	vops_reduce_context* user_ctx;
 	vops_group_by_entry* entry;
 	int n_aggregates = state->n_aggs;
 
 	if (SRF_IS_FIRSTCALL()) {
-        MemoryContext old_context;
+		MemoryContext old_context;
 		func_ctx = SRF_FIRSTCALL_INIT();
 		old_context = MemoryContextSwitchTo(func_ctx->multi_call_memory_ctx);
 		user_ctx = (vops_reduce_context*)palloc(sizeof(vops_reduce_context));
@@ -3480,7 +3480,7 @@ Datum vops_reduce(PG_FUNCTION_ARGS)
 		MemoryContextSwitchTo(old_context);
 	}
 	func_ctx = SRF_PERCALL_SETUP();
-    user_ctx = (vops_reduce_context*)func_ctx->user_fctx;
+	user_ctx = (vops_reduce_context*)func_ctx->user_fctx;
 	entry = (vops_group_by_entry*)hash_seq_search(&user_ctx->iter);
 	if (entry != NULL) {
 		Datum values[3];
@@ -3560,11 +3560,11 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
 {
 	int i, j, n_attrs;
 	FuncCallContext* func_ctx;
-    vops_unnest_context* user_ctx;
+	vops_unnest_context* user_ctx;
 
 	if (SRF_IS_FIRSTCALL()) {
 		Oid	argtype;
-        MemoryContext old_context;
+		MemoryContext old_context;
 		char typtype;
 		HeapTupleHeader t;
 		TupleDesc src_desc;
@@ -3576,29 +3576,29 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
 		src_desc = lookup_rowtype_tupdesc(HeapTupleHeaderGetTypeId(t), HeapTupleHeaderGetTypMod(t));
 
 		user_ctx = (vops_unnest_context*)palloc(sizeof(vops_unnest_context));
-        argtype = get_fn_expr_argtype(fcinfo->flinfo, 0);
-        typtype = get_typtype(argtype);
-        if (typtype != 'c' && typtype != 'p') {
+		argtype = get_fn_expr_argtype(fcinfo->flinfo, 0);
+		typtype = get_typtype(argtype);
+		if (typtype != 'c' && typtype != 'p') {
 			elog(ERROR, "Argument of unnest function should have compound type");
-        }
+		}
 		n_attrs = src_desc->natts;
 
 		user_ctx->values = (Datum*)palloc(sizeof(Datum)*n_attrs);
-        user_ctx->nulls = (bool*)palloc(sizeof(bool)*n_attrs);
-        user_ctx->types = (vops_type*)palloc(sizeof(vops_type)*n_attrs);
+		user_ctx->nulls = (bool*)palloc(sizeof(bool)*n_attrs);
+		user_ctx->types = (vops_type*)palloc(sizeof(vops_type)*n_attrs);
 		user_ctx->tiles = (vops_tile_hdr**)palloc(sizeof(vops_tile_hdr*)*n_attrs);
 #if PG_VERSION_NUM>=120000
-        user_ctx->desc = CreateTemplateTupleDesc(n_attrs);
+		user_ctx->desc = CreateTemplateTupleDesc(n_attrs);
 #else
-        user_ctx->desc = CreateTemplateTupleDesc(n_attrs, false);
+		user_ctx->desc = CreateTemplateTupleDesc(n_attrs, false);
 #endif
-        func_ctx->user_fctx = user_ctx;
-        user_ctx->n_attrs = n_attrs;
+		func_ctx->user_fctx = user_ctx;
+		user_ctx->n_attrs = n_attrs;
 		user_ctx->tile_pos = 0;
 		user_ctx->filter_mask = filter_mask;
 		filter_mask = ~0;
 
-        for (i = 0; i < n_attrs; i++) {
+		for (i = 0; i < n_attrs; i++) {
 			Form_pg_attribute attr = TupleDescAttr(src_desc, i);
 			vops_type tid = vops_get_type(attr->atttypid);
 			Datum val = GetAttributeByNum(t, attr->attnum, &user_ctx->nulls[i]);
@@ -3617,10 +3617,10 @@ Datum vops_unnest(PG_FUNCTION_ARGS)
 		}
 		TupleDescGetAttInMetadata(user_ctx->desc);
  		ReleaseTupleDesc(src_desc);
-        MemoryContextSwitchTo(old_context);
+		MemoryContextSwitchTo(old_context);
 	}
 	func_ctx = SRF_PERCALL_SETUP();
-    user_ctx = (vops_unnest_context*)func_ctx->user_fctx;
+	user_ctx = (vops_unnest_context*)func_ctx->user_fctx;
 	n_attrs = user_ctx->n_attrs;
 
 	for (j = user_ctx->tile_pos; j < TILE_SIZE; j++) {
@@ -4019,7 +4019,7 @@ typedef struct
 	Query*     query;      /* executed query */
 	int        scope;      /* mask of vops_clause_scope bits */
 	int        n_rels;     /* number of relations in query (join pseudorelations) */
-    Const**    consts;     /* array references to Const nodes in query, indexed by literal location */
+	Const**    consts;     /* array references to Const nodes in query, indexed by literal location */
 	Bitmapset* operands;   /* columns used in one expression */
 	vops_table_refs* refs; /* usage of table' variables (index by relation number - 1) */
 	vops_vars_cluster* clusters; /* clusters of query variables */
@@ -4390,7 +4390,7 @@ vops_substitute_tables_with_projections(char const* queryString, Query *query)
 	pullvar_ctx.refs = palloc0(n_rels*sizeof(vops_table_refs));
 	query_tree_walker(query, vops_pullvars_walker, &pullvar_ctx, QTW_IGNORE_CTE_SUBQUERIES|QTW_IGNORE_RANGE_TABLE);
 
-    SPI_connect();
+	SPI_connect();
 
 	for (relno = 0, fromno = 0; relno < n_rels; relno++)
 	{
@@ -4748,7 +4748,7 @@ void _PG_init(void)
 	save_explain_hook = ExplainOneQuery_hook;
 	ExplainOneQuery_hook = vops_explain_hook;
 #endif
-    DefineCustomBoolVariable("vops.auto_substitute_projections",
+	DefineCustomBoolVariable("vops.auto_substitute_projections",
 							 "Automatically substitute tables with thier projections",
 							 NULL,
 							 &vops_auto_substitute_projections,
