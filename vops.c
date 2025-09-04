@@ -2772,7 +2772,7 @@ vops_last_combine(PG_FUNCTION_ARGS)
 }
 
 
-const size_t vops_sizeof[] =
+static const size_t vops_sizeof[] =
 {
 	sizeof(vops_bool),
 	sizeof(vops_char),
