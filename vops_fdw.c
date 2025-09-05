@@ -438,7 +438,6 @@ postgresGetForeignPaths(PlannerInfo *root,
 								   baserel,
 								   NULL,		/* default pathtarget */
 								   fpinfo->rows,
-								   0,
 								   fpinfo->startup_cost,
 								   fpinfo->total_cost,
 								   NIL, /* no pathkeys */
@@ -1409,7 +1408,6 @@ add_foreign_grouping_paths(PlannerInfo *root, RelOptInfo *input_rel,
 										  grouped_rel,
 										  grouped_rel->reltarget,
 										  rows,
-										  0,
 										  startup_cost,
 										  total_cost,
 										  NIL,	/* no pathkeys */
